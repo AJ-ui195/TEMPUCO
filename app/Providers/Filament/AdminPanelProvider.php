@@ -28,6 +28,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->spa()
             ->login()
+            ->brandName('DICNHS TEMPUCO')
             ->colors([
                 'primary' => Color::Amber,
             ])
