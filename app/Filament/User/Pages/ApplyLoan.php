@@ -2,6 +2,7 @@
 
 namespace App\Filament\User\Pages;
 
+use App\Enums\LoanStatus;
 use App\Models\Loan;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -109,6 +110,7 @@ class ApplyLoan extends Page
 
         Loan::query()->create([
             'user_id' => auth()->id(),
+            'status' => LoanStatus::Pending,
             'apply_loan' => $data['apply_loan'],
             'loan_amount' => $data['loan_amount'],
             'loan_period_months' => $data['loan_period_months'],

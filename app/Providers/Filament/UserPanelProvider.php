@@ -31,6 +31,7 @@ class UserPanelProvider extends PanelProvider
                 'primary' => Color::Sky,
             ])
             ->globalSearch(false)
+            ->databaseNotifications()
             ->userMenu(false)
             ->discoverPages(in: app_path('Filament/User/Pages'), for: 'App\Filament\User\Pages')
             ->widgets([

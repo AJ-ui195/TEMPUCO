@@ -2,10 +2,12 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\User;
+use App\Enums\LoanStatus;
+use App\Enums\UserRole;
+use App\Models\Loan;
+use App\Models\LoanPayment;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\Facades\DB;
 
 class AnalyticsOverviewWidget extends StatsOverviewWidget
 {
@@ -15,75 +17,40 @@ class AnalyticsOverviewWidget extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $totalUsers = User::count();
+        $monthStart = now()->startOfMonth();
+        $monthEnd = now()->endOfMonth();
 
-        $thisWeek = User::where('created_at', '>=', now()->startOfWeek())->count();
-        $lastWeek = User::where('created_at', '>=', now()->subWeek()->startOfWeek())
-            ->where('created_at', '<', now()->startOfWeek())
+        $memberLoansQuery = Loan::query()
+            ->whereHas('user', fn ($query) => $query->where('role', UserRole::User))
+            ->whereBetween('created_at', [$monthStart, $monthEnd]);
+
+        $totalMemberLoanAmount = (float) (clone $memberLoansQuery)->sum('loan_amount');
+        $memberLoanCount = (clone $memberLoansQuery)->count();
+
+        $approvedLoansCount = Loan::query()
+            ->where('status', LoanStatus::Approved)
+            ->whereBetween('approved_at', [$monthStart, $monthEnd])
             ->count();
 
-        $verified = User::whereNotNull('email_verified_at')->count();
-        $verificationRate = $totalUsers > 0 ? (int) round(100 * $verified / $totalUsers) : 0;
-
-        $pendingJobs = DB::table('jobs')->count();
-        $failedJobs = DB::table('failed_jobs')->count();
-
-        $activeUsers = (int) DB::table('sessions')
-            ->where('last_activity', '>=', now()->subDay()->getTimestamp())
-            ->whereNotNull('user_id')
-            ->distinct()
-            ->count('user_id');
-
-        $last7Days = collect(range(6, 0))
-            ->map(fn (int $d) => User::whereDate('created_at', now()->subDays($d)->toDateString())->count())
-            ->reverse()
-            ->values()
-            ->all();
-
-        $delta = $thisWeek - $lastWeek;
-        if ($lastWeek > 0) {
-            $weekDescription = ($delta >= 0 ? '+' : '') . $delta . ' vs last week';
-            $weekTrend = $delta >= 0 ? 'success' : 'danger';
-            $weekIcon = $delta >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down';
-        } else {
-            $weekDescription = $thisWeek > 0 ? 'New activity this week' : 'No sign-ups this week';
-            $weekTrend = $thisWeek > 0 ? 'success' : 'gray';
-            $weekIcon = $thisWeek > 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-minus-small';
-        }
+        $totalReceived = (float) LoanPayment::query()
+            ->whereBetween('received_at', [$monthStart, $monthEnd])
+            ->sum('amount');
 
         return [
-            Stat::make('Total users', number_format($totalUsers))
-                ->description('All registered accounts')
-                ->descriptionIcon('heroicon-m-users')
-                ->chart($last7Days)
+            Stat::make('Total members loan', number_format($totalMemberLoanAmount, 2))
+                ->description($memberLoanCount.' '.__('application(s) this month'))
+                ->descriptionIcon('heroicon-m-banknotes')
                 ->color('primary'),
 
-            Stat::make('New this week', number_format($thisWeek))
-                ->description($weekDescription)
-                ->descriptionIcon($weekIcon)
-                ->descriptionColor($weekTrend)
+            Stat::make('Approved loans', number_format($approvedLoansCount))
+                ->description(__('Approved in').' '.now()->format('F Y'))
+                ->descriptionIcon('heroicon-m-check-badge')
                 ->color('success'),
 
-            Stat::make('Verified email', number_format($verified).' ('.$verificationRate.'%)')
-                ->description('Users who verified their email')
-                ->descriptionIcon('heroicon-m-envelope-open')
+            Stat::make('Total received', number_format($totalReceived, 2))
+                ->description(__('Loan payments received this month'))
+                ->descriptionIcon('heroicon-m-arrow-down-tray')
                 ->color('info'),
-
-            Stat::make('Active users (24h)', number_format($activeUsers))
-                ->description('Distinct accounts with a recent session')
-                ->descriptionIcon('heroicon-m-signal')
-                ->color('warning'),
-
-            Stat::make('Queue depth', number_format($pendingJobs))
-                ->description('Jobs waiting to run')
-                ->descriptionIcon('heroicon-m-queue-list')
-                ->color($pendingJobs > 50 ? 'danger' : 'gray'),
-
-            Stat::make('Failed jobs', number_format($failedJobs))
-                ->description('Jobs that exhausted retries')
-                ->descriptionIcon('heroicon-m-exclamation-triangle')
-                ->descriptionColor($failedJobs > 0 ? 'danger' : 'success')
-                ->color($failedJobs > 0 ? 'danger' : 'success'),
         ];
     }
 }

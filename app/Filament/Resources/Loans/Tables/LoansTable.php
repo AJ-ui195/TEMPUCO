@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources\Loans\Tables;
 
+use App\Enums\LoanStatus;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -22,6 +24,15 @@ class LoansTable
                     ->label(__('Email'))
                     ->searchable()
                     ->copyable(),
+                TextColumn::make('status')
+                    ->badge()
+                    ->formatStateUsing(fn (mixed $state): string => $state instanceof LoanStatus ? $state->getLabel() : (string) $state)
+                    ->color(fn (mixed $state): string => match ($state instanceof LoanStatus ? $state : LoanStatus::tryFrom((string) $state)) {
+                        LoanStatus::Approved => 'success',
+                        LoanStatus::Rejected => 'danger',
+                        default => 'warning',
+                    })
+                    ->sortable(),
                 TextColumn::make('apply_loan')
                     ->label(__('Apply loan'))
                     ->searchable()
@@ -51,6 +62,7 @@ class LoansTable
             ->deferLoading()
             ->recordActions([
                 ViewAction::make(),
+                EditAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
