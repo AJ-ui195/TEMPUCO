@@ -26,9 +26,13 @@ class UserLoansTableWidget extends TableWidget
                     ->orderByDesc('loan_date')
             )
             ->columns([
-                TextColumn::make('apply_loan')
-                    ->label(__('Apply loan'))
-                    ->searchable(),
+                TextColumn::make('loan_type')
+                    ->label(__('Loan type'))
+                    ->searchable()
+                    ->formatStateUsing(fn (mixed $state, $record): string => (string) ($state ?? $record->apply_loan)),
+                TextColumn::make('loan_category')
+                    ->label(__('Category'))
+                    ->formatStateUsing(fn (mixed $state): string => $state?->getLabel() ?? '—'),
                 TextColumn::make('loan_amount')
                     ->label(__('Loan amount'))
                     ->formatStateUsing(fn (mixed $state): string => number_format((float) $state, 2)),

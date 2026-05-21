@@ -33,10 +33,15 @@ class LoansTable
                         default => 'warning',
                     })
                     ->sortable(),
-                TextColumn::make('apply_loan')
-                    ->label(__('Apply loan'))
+                TextColumn::make('loan_type')
+                    ->label(__('Loan type'))
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->formatStateUsing(fn (mixed $state, $record): string => (string) ($state ?? $record->apply_loan)),
+                TextColumn::make('loan_category')
+                    ->label(__('Category'))
+                    ->formatStateUsing(fn (mixed $state): string => $state?->getLabel() ?? '—')
+                    ->toggleable(),
                 TextColumn::make('loan_amount')
                     ->label(__('Loan amount'))
                     ->formatStateUsing(fn (mixed $state): string => number_format((float) $state, 2))

@@ -27,6 +27,8 @@ class UserPanelProvider extends PanelProvider
             ->path('portal')
             ->login()
             ->brandName(__('Members Portal'))
+            ->brandLogo(asset('images/DICNHSLOGO1.png'))
+            ->brandLogoHeight('6.5rem')
             ->colors([
                 'primary' => Color::Sky,
             ])
@@ -37,6 +39,26 @@ class UserPanelProvider extends PanelProvider
             ->widgets([
                 UserLoansTableWidget::class,
             ])
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): string => view('filament.hooks.hide-topbar-logo-on-desktop')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): string => view('filament.hooks.auth-login-background')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): string => view('filament.hooks.sidebar-dark-theme')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_LOGO_AFTER,
+                fn (): string => view('filament.hooks.topbar-brand-name')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_NAV_START,
+                fn (): string => view('filament.hooks.sidebar-brand-logo')->render(),
+            )
             ->renderHook(
                 PanelsRenderHook::TOPBAR_END,
                 fn (): string => view('filament.hooks.topbar-theme-switcher')->render(),

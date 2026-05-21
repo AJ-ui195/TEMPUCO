@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\LoanCategory;
 use App\Enums\LoanStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,12 +13,31 @@ class Loan extends Model
     protected $fillable = [
         'user_id',
         'status',
+        'loan_category',
+        'applicant_name',
+        'applicant_address',
         'apply_loan',
+        'loan_type',
         'loan_amount',
+        'loan_amount_words',
         'loan_period_months',
         'installment_amount',
+        'first_payment_due_date',
+        'loan_purpose',
+        'applicant_signed_at',
+        'applicant_signature_name',
         'loan_date',
         'approved_at',
+        'cert_borrower_name',
+        'cert_fixed_savings_deposits',
+        'cert_standing_loan',
+        'cert_date_of_birth',
+        'cert_home_address',
+        'cert_treasurer_signed_at',
+        'committee_meeting_date',
+        'committee_conditions_notes',
+        'committee_approved_amount',
+        'committee_minutes_date',
     ];
 
     /**
@@ -27,8 +47,18 @@ class Loan extends Model
     {
         return [
             'status' => LoanStatus::class,
+            'loan_category' => LoanCategory::class,
             'loan_amount' => 'decimal:2',
             'installment_amount' => 'decimal:2',
+            'cert_fixed_savings_deposits' => 'decimal:2',
+            'cert_standing_loan' => 'decimal:2',
+            'committee_approved_amount' => 'decimal:2',
+            'first_payment_due_date' => 'date',
+            'applicant_signed_at' => 'date',
+            'cert_date_of_birth' => 'date',
+            'cert_treasurer_signed_at' => 'date',
+            'committee_meeting_date' => 'date',
+            'committee_minutes_date' => 'date',
             'loan_date' => 'date',
             'approved_at' => 'datetime',
         ];
