@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Pages\Login;
 use App\Filament\User\Widgets\UserLoansTableWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -25,7 +26,7 @@ class UserPanelProvider extends PanelProvider
         return $panel
             ->id('user')
             ->path('portal')
-            ->login()
+            ->login(Login::class)
             ->brandName(__('Members Portal'))
             ->brandLogo(asset('images/DICNHSLOGO1.png'))
             ->brandLogoHeight('6.5rem')

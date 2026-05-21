@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Pages\Login;
 use App\Filament\Pages\Dashboard;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -27,7 +28,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->spa()
-            ->login()
+            ->login(Login::class)
             ->brandName('DICNHS TEMPUCO')
             ->brandLogo(asset('images/DICNHSLOGO1.png'))
             ->brandLogoHeight('6.5rem')
