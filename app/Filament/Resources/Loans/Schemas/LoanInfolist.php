@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\Loans\Schemas;
 
 use App\Enums\LoanCategory;
+use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
+use App\Enums\ModeOfPayment;
 use App\Models\Loan;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -53,9 +55,23 @@ class LoanInfolist
                             ->label(__('First payment due'))
                             ->date()
                             ->placeholder('—'),
-                        TextEntry::make('loan_purpose')
-                            ->label(__('Purpose'))
+                        TextEntry::make('purpose_of_loan')
+                            ->label(__('Purpose of loan'))
+                            ->formatStateUsing(fn (mixed $state): string => $state instanceof LoanPurpose ? $state->getLabel() : '—')
+                            ->placeholder('—'),
+                        TextEntry::make('purpose_of_loan_other')
+                            ->label(__('Purpose (others)'))
+                            ->visible(fn (Loan $record): bool => $record->purpose_of_loan === LoanPurpose::Others)
+                            ->placeholder('—')
                             ->columnSpanFull(),
+                        TextEntry::make('mode_of_payment')
+                            ->label(__('Mode of payment'))
+                            ->formatStateUsing(fn (mixed $state): string => $state instanceof ModeOfPayment ? $state->getLabel() : '—')
+                            ->placeholder('—'),
+                        TextEntry::make('loan_purpose')
+                            ->label(__('Purpose notes'))
+                            ->columnSpanFull()
+                            ->placeholder('—'),
                         TextEntry::make('applicant_signed_at')
                             ->label(__('Applicant signed on'))
                             ->date(),

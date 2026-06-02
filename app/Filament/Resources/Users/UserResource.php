@@ -5,7 +5,9 @@ namespace App\Filament\Resources\Users;
 use App\Enums\UserRole;
 use App\Filament\Resources\Users\Pages\ManageUsers;
 use App\Models\User;
+use App\Support\MemberQrCode;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -16,7 +18,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -125,14 +127,26 @@ class UserResource extends Resource
                     ->searchable()
                     ->copyable()
                     ->placeholder('—'),
-                IconColumn::make('email_verified_at')
-                    ->label('Verified')
-                    ->boolean()
-                    ->sortable(),
+                ImageColumn::make('qr_code')
+                    ->label('QR code')
+                    ->getStateUsing(fn (User $record): string => MemberQrCode::dataUriFor($record))
+                    ->imageHeight(64)
+                    ->imageWidth(64)
+                    ->extraImgAttributes(fn (User $record): array => [
+                        'alt' => "QR code for {$record->name}",
+                    ]),
             ])
             ->defaultSort('name')
             ->deferLoading()
             ->recordActions([
+                Action::make('printQrCode')
+                    ->label(__('Print QR code'))
+                    ->icon(Heroicon::OutlinedPrinter)
+                    ->url(fn (User $record): string => route('admin.members.print-qr', [
+                        'user' => $record,
+                        'auto' => 1,
+                    ]))
+                    ->openUrlInNewTab(),
                 EditAction::make(),
                 DeleteAction::make(),
             ])

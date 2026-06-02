@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\LoanCategory;
+use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
+use App\Enums\ModeOfPayment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,6 +26,9 @@ class Loan extends Model
         'installment_amount',
         'first_payment_due_date',
         'loan_purpose',
+        'purpose_of_loan',
+        'purpose_of_loan_other',
+        'mode_of_payment',
         'applicant_signed_at',
         'applicant_signature_name',
         'loan_date',
@@ -48,6 +53,8 @@ class Loan extends Model
         return [
             'status' => LoanStatus::class,
             'loan_category' => LoanCategory::class,
+            'purpose_of_loan' => LoanPurpose::class,
+            'mode_of_payment' => ModeOfPayment::class,
             'loan_amount' => 'decimal:2',
             'installment_amount' => 'decimal:2',
             'cert_fixed_savings_deposits' => 'decimal:2',
