@@ -7,7 +7,10 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::middleware(['auth'])->prefix('admin')->group(function (): void {
+Route::middleware(['auth'])->group(function (): void {
     Route::get('/members/{user}/print-qr', PrintMemberQrCodeController::class)
+        ->name('members.print-qr');
+
+    Route::get('/admin/members/{user}/print-qr', PrintMemberQrCodeController::class)
         ->name('admin.members.print-qr');
 });

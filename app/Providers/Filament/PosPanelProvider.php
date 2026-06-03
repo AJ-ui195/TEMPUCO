@@ -3,7 +3,6 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Pages\Login;
-use App\Filament\User\Widgets\UserLoansTableWidget;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -19,17 +18,17 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
-class UserPanelProvider extends PanelProvider
+class PosPanelProvider extends PanelProvider
 {
     use RegistersPortalUi;
 
     public function panel(Panel $panel): Panel
     {
         $panel = $panel
-            ->id('user')
-            ->path('portal')
+            ->id('pos')
+            ->path('pos')
             ->login(Login::class)
-            ->brandName(__('Members Portal'))
+            ->brandName(__('POS'))
             ->brandLogo(asset('images/DICNHSLOGO1.png'))
             ->brandLogoHeight('6.5rem')
             ->colors([
@@ -38,10 +37,7 @@ class UserPanelProvider extends PanelProvider
             ->globalSearch(false)
             ->databaseNotifications()
             ->userMenu(false)
-            ->discoverPages(in: app_path('Filament/User/Pages'), for: 'App\Filament\User\Pages')
-            ->widgets([
-                UserLoansTableWidget::class,
-            ])
+            ->discoverPages(in: app_path('Filament/Cashier/Pages'), for: 'App\Filament\Cashier\Pages')
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

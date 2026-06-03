@@ -58,6 +58,8 @@ class UserResource extends Resource
                     ->options([
                         UserRole::Admin->value => UserRole::Admin->getLabel(),
                         UserRole::User->value => UserRole::User->getLabel(),
+                        UserRole::Cashier->value => UserRole::Cashier->getLabel(),
+                        UserRole::Inventory->value => UserRole::Inventory->getLabel(),
                     ])
                     ->required()
                     ->default(UserRole::User->value)
@@ -113,6 +115,8 @@ class UserResource extends Resource
                         return match ($role) {
                             UserRole::Admin => 'danger',
                             UserRole::User => 'gray',
+                            UserRole::Cashier => 'info',
+                            UserRole::Inventory => 'success',
                             default => 'gray',
                         };
                     })
@@ -142,10 +146,7 @@ class UserResource extends Resource
                 Action::make('printQrCode')
                     ->label(__('Print QR code'))
                     ->icon(Heroicon::OutlinedPrinter)
-                    ->url(fn (User $record): string => route('admin.members.print-qr', [
-                        'user' => $record,
-                        'auto' => 1,
-                    ]))
+                    ->url(fn (User $record): string => route('members.print-qr', ['user' => $record]))
                     ->openUrlInNewTab(),
                 EditAction::make(),
                 DeleteAction::make(),

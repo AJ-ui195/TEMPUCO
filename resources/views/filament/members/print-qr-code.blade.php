@@ -46,11 +46,16 @@
             color: #6b7280;
         }
 
-        img {
-            display: block;
+        .qr-code {
             width: 16rem;
             height: 16rem;
             margin: 1.5rem auto 0;
+        }
+
+        .qr-code svg {
+            display: block;
+            width: 100%;
+            height: 100%;
         }
 
         .actions {
@@ -60,14 +65,9 @@
             margin-top: 1.5rem;
         }
 
-        button,
-        a {
+        button {
             font: inherit;
             cursor: pointer;
-            text-decoration: none;
-        }
-
-        .btn {
             padding: 0.625rem 1rem;
             border-radius: 0.5rem;
             border: 1px solid transparent;
@@ -111,21 +111,23 @@
             <p>{{ $user->address }}</p>
         @endif
 
-        <img src="{{ $qrCodeDataUri }}" alt="{{ __('QR code for :name', ['name' => $user->name]) }}">
+        <div class="qr-code" aria-label="{{ __('Member QR code') }}">
+            {!! $qrSvg !!}
+        </div>
 
         <p class="member-id">{{ __('Member ID') }}: {{ $user->id }}</p>
 
         <div class="actions">
-            <button type="button" class="btn btn-primary" onclick="window.print()">
+            <button type="button" class="btn-primary" onclick="window.print()">
                 {{ __('Print') }}
             </button>
-            <button type="button" class="btn btn-secondary" onclick="window.close()">
+            <button type="button" class="btn-secondary" onclick="window.close()">
                 {{ __('Close') }}
             </button>
         </div>
     </div>
 
-    @if ($autoPrint)
+    @if ($autoPrint ?? false)
         <script>
             window.addEventListener('load', () => window.print());
         </script>

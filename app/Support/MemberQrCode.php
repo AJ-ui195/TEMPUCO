@@ -18,6 +18,19 @@ final class MemberQrCode
         return self::dataUriFor($user, scale: 10);
     }
 
+    public static function printSvgMarkupFor(User $user): string
+    {
+        $options = new QROptions([
+            'scale' => 10,
+            'outputBase64' => false,
+            'svgAddXmlHeader' => false,
+        ]);
+
+        return (string) (new QRCode($options))->render(
+            json_encode(self::payloadFor($user), JSON_THROW_ON_ERROR),
+        );
+    }
+
     /**
      * @return array{member_id: int, name: string, email: string}
      */
