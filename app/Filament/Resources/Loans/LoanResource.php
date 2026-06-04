@@ -11,6 +11,7 @@ use App\Filament\Resources\Loans\Tables\LoansTable;
 use App\Models\Loan;
 use BackedEnum;
 use Filament\Resources\Resource;
+use Illuminate\Database\Eloquent\Builder;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
@@ -21,7 +22,7 @@ class LoanResource extends Resource
 
     protected static ?string $slug = 'loan-applications';
 
-    protected static ?string $recordTitleAttribute = 'apply_loan';
+    protected static ?string $recordTitleAttribute = 'loan_type';
 
     protected static ?string $modelLabel = 'loan application';
 
@@ -46,6 +47,12 @@ class LoanResource extends Resource
     public static function table(Table $table): Table
     {
         return LoansTable::configure($table);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['user', 'certification', 'committeeDecision']);
     }
 
     public static function getRelations(): array

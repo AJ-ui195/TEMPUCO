@@ -311,28 +311,27 @@ class ApplyLoan extends Page
             ? $this->buildQuickLoanPurpose($data)
             : $this->formatLoanPurposeSummary($data);
 
-        Loan::query()->create([
+        $loan = Loan::query()->create([
             'user_id' => auth()->id(),
             'status' => LoanStatus::Pending,
             'loan_category' => $isQuickLoan ? LoanCategory::AdditionalNew : $data['loan_category'],
-            'applicant_name' => $data['applicant_name'],
-            'applicant_address' => $data['applicant_address'],
-            'apply_loan' => $loanType,
             'loan_type' => $loanType,
             'loan_amount' => $data['loan_amount'],
             'loan_amount_words' => $data['loan_amount_words'] ?? null,
             'loan_period_months' => $data['loan_period_months'],
             'installment_amount' => $data['installment_amount'],
-            'first_payment_due_date' => $data['first_payment_due_date'],
-            'loan_purpose' => $loanPurpose,
-            'purpose_of_loan' => $data['purpose_of_loan'],
-            'purpose_of_loan_other' => ($data['purpose_of_loan'] ?? null) === LoanPurpose::Others->value
-                ? ($data['purpose_of_loan_other'] ?? null)
-                : null,
+            'first_payment_due_date' => $data['first_payment_due_date'] ?? null,
+            'purpose_of_loan' => $isQuickLoan ? null : $data['purpose_of_loan'],
+            'purpose_of_loan_other' => $isQuickLoan ? null : (
+                ($data['purpose_of_loan'] ?? null) === LoanPurpose::Others->value
+                    ? ($data['purpose_of_loan_other'] ?? null)
+                    : null
+            ),
+            'application_notes' => $isQuickLoan ? $loanPurpose : null,
             'mode_of_payment' => $data['mode_of_payment'],
-            'applicant_signed_at' => $data['applicant_signed_at'],
+            'applicant_signed_at' => $isQuickLoan ? now()->toDateString() : $data['applicant_signed_at'],
             'applicant_signature_name' => $data['applicant_name'],
-            'cert_date_of_birth' => $isQuickLoan ? ($data['quick_date_of_birth'] ?? null) : null,
+            'applicant_date_of_birth' => $isQuickLoan ? ($data['quick_date_of_birth'] ?? null) : null,
             'loan_date' => now()->toDateString(),
         ]);
 

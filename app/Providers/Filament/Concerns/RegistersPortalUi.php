@@ -37,12 +37,6 @@ trait RegistersPortalUi
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_FOOTER,
                 fn (): string => view('filament.hooks.sidebar-logout')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
-                fn (): string => view('filament.hooks.auth-login-portal-links', [
-                    'currentPanel' => $panel->getId(),
-                ])->render(),
             );
     }
 }

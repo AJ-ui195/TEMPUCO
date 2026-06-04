@@ -36,28 +36,29 @@ class LoanForm
                     ->columns(2),
 
                 Section::make(__('Cooperative certification'))
+                    ->relationship('certification')
                     ->schema([
-                        TextInput::make('cert_borrower_name')
+                        TextInput::make('borrower_name')
                             ->label(__('Name of borrower'))
                             ->maxLength(255),
-                        TextInput::make('cert_fixed_savings_deposits')
+                        TextInput::make('fixed_savings_deposits')
                             ->label(__('Fixed savings deposits'))
                             ->numeric()
                             ->minValue(0)
                             ->step(0.01),
-                        TextInput::make('cert_standing_loan')
+                        TextInput::make('standing_loan')
                             ->label(__('Standing loan'))
                             ->numeric()
                             ->minValue(0)
                             ->step(0.01),
-                        DatePicker::make('cert_date_of_birth')
+                        DatePicker::make('date_of_birth')
                             ->label(__('Date of birth'))
                             ->native(false),
-                        Textarea::make('cert_home_address')
+                        Textarea::make('home_address')
                             ->label(__('Home address'))
                             ->rows(2)
                             ->columnSpanFull(),
-                        DatePicker::make('cert_treasurer_signed_at')
+                        DatePicker::make('treasurer_signed_at')
                             ->label(__('Treasurer date'))
                             ->native(false),
                     ])
@@ -65,20 +66,21 @@ class LoanForm
                     ->collapsed(),
 
                 Section::make(__('Committee approval'))
+                    ->relationship('committeeDecision')
                     ->schema([
-                        DatePicker::make('committee_meeting_date')
+                        DatePicker::make('meeting_date')
                             ->label(__('Meeting date'))
                             ->native(false),
-                        Textarea::make('committee_conditions_notes')
+                        Textarea::make('conditions_notes')
                             ->label(__('Conditions / changes'))
                             ->rows(3)
                             ->columnSpanFull(),
-                        TextInput::make('committee_approved_amount')
+                        TextInput::make('approved_amount')
                             ->label(__('Amount approved'))
                             ->numeric()
                             ->minValue(0)
                             ->step(0.01),
-                        DatePicker::make('committee_minutes_date')
+                        DatePicker::make('minutes_date')
                             ->label(__('Recorded in minutes'))
                             ->native(false),
                     ])

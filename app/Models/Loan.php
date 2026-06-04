@@ -9,6 +9,7 @@ use App\Enums\ModeOfPayment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Loan extends Model
 {
@@ -16,33 +17,21 @@ class Loan extends Model
         'user_id',
         'status',
         'loan_category',
-        'applicant_name',
-        'applicant_address',
-        'apply_loan',
         'loan_type',
         'loan_amount',
         'loan_amount_words',
         'loan_period_months',
         'installment_amount',
         'first_payment_due_date',
-        'loan_purpose',
         'purpose_of_loan',
         'purpose_of_loan_other',
+        'application_notes',
         'mode_of_payment',
         'applicant_signed_at',
         'applicant_signature_name',
+        'applicant_date_of_birth',
         'loan_date',
         'approved_at',
-        'cert_borrower_name',
-        'cert_fixed_savings_deposits',
-        'cert_standing_loan',
-        'cert_date_of_birth',
-        'cert_home_address',
-        'cert_treasurer_signed_at',
-        'committee_meeting_date',
-        'committee_conditions_notes',
-        'committee_approved_amount',
-        'committee_minutes_date',
     ];
 
     /**
@@ -57,15 +46,9 @@ class Loan extends Model
             'mode_of_payment' => ModeOfPayment::class,
             'loan_amount' => 'decimal:2',
             'installment_amount' => 'decimal:2',
-            'cert_fixed_savings_deposits' => 'decimal:2',
-            'cert_standing_loan' => 'decimal:2',
-            'committee_approved_amount' => 'decimal:2',
             'first_payment_due_date' => 'date',
             'applicant_signed_at' => 'date',
-            'cert_date_of_birth' => 'date',
-            'cert_treasurer_signed_at' => 'date',
-            'committee_meeting_date' => 'date',
-            'committee_minutes_date' => 'date',
+            'applicant_date_of_birth' => 'date',
             'loan_date' => 'date',
             'approved_at' => 'datetime',
         ];
@@ -79,5 +62,15 @@ class Loan extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(LoanPayment::class);
+    }
+
+    public function certification(): HasOne
+    {
+        return $this->hasOne(LoanCertification::class);
+    }
+
+    public function committeeDecision(): HasOne
+    {
+        return $this->hasOne(LoanCommitteeDecision::class);
     }
 }

@@ -11,7 +11,6 @@ class PosSale extends Model
     protected $fillable = [
         'pos_branch_id',
         'user_id',
-        'subtotal',
         'total',
         'amount_paid',
         'change_amount',
@@ -24,7 +23,6 @@ class PosSale extends Model
     protected function casts(): array
     {
         return [
-            'subtotal' => 'decimal:2',
             'total' => 'decimal:2',
             'amount_paid' => 'decimal:2',
             'change_amount' => 'decimal:2',

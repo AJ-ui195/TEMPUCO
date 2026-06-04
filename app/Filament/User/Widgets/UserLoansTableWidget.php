@@ -29,7 +29,7 @@ class UserLoansTableWidget extends TableWidget
                 TextColumn::make('loan_type')
                     ->label(__('Loan type'))
                     ->searchable()
-                    ->formatStateUsing(fn (mixed $state, $record): string => (string) ($state ?? $record->apply_loan)),
+                    ->formatStateUsing(fn (mixed $state): string => (string) $state),
                 TextColumn::make('loan_category')
                     ->label(__('Category'))
                     ->formatStateUsing(fn (mixed $state): string => $state?->getLabel() ?? '—'),

@@ -186,7 +186,6 @@ class PosGroceryPage extends BaseDashboard
             $sale = PosSale::query()->create([
                 'pos_branch_id' => null,
                 'user_id' => $userId,
-                'subtotal' => $total,
                 'total' => $total,
                 'amount_paid' => $paid,
                 'change_amount' => round($paid - $total, 2),
@@ -197,8 +196,6 @@ class PosGroceryPage extends BaseDashboard
                 PosSaleItem::query()->create([
                     'pos_sale_id' => $sale->id,
                     'pos_inventory_item_id' => $line['product_id'],
-                    'product_name' => $line['name'],
-                    'sku' => $line['sku'],
                     'quantity' => $line['quantity'],
                     'unit_price' => $line['unit_price'],
                     'line_total' => $line['line_total'],

@@ -36,6 +36,8 @@ class PosPanelProvider extends PanelProvider
             ])
             ->globalSearch(false)
             ->databaseNotifications()
+            ->sidebarCollapsibleOnDesktop()
+            ->sidebarFullyCollapsibleOnDesktop()
             ->userMenu(false)
             ->discoverPages(in: app_path('Filament/Cashier/Pages'), for: 'App\Filament\Cashier\Pages')
             ->middleware([

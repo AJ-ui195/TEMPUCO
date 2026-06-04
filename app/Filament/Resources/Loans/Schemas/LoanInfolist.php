@@ -24,6 +24,10 @@ class LoanInfolist
                         TextEntry::make('user.email')
                             ->label(__('Email'))
                             ->copyable(),
+                        TextEntry::make('user.address')
+                            ->label(__('Address'))
+                            ->placeholder('—')
+                            ->columnSpanFull(),
                         TextEntry::make('status')
                             ->label(__('Status'))
                             ->badge()
@@ -32,11 +36,6 @@ class LoanInfolist
                             ->label(__('Loan category'))
                             ->formatStateUsing(fn (mixed $state): string => $state instanceof LoanCategory ? $state->getLabel() : '—')
                             ->placeholder('—'),
-                        TextEntry::make('applicant_name')
-                            ->label(__('Applicant name')),
-                        TextEntry::make('applicant_address')
-                            ->label(__('Address'))
-                            ->columnSpanFull(),
                         TextEntry::make('loan_type')
                             ->label(__('Type of loan')),
                         TextEntry::make('loan_amount')
@@ -68,15 +67,17 @@ class LoanInfolist
                             ->label(__('Mode of payment'))
                             ->formatStateUsing(fn (mixed $state): string => $state instanceof ModeOfPayment ? $state->getLabel() : '—')
                             ->placeholder('—'),
-                        TextEntry::make('loan_purpose')
-                            ->label(__('Purpose notes'))
+                        TextEntry::make('application_notes')
+                            ->label(__('Application notes'))
                             ->columnSpanFull()
                             ->placeholder('—'),
                         TextEntry::make('applicant_signed_at')
                             ->label(__('Applicant signed on'))
-                            ->date(),
+                            ->date()
+                            ->placeholder('—'),
                         TextEntry::make('applicant_signature_name')
-                            ->label(__('Applicant signature')),
+                            ->label(__('Applicant signature'))
+                            ->placeholder('—'),
                         TextEntry::make('loan_date')
                             ->label(__('Submitted'))
                             ->date(),
@@ -89,24 +90,24 @@ class LoanInfolist
 
                 Section::make(__('Cooperative certification'))
                     ->schema([
-                        TextEntry::make('cert_borrower_name')
+                        TextEntry::make('certification.borrower_name')
                             ->label(__('Name of borrower'))
                             ->placeholder('—'),
-                        TextEntry::make('cert_fixed_savings_deposits')
+                        TextEntry::make('certification.fixed_savings_deposits')
                             ->label(__('Fixed savings deposits'))
                             ->formatStateUsing(fn (mixed $state): string => filled($state) ? number_format((float) $state, 2) : '—'),
-                        TextEntry::make('cert_standing_loan')
+                        TextEntry::make('certification.standing_loan')
                             ->label(__('Standing loan'))
                             ->formatStateUsing(fn (mixed $state): string => filled($state) ? number_format((float) $state, 2) : '—'),
-                        TextEntry::make('cert_date_of_birth')
+                        TextEntry::make('certification.date_of_birth')
                             ->label(__('Date of birth'))
                             ->date()
                             ->placeholder('—'),
-                        TextEntry::make('cert_home_address')
+                        TextEntry::make('certification.home_address')
                             ->label(__('Home address'))
                             ->placeholder('—')
                             ->columnSpanFull(),
-                        TextEntry::make('cert_treasurer_signed_at')
+                        TextEntry::make('certification.treasurer_signed_at')
                             ->label(__('Treasurer date'))
                             ->date()
                             ->placeholder('—'),
@@ -116,18 +117,18 @@ class LoanInfolist
 
                 Section::make(__('Committee approval'))
                     ->schema([
-                        TextEntry::make('committee_meeting_date')
+                        TextEntry::make('committeeDecision.meeting_date')
                             ->label(__('Meeting date'))
                             ->date()
                             ->placeholder('—'),
-                        TextEntry::make('committee_conditions_notes')
+                        TextEntry::make('committeeDecision.conditions_notes')
                             ->label(__('Conditions / changes'))
                             ->placeholder('—')
                             ->columnSpanFull(),
-                        TextEntry::make('committee_approved_amount')
+                        TextEntry::make('committeeDecision.approved_amount')
                             ->label(__('Amount approved'))
                             ->formatStateUsing(fn (mixed $state): string => filled($state) ? number_format((float) $state, 2) : '—'),
-                        TextEntry::make('committee_minutes_date')
+                        TextEntry::make('committeeDecision.minutes_date')
                             ->label(__('Recorded in minutes'))
                             ->date()
                             ->placeholder('—'),

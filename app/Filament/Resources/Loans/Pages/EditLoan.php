@@ -10,6 +10,14 @@ class EditLoan extends EditRecord
 {
     protected static string $resource = LoanResource::class;
 
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        $this->record->certification()->firstOrCreate([]);
+        $this->record->committeeDecision()->firstOrCreate([]);
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
