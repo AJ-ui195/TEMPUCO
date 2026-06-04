@@ -41,8 +41,9 @@ class LoanInfolist
                         TextEntry::make('loan_amount')
                             ->label(__('Loan amount (PHP)'))
                             ->formatStateUsing(fn (mixed $state): string => number_format((float) $state, 2)),
-                        TextEntry::make('loan_amount_words')
+                        TextEntry::make('amount_in_words')
                             ->label(__('Amount in words'))
+                            ->state(fn (Loan $record): string => $record->amountInWords())
                             ->placeholder('—'),
                         TextEntry::make('loan_period_months')
                             ->label(__('Loan period'))
@@ -70,13 +71,11 @@ class LoanInfolist
                         TextEntry::make('application_notes')
                             ->label(__('Application notes'))
                             ->columnSpanFull()
+                            ->visible(fn (Loan $record): bool => filled($record->application_notes))
                             ->placeholder('—'),
                         TextEntry::make('applicant_signed_at')
                             ->label(__('Applicant signed on'))
                             ->date()
-                            ->placeholder('—'),
-                        TextEntry::make('applicant_signature_name')
-                            ->label(__('Applicant signature'))
                             ->placeholder('—'),
                         TextEntry::make('loan_date')
                             ->label(__('Submitted'))

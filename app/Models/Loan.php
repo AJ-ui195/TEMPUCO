@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\LoanCategory;
+use App\Support\AmountInWords;
 use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
@@ -19,7 +20,6 @@ class Loan extends Model
         'loan_category',
         'loan_type',
         'loan_amount',
-        'loan_amount_words',
         'loan_period_months',
         'installment_amount',
         'first_payment_due_date',
@@ -28,8 +28,6 @@ class Loan extends Model
         'application_notes',
         'mode_of_payment',
         'applicant_signed_at',
-        'applicant_signature_name',
-        'applicant_date_of_birth',
         'loan_date',
         'approved_at',
     ];
@@ -48,7 +46,6 @@ class Loan extends Model
             'installment_amount' => 'decimal:2',
             'first_payment_due_date' => 'date',
             'applicant_signed_at' => 'date',
-            'applicant_date_of_birth' => 'date',
             'loan_date' => 'date',
             'approved_at' => 'datetime',
         ];
@@ -72,5 +69,10 @@ class Loan extends Model
     public function committeeDecision(): HasOne
     {
         return $this->hasOne(LoanCommitteeDecision::class);
+    }
+
+    public function amountInWords(): string
+    {
+        return AmountInWords::format($this->loan_amount);
     }
 }

@@ -1,4 +1,256 @@
 <x-filament-panels::page>
+    @once
+        @push('styles')
+            <style>
+                .fi-pos-grocery {
+                    color: rgb(15 23 42);
+                }
+
+                .dark .fi-pos-grocery {
+                    color: rgb(255 255 255);
+                }
+
+                .fi-pos-grocery .pos-panel {
+                    border-radius: 0.75rem;
+                    border: 1px solid rgb(226 232 240);
+                    background: rgb(255 255 255);
+                    color: inherit;
+                }
+
+                .dark .fi-pos-grocery .pos-panel {
+                    border-color: rgba(255, 255, 255, 0.1);
+                    background: rgb(17 24 39);
+                }
+
+                .fi-pos-grocery .pos-panel--scanner {
+                    border-width: 2px;
+                    border-color: rgb(2 132 199);
+                    background: rgb(240 249 255);
+                }
+
+                .dark .fi-pos-grocery .pos-panel--scanner {
+                    border-color: rgb(14 165 233);
+                    background: rgba(12, 74, 110, 0.35);
+                }
+
+                .fi-pos-grocery .pos-muted {
+                    color: rgb(100 116 139);
+                }
+
+                .dark .fi-pos-grocery .pos-muted {
+                    color: rgb(148 163 184);
+                }
+
+                .fi-pos-grocery .pos-label-accent {
+                    color: rgb(3 105 161);
+                }
+
+                .dark .fi-pos-grocery .pos-label-accent {
+                    color: rgb(125 211 252);
+                }
+
+                .fi-pos-grocery .pos-cart-header {
+                    border-bottom: 1px solid rgb(226 232 240);
+                    background: rgb(241 245 249);
+                }
+
+                .dark .fi-pos-grocery .pos-cart-header {
+                    border-bottom-color: rgba(255, 255, 255, 0.1);
+                    background: rgb(31 41 55);
+                }
+
+                .fi-pos-grocery .pos-input {
+                    width: 100%;
+                    box-sizing: border-box;
+                    border-radius: 0.5rem;
+                    border: 1px solid rgb(203 213 225);
+                    background: rgb(255 255 255);
+                    color: rgb(15 23 42);
+                }
+
+                .dark .fi-pos-grocery .pos-input {
+                    border-color: rgb(75 85 99);
+                    background: rgb(3 7 18);
+                    color: rgb(255 255 255);
+                }
+
+                .fi-pos-grocery .pos-input::placeholder {
+                    color: rgb(148 163 184);
+                }
+
+                .fi-pos-grocery .pos-input--scanner {
+                    border-color: rgb(2 132 199);
+                    font-size: 1.125rem;
+                    font-weight: 600;
+                    letter-spacing: 0.05em;
+                    padding: 0.75rem 1rem;
+                }
+
+                .dark .fi-pos-grocery .pos-input--scanner {
+                    border-color: rgb(14 165 233);
+                }
+
+                .fi-pos-grocery .pos-search-result {
+                    display: flex;
+                    width: 100%;
+                    cursor: pointer;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 0.75rem;
+                    padding: 0.625rem 0.75rem;
+                    text-align: left;
+                    border: none;
+                    border-bottom: 1px solid rgb(241 245 249);
+                    background: rgb(255 255 255);
+                    color: inherit;
+                    font: inherit;
+                }
+
+                .dark .fi-pos-grocery .pos-search-result {
+                    border-bottom-color: rgba(255, 255, 255, 0.05);
+                    background: rgb(17 24 39);
+                }
+
+                .fi-pos-grocery .pos-search-result:hover {
+                    background: rgb(248 250 252);
+                }
+
+                .dark .fi-pos-grocery .pos-search-result:hover {
+                    background: rgb(31 41 55);
+                }
+
+                .fi-pos-grocery .pos-search-result--low-stock {
+                    background: rgb(255 251 235);
+                }
+
+                .dark .fi-pos-grocery .pos-search-result--low-stock {
+                    background: rgba(120, 53, 15, 0.25);
+                }
+
+                .fi-pos-grocery .pos-price {
+                    color: rgb(2 132 199);
+                    font-weight: 600;
+                    white-space: nowrap;
+                }
+
+                .dark .fi-pos-grocery .pos-price {
+                    color: rgb(56 189 248);
+                }
+
+                .fi-pos-grocery .pos-table thead tr {
+                    background: rgb(248 250 252);
+                    color: rgb(51 65 85);
+                }
+
+                .dark .fi-pos-grocery .pos-table thead tr {
+                    background: rgba(31, 41, 55, 0.8);
+                    color: rgb(203 213 225);
+                }
+
+                .fi-pos-grocery .pos-table tbody tr {
+                    border-top: 1px solid rgb(226 232 240);
+                }
+
+                .dark .fi-pos-grocery .pos-table tbody tr {
+                    border-top-color: rgba(255, 255, 255, 0.1);
+                }
+
+                .fi-pos-grocery .pos-qty-btn {
+                    width: 1.75rem;
+                    height: 1.75rem;
+                    border-radius: 0.25rem;
+                    border: 1px solid rgb(203 213 225);
+                    background: rgb(255 255 255);
+                    color: inherit;
+                    cursor: pointer;
+                }
+
+                .dark .fi-pos-grocery .pos-qty-btn {
+                    border-color: rgb(75 85 99);
+                    background: rgb(31 41 55);
+                }
+
+                .fi-pos-grocery .pos-btn-primary {
+                    width: 100%;
+                    padding: 0.75rem;
+                    font-size: 0.9375rem;
+                    font-weight: 700;
+                    color: #fff;
+                    background: rgb(2 132 199);
+                    border: none;
+                    border-radius: 0.5rem;
+                    cursor: pointer;
+                }
+
+                .dark .fi-pos-grocery .pos-btn-primary {
+                    background: rgb(14 165 233);
+                }
+
+                .fi-pos-grocery .pos-btn-secondary {
+                    width: 100%;
+                    padding: 0.625rem;
+                    font-size: 0.8125rem;
+                    font-weight: 600;
+                    color: rgb(100 116 139);
+                    background: transparent;
+                    border: 1px solid rgb(203 213 225);
+                    border-radius: 0.5rem;
+                    cursor: pointer;
+                }
+
+                .dark .fi-pos-grocery .pos-btn-secondary {
+                    color: rgb(148 163 184);
+                    border-color: rgb(75 85 99);
+                }
+
+                .fi-pos-grocery .pos-btn-remove {
+                    color: rgb(180 83 9);
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                }
+
+                .dark .fi-pos-grocery .pos-btn-remove {
+                    color: rgb(251 191 36);
+                }
+
+                .fi-pos-grocery .pos-feedback--ok {
+                    color: rgb(5 150 105);
+                }
+
+                .dark .fi-pos-grocery .pos-feedback--ok {
+                    color: rgb(52 211 153);
+                }
+
+                .fi-pos-grocery .pos-feedback--error {
+                    color: rgb(180 83 9);
+                }
+
+                .dark .fi-pos-grocery .pos-feedback--error {
+                    color: rgb(251 191 36);
+                }
+
+                .fi-pos-grocery .pos-change {
+                    color: rgb(5 150 105);
+                }
+
+                .dark .fi-pos-grocery .pos-change {
+                    color: rgb(52 211 153);
+                }
+
+                .fi-pos-grocery .pos-checkout-divider {
+                    border-top: 1px solid rgb(226 232 240);
+                }
+
+                .dark .fi-pos-grocery .pos-checkout-divider {
+                    border-top-color: rgba(255, 255, 255, 0.1);
+                }
+            </style>
+        @endpush
+    @endonce
+
     <div
         class="fi-pos-grocery"
         x-data="{
@@ -18,11 +270,11 @@
         <div style="display: grid; grid-template-columns: 1fr 22rem; gap: 1.25rem; align-items: start;">
             {{-- Left: scanner + cart --}}
             <div style="display: flex; flex-direction: column; gap: 1rem;">
-                <div style="padding: 1rem 1.25rem; border-radius: 0.75rem; border: 2px solid #0284c7; background: rgba(14, 165, 233, 0.06);">
-                    <label for="barcode-scanner" style="display: block; font-size: 0.875rem; font-weight: 700; color: #0284c7; margin-bottom: 0.5rem;">
+                <div class="pos-panel pos-panel--scanner" style="padding: 1rem 1.25rem;">
+                    <label for="barcode-scanner" class="pos-label-accent" style="display: block; font-size: 0.875rem; font-weight: 700; margin-bottom: 0.5rem;">
                         {{ __('Barcode scanner') }}
                     </label>
-                    <p style="margin: 0 0 0.75rem; font-size: 0.8125rem; color: #64748b;">
+                    <p class="pos-muted" style="margin: 0 0 0.75rem; font-size: 0.8125rem;">
                         {{ __('Scan a product barcode or type the SKU, then press Enter. USB scanners work automatically.') }}
                     </p>
                     <input
@@ -33,23 +285,20 @@
                         x-ref="barcodeScanner"
                         autocomplete="off"
                         placeholder="{{ __('Scan barcode here…') }}"
-                        style="width: 100%; padding: 0.75rem 1rem; font-size: 1.125rem; font-weight: 600; letter-spacing: 0.05em; border-radius: 0.5rem; border: 1px solid #0284c7; box-sizing: border-box;"
+                        class="pos-input pos-input--scanner"
                     />
                     @if ($scanFeedback)
-                        <p style="margin: 0.75rem 0 0; font-size: 0.8125rem; font-weight: 600; color: {{ $scanFeedbackIsError ? '#b45309' : '#059669' }};">
+                        <p class="{{ $scanFeedbackIsError ? 'pos-feedback--error' : 'pos-feedback--ok' }}" style="margin: 0.75rem 0 0; font-size: 0.8125rem; font-weight: 600;">
                             {{ $scanFeedback }}
                         </p>
                     @endif
                 </div>
 
-                <div
-                    data-pos-no-refocus
-                    style="padding: 1rem 1.25rem; border-radius: 0.75rem; border: 1px solid rgba(148, 163, 184, 0.35); background: rgba(255, 255, 255, 0.7);"
-                >
+                <div data-pos-no-refocus class="pos-panel" style="padding: 1rem 1.25rem;">
                     <label for="product-search" style="display: block; font-size: 0.875rem; font-weight: 700; margin-bottom: 0.5rem;">
                         {{ __('Search products') }}
                     </label>
-                    <p style="margin: 0 0 0.75rem; font-size: 0.8125rem; color: #64748b;">
+                    <p class="pos-muted" style="margin: 0 0 0.75rem; font-size: 0.8125rem;">
                         {{ __('Search by product name or SKU, then click a result to add to cart.') }}
                     </p>
                     <input
@@ -58,32 +307,33 @@
                         wire:model.live.debounce.300ms="productSearch"
                         autocomplete="off"
                         placeholder="{{ __('Type to search…') }}"
-                        style="width: 100%; padding: 0.625rem 0.75rem; font-size: 0.9375rem; border-radius: 0.5rem; border: 1px solid rgba(148, 163, 184, 0.5); box-sizing: border-box;"
+                        class="pos-input"
+                        style="padding: 0.625rem 0.75rem; font-size: 0.9375rem;"
                     />
 
                     @php($searchResults = $this->getSearchResults())
 
                     @if (strlen(trim($productSearch)) >= 2)
-                        <div style="margin-top: 0.75rem; max-height: 14rem; overflow-y: auto; border-radius: 0.5rem; border: 1px solid rgba(148, 163, 184, 0.25);">
+                        <div class="pos-panel" style="margin-top: 0.75rem; max-height: 14rem; overflow-y: auto; padding: 0;">
                             @forelse ($searchResults as $product)
                                 <button
                                     type="button"
                                     wire:click="addProductFromSearch({{ $product->id }})"
-                                    style="display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.625rem 0.75rem; text-align: left; border: none; border-bottom: 1px solid rgba(148, 163, 184, 0.15); background: {{ $product->quantity < 1 ? 'rgba(254, 243, 199, 0.25)' : '#fff' }}; cursor: pointer; font: inherit; color: inherit;"
+                                    class="pos-search-result {{ $product->quantity < 1 ? 'pos-search-result--low-stock' : '' }}"
                                 >
                                     <span>
                                         <span style="display: block; font-weight: 600; font-size: 0.875rem;">{{ $product->name }}</span>
-                                        <span style="font-size: 0.75rem; color: #64748b;">
+                                        <span class="pos-muted" style="font-size: 0.75rem;">
                                             {{ $product->sku ?? __('No SKU') }}
                                             · {{ __('Stock') }}: {{ number_format($product->quantity) }}
                                         </span>
                                     </span>
-                                    <span style="font-weight: 600; color: #0284c7; white-space: nowrap;">
+                                    <span class="pos-price">
                                         ₱{{ number_format((float) $product->unit_price, 2) }}
                                     </span>
                                 </button>
                             @empty
-                                <p style="margin: 0; padding: 1rem 0.75rem; font-size: 0.8125rem; color: #64748b; text-align: center;">
+                                <p class="pos-muted" style="margin: 0; padding: 1rem 0.75rem; font-size: 0.8125rem; text-align: center;">
                                     {{ __('No products match your search.') }}
                                 </p>
                             @endforelse
@@ -91,23 +341,23 @@
                     @endif
                 </div>
 
-                <div style="border-radius: 0.75rem; border: 1px solid rgba(148, 163, 184, 0.35); overflow: hidden; background: rgba(255, 255, 255, 0.7);">
-                    <div style="padding: 0.75rem 1rem; background: rgba(241, 245, 249, 0.9); border-bottom: 1px solid rgba(148, 163, 184, 0.25); display: flex; justify-content: space-between; align-items: center;">
+                <div class="pos-panel" style="padding: 0; overflow: hidden;">
+                    <div class="pos-cart-header" style="padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-weight: 700; font-size: 0.9375rem;">{{ __('Cart') }}</span>
-                        <span style="font-size: 0.8125rem; color: #64748b;">
+                        <span class="pos-muted" style="font-size: 0.8125rem;">
                             {{ trans_choice(':count item|:count items', $this->getCartItemCount(), ['count' => $this->getCartItemCount()]) }}
                         </span>
                     </div>
 
                     @if ($cartLines === [])
-                        <p style="padding: 2rem 1rem; text-align: center; color: #64748b; font-size: 0.875rem; margin: 0;">
+                        <p class="pos-muted" style="padding: 2rem 1rem; text-align: center; font-size: 0.875rem; margin: 0;">
                             {{ __('Scan or search products to add them to the cart.') }}
                         </p>
                     @else
                         <div style="overflow-x: auto;">
-                            <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+                            <table class="pos-table" style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
                                 <thead>
-                                    <tr style="text-align: left; background: rgba(248, 250, 252, 0.9);">
+                                    <tr style="text-align: left;">
                                         <th style="padding: 0.5rem 0.75rem;">{{ __('Product') }}</th>
                                         <th style="padding: 0.5rem 0.75rem;">{{ __('SKU') }}</th>
                                         <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Price') }}</th>
@@ -118,20 +368,20 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($cartLines as $productId => $line)
-                                        <tr style="border-top: 1px solid rgba(148, 163, 184, 0.2);">
+                                        <tr>
                                             <td style="padding: 0.5rem 0.75rem; font-weight: 500;">{{ $line['name'] }}</td>
-                                            <td style="padding: 0.5rem 0.75rem; color: #64748b;">{{ $line['sku'] ?? '—' }}</td>
+                                            <td class="pos-muted" style="padding: 0.5rem 0.75rem;">{{ $line['sku'] ?? '—' }}</td>
                                             <td style="padding: 0.5rem 0.75rem; text-align: end;">₱{{ number_format($line['unit_price'], 2) }}</td>
                                             <td style="padding: 0.5rem 0.75rem; text-align: center;">
                                                 <div style="display: inline-flex; align-items: center; gap: 0.25rem;">
-                                                    <button type="button" wire:click="decrementLine({{ $productId }})" style="width: 1.75rem; height: 1.75rem; border-radius: 0.25rem; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">−</button>
+                                                    <button type="button" wire:click="decrementLine({{ $productId }})" class="pos-qty-btn">−</button>
                                                     <span style="min-width: 1.5rem; font-weight: 600;">{{ $line['quantity'] }}</span>
-                                                    <button type="button" wire:click="incrementLine({{ $productId }})" style="width: 1.75rem; height: 1.75rem; border-radius: 0.25rem; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">+</button>
+                                                    <button type="button" wire:click="incrementLine({{ $productId }})" class="pos-qty-btn">+</button>
                                                 </div>
                                             </td>
                                             <td style="padding: 0.5rem 0.75rem; text-align: end; font-weight: 600;">₱{{ number_format($line['line_total'], 2) }}</td>
                                             <td style="padding: 0.5rem 0.75rem;">
-                                                <button type="button" wire:click="removeLine({{ $productId }})" style="color: #b45309; font-size: 0.75rem; font-weight: 600; background: none; border: none; cursor: pointer;">
+                                                <button type="button" wire:click="removeLine({{ $productId }})" class="pos-btn-remove">
                                                     {{ __('Remove') }}
                                                 </button>
                                             </td>
@@ -145,7 +395,7 @@
             </div>
 
             {{-- Right: checkout --}}
-            <div data-pos-no-refocus style="position: sticky; top: 1rem; padding: 1.25rem; border-radius: 0.75rem; border: 1px solid rgba(148, 163, 184, 0.35); background: rgba(255, 255, 255, 0.85);">
+            <div data-pos-no-refocus class="pos-panel" style="position: sticky; top: 1rem; padding: 1.25rem;">
                 <h2 style="margin: 0 0 1rem; font-size: 1.125rem; font-weight: 700;">{{ __('Checkout') }}</h2>
 
                 <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9375rem;">
@@ -153,7 +403,7 @@
                     <span style="font-weight: 700;">₱{{ number_format($this->getCartTotal(), 2) }}</span>
                 </div>
 
-                <div style="margin: 1rem 0; padding-top: 1rem; border-top: 1px solid rgba(148, 163, 184, 0.3);">
+                <div class="pos-checkout-divider" style="margin: 1rem 0; padding-top: 1rem;">
                     <label for="amount-paid" style="display: block; font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.375rem;">
                         {{ __('Amount paid (₱)') }}
                     </label>
@@ -164,12 +414,13 @@
                         step="0.01"
                         wire:model.live="amountPaid"
                         placeholder="0.00"
-                        style="width: 100%; padding: 0.625rem 0.75rem; font-size: 1rem; border-radius: 0.5rem; border: 1px solid rgba(148, 163, 184, 0.5); box-sizing: border-box;"
+                        class="pos-input"
+                        style="padding: 0.625rem 0.75rem; font-size: 1rem;"
                     />
                 </div>
 
                 @if ((float) $amountPaid > 0 && $this->getChangeAmount() > 0)
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.9375rem; color: #059669;">
+                    <div class="pos-change" style="display: flex; justify-content: space-between; margin-bottom: 1rem; font-size: 0.9375rem;">
                         <span>{{ __('Change') }}</span>
                         <span style="font-weight: 700;">₱{{ number_format($this->getChangeAmount(), 2) }}</span>
                     </div>
@@ -180,7 +431,8 @@
                     wire:click="completeSale"
                     wire:confirm="{{ __('Complete this sale and update stock?') }}"
                     @disabled($cartLines === [])
-                    style="width: 100%; padding: 0.75rem; font-size: 0.9375rem; font-weight: 700; color: #fff; background: #0284c7; border: none; border-radius: 0.5rem; cursor: pointer; margin-bottom: 0.5rem; opacity: {{ $cartLines === [] ? '0.5' : '1' }};"
+                    class="pos-btn-primary"
+                    style="margin-bottom: 0.5rem; opacity: {{ $cartLines === [] ? '0.5' : '1' }};"
                 >
                     {{ __('Complete sale') }}
                 </button>
@@ -190,7 +442,8 @@
                     wire:click="clearCart"
                     wire:confirm="{{ __('Clear all items from the cart?') }}"
                     @disabled($cartLines === [])
-                    style="width: 100%; padding: 0.625rem; font-size: 0.8125rem; font-weight: 600; color: #64748b; background: transparent; border: 1px solid rgba(148, 163, 184, 0.5); border-radius: 0.5rem; cursor: pointer;"
+                    class="pos-btn-secondary"
+                    style="opacity: {{ $cartLines === [] ? '0.5' : '1' }};"
                 >
                     {{ __('Clear cart') }}
                 </button>

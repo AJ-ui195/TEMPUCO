@@ -139,10 +139,6 @@ class ApplyLoan extends Page
                             ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
                             ->maxLength(255)
                             ->columnSpanFull(),
-                        TextInput::make('loan_amount_words')
-                            ->label(__('Loan amount (in words)'))
-                            ->maxLength(255)
-                            ->columnSpanFull(),
                         TextInput::make('loan_amount')
                             ->label(__('Loan amount (PHP)'))
                             ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
@@ -303,21 +299,25 @@ class ApplyLoan extends Page
         $data = $this->form->getState();
         $isQuickLoan = ($data['loan_application_type'] ?? self::APPLICATION_TYPE_REGULAR) === self::APPLICATION_TYPE_QUICK;
 
+        /** @var User $user */
+        $user = auth()->user();
+        $user->update(array_filter([
+            'name' => $data['applicant_name'] ?? null,
+            'address' => $data['applicant_address'] ?? null,
+            'cellphone' => $isQuickLoan ? ($data['quick_contact_number'] ?? null) : null,
+            'email' => $isQuickLoan ? ($data['quick_email'] ?? null) : null,
+        ], fn (mixed $value): bool => filled($value)));
+
         $loanType = $isQuickLoan
             ? 'QUICK LOAN'
             : ($data['loan_type'] ?? '');
 
-        $loanPurpose = $isQuickLoan
-            ? $this->buildQuickLoanPurpose($data)
-            : $this->formatLoanPurposeSummary($data);
-
-        $loan = Loan::query()->create([
+        Loan::query()->create([
             'user_id' => auth()->id(),
             'status' => LoanStatus::Pending,
             'loan_category' => $isQuickLoan ? LoanCategory::AdditionalNew : $data['loan_category'],
             'loan_type' => $loanType,
             'loan_amount' => $data['loan_amount'],
-            'loan_amount_words' => $data['loan_amount_words'] ?? null,
             'loan_period_months' => $data['loan_period_months'],
             'installment_amount' => $data['installment_amount'],
             'first_payment_due_date' => $data['first_payment_due_date'] ?? null,
@@ -327,11 +327,9 @@ class ApplyLoan extends Page
                     ? ($data['purpose_of_loan_other'] ?? null)
                     : null
             ),
-            'application_notes' => $isQuickLoan ? $loanPurpose : null,
+            'application_notes' => $isQuickLoan ? $this->buildQuickLoanPurpose($data) : null,
             'mode_of_payment' => $data['mode_of_payment'],
-            'applicant_signed_at' => $isQuickLoan ? now()->toDateString() : $data['applicant_signed_at'],
-            'applicant_signature_name' => $data['applicant_name'],
-            'applicant_date_of_birth' => $isQuickLoan ? ($data['quick_date_of_birth'] ?? null) : null,
+            'applicant_signed_at' => $data['applicant_signed_at'] ?? now()->toDateString(),
             'loan_date' => now()->toDateString(),
         ]);
 
@@ -404,6 +402,8 @@ class ApplyLoan extends Page
             'Mode of payment: '.$paymentLabel,
             '',
             'Quick Loan Applicant Details:',
+            'Address: '.($data['applicant_address'] ?? 'N/A'),
+            'Date of birth: '.($data['quick_date_of_birth'] ?? 'N/A'),
             'Age: '.($data['quick_age'] ?? 'N/A'),
             'Sex: '.ucfirst((string) ($data['quick_sex'] ?? 'N/A')),
             'Civil status: '.ucfirst((string) ($data['quick_civil_status'] ?? 'N/A')),
