@@ -5,6 +5,7 @@
         $report = $this->report();
         $summary = $this->getSummary();
         $sales = $report->sales();
+        $itemsSold = $this->getItemsSoldByProduct();
         $years = range(now()->year, now()->year - 5);
         $months = collect(range(1, 12))->mapWithKeys(fn (int $m): array => [
             $m => \Carbon\Carbon::createFromDate($this->year, $m, 1)->format('F'),
@@ -101,13 +102,73 @@
                 <div class="pos-stat-value">{{ number_format($summary['transaction_count']) }}</div>
             </div>
             <div class="pos-panel pos-stat">
-                <div class="pos-muted pos-stat-label">{{ __('Total sales') }}</div>
+                <div class="pos-muted pos-stat-label">{{ __('Cash sales') }}</div>
                 <div class="pos-stat-value">₱{{ number_format($summary['total_revenue'], 2) }}</div>
+                <div class="pos-muted" style="font-size: 0.6875rem; margin-top: 0.25rem;">
+                    {{ trans_choice(':count cash sale|:count cash sales', $summary['cash_transaction_count'], ['count' => $summary['cash_transaction_count']]) }}
+                </div>
             </div>
+            @if ($summary['credit_transaction_count'] > 0)
+                <div class="pos-panel pos-stat">
+                    <div class="pos-muted pos-stat-label">{{ __('Credit sales') }}</div>
+                    <div class="pos-stat-value" style="color: rgb(4 120 87);">₱{{ number_format($summary['credit_sales_total'], 2) }}</div>
+                    <div class="pos-muted" style="font-size: 0.6875rem; margin-top: 0.25rem;">
+                        {{ trans_choice(':count credit sale|:count credit sales', $summary['credit_transaction_count'], ['count' => $summary['credit_transaction_count']]) }}
+                        · {{ __('Not included in cash total') }}
+                    </div>
+                </div>
+            @endif
             <div class="pos-panel pos-stat">
                 <div class="pos-muted pos-stat-label">{{ __('Items sold') }}</div>
                 <div class="pos-stat-value">{{ number_format($summary['items_sold']) }}</div>
             </div>
+        </div>
+
+        <div class="pos-panel" style="padding: 0; overflow: hidden; margin-bottom: 1rem;">
+            <div class="pos-cart-header" style="padding: 0.75rem 1rem;">
+                <span style="font-weight: 700; font-size: 0.9375rem;">{{ __('Items sold') }}</span>
+                <span class="pos-muted" style="display: block; font-size: 0.6875rem; font-weight: 500; margin-top: 0.125rem;">
+                    {{ __('Revenue column reflects cash sales only.') }}
+                </span>
+            </div>
+
+            @if ($itemsSold->isEmpty())
+                <p class="pos-muted" style="margin: 0; padding: 2rem 1rem; text-align: center; font-size: 0.875rem;">
+                    {{ __('No items sold for this period.') }}
+                </p>
+            @else
+                <div style="overflow-x: auto;">
+                    <table class="pos-table" style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+                        <thead>
+                            <tr style="text-align: left;">
+                                <th style="padding: 0.5rem 0.75rem;">{{ __('Product') }}</th>
+                                <th style="padding: 0.5rem 0.75rem;">{{ __('SKU') }}</th>
+                                <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Quantity sold') }}</th>
+                                <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Revenue') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($itemsSold as $item)
+                                <tr>
+                                    <td style="padding: 0.5rem 0.75rem; font-weight: 600;">{{ $item['name'] }}</td>
+                                    <td class="pos-muted" style="padding: 0.5rem 0.75rem;">{{ $item['sku'] ?? '—' }}</td>
+                                    <td style="padding: 0.5rem 0.75rem; text-align: end;">{{ number_format($item['quantity_sold']) }}</td>
+                                    <td style="padding: 0.5rem 0.75rem; text-align: end; font-weight: 600;">
+                                        ₱{{ number_format($item['revenue'], 2) }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr style="border-top: 2px solid rgb(203 213 225); font-weight: 700;">
+                                <td colspan="2" style="padding: 0.75rem; text-align: end;">{{ __('Total') }}</td>
+                                <td style="padding: 0.75rem; text-align: end;">{{ number_format($summary['items_sold']) }}</td>
+                                <td style="padding: 0.75rem; text-align: end;">₱{{ number_format($summary['total_revenue'], 2) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
         </div>
 
         <div class="pos-panel" style="padding: 0; overflow: hidden;">
@@ -126,7 +187,8 @@
                             <tr style="text-align: left;">
                                 <th style="padding: 0.5rem 0.75rem;">{{ __('Reference') }}</th>
                                 <th style="padding: 0.5rem 0.75rem;">{{ __('Date & time') }}</th>
-                                <th style="padding: 0.5rem 0.75rem;">{{ __('Cashier') }}</th>
+                                <th style="padding: 0.5rem 0.75rem;">{{ __('Payment') }}</th>
+                                <th style="padding: 0.5rem 0.75rem;">{{ __('Member / Cashier') }}</th>
                                 <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Items') }}</th>
                                 <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Total') }}</th>
                             </tr>
@@ -136,20 +198,57 @@
                                 <tr>
                                     <td style="padding: 0.5rem 0.75rem; font-weight: 600;">{{ $sale->reference }}</td>
                                     <td class="pos-muted" style="padding: 0.5rem 0.75rem;">
-                                        {{ $sale->created_at?->format('M j, Y g:i A') }}
+                                        {{ \App\Support\PhilippineTime::format($sale->created_at) }}
                                     </td>
-                                    <td style="padding: 0.5rem 0.75rem;">{{ $sale->user?->name ?? '—' }}</td>
+                                    <td style="padding: 0.5rem 0.75rem;">
+                                        @if ($sale->isCreditSale())
+                                            <span style="display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: rgb(4 120 87); background: rgb(209 250 229);">
+                                                {{ __('Credit') }}
+                                            </span>
+                                            @if ($sale->isUnsettled())
+                                                <span class="pos-muted" style="display: block; margin-top: 0.25rem; font-size: 0.6875rem;">
+                                                    {{ __('Outstanding') }}: ₱{{ number_format($sale->outstandingAmount(), 2) }}
+                                                </span>
+                                            @endif
+                                        @else
+                                            <span style="display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: rgb(3 105 161); background: rgb(224 242 254);">
+                                                {{ __('Cash') }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td style="padding: 0.5rem 0.75rem;">
+                                        @if ($sale->isCreditSale())
+                                            <span style="display: block; font-size: 0.6875rem; font-weight: 600; color: rgb(4 120 87); text-transform: uppercase;">{{ __('Member') }}</span>
+                                            <span style="font-weight: 600;">{{ $sale->reportPartyLabel() }}</span>
+                                        @else
+                                            <span style="display: block; font-size: 0.6875rem; font-weight: 600; color: rgb(100 116 139); text-transform: uppercase;">{{ __('Cashier') }}</span>
+                                            <span>{{ $sale->reportPartyLabel() }}</span>
+                                        @endif
+                                    </td>
                                     <td style="padding: 0.5rem 0.75rem; text-align: end;">{{ $sale->items->sum('quantity') }}</td>
                                     <td style="padding: 0.5rem 0.75rem; text-align: end; font-weight: 600;">
                                         ₱{{ number_format((float) $sale->total, 2) }}
                                     </td>
                                 </tr>
+                                @foreach ($sale->items as $line)
+                                    <tr class="pos-line-item">
+                                        <td colspan="6" style="padding: 0.25rem 0.75rem 0.5rem 1.5rem; font-size: 0.75rem;">
+                                            <span style="font-weight: 600;">{{ $line->inventoryItem?->name ?? __('Unknown product') }}</span>
+                                            <span class="pos-muted">
+                                                · {{ $line->inventoryItem?->sku ?? __('No SKU') }}
+                                                · {{ __('Qty') }}: {{ $line->quantity }}
+                                                · ₱{{ number_format((float) $line->unit_price, 2) }}
+                                                · {{ __('Line total') }}: ₱{{ number_format((float) $line->line_total, 2) }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
                             @endforeach
                         </tbody>
                         <tfoot>
                             <tr style="border-top: 2px solid rgb(203 213 225); font-weight: 700;">
-                                <td colspan="4" style="padding: 0.75rem; text-align: end;">{{ __('Grand total') }}</td>
-                                <td style="padding: 0.75rem; text-align: end;">₱{{ number_format($summary['total_revenue'], 2) }}</td>
+                                <td colspan="5" style="padding: 0.75rem; text-align: end;">{{ __('Cash grand total') }}</td>
+                                <td style="padding: 0.75rem; text-align: end;">₱{{ number_format($report->cashSalesGrandTotal(), 2) }}</td>
                             </tr>
                         </tfoot>
                     </table>

@@ -72,4 +72,22 @@
     .fi-panel-admin .fi-wi-stats-overview-stat-chart .fi-wi-stats-overview-stat-chart-bg-color {
         opacity: 0.35;
     }
+
+    /* Glass sections create stacking contexts; raise the active section so
+       select/date dropdowns are not clipped by sections rendered below. */
+    .fi-panel-admin .fi-section:not(.fi-section-not-contained):not(.fi-aside),
+    .fi-panel-admin .fi-section.fi-aside > .fi-section-content-ctn,
+    .fi-panel-admin .fi-section-content-ctn,
+    .fi-panel-admin .fi-section-content {
+        overflow: visible;
+    }
+
+    .fi-panel-admin .fi-section:has(.fi-select-input-btn[aria-expanded="true"]) {
+        position: relative;
+        z-index: 50;
+    }
+
+    .fi-panel-admin .fi-select-input-ctn .fi-dropdown-panel {
+        z-index: 60;
+    }
 </style>

@@ -2,10 +2,12 @@
 
 namespace App\Filament\User\Widgets;
 
+use App\Enums\LoanStatus;
 use App\Models\Loan;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
+use Illuminate\Database\Eloquent\Builder;
 
 class UserLoansTableWidget extends TableWidget
 {
@@ -20,12 +22,18 @@ class UserLoansTableWidget extends TableWidget
         return $table
             ->heading(__('My loans'))
             ->description(__('Loans linked to your account.'))
-            ->query(
-                Loan::query()
-                    ->where('user_id', auth()->id())
-                    ->orderByDesc('loan_date')
-            )
+            ->query(fn (): Builder => Loan::query()->forUser(auth()->user())->orderedByLoanDate())
             ->columns([
+                TextColumn::make('status')
+                    ->label(__('Status'))
+                    ->badge()
+                    ->formatStateUsing(fn (mixed $state): string => $state instanceof LoanStatus ? $state->getLabel() : (string) $state)
+                    ->color(fn (mixed $state): string => match ($state instanceof LoanStatus ? $state : LoanStatus::tryFrom((string) $state)) {
+                        LoanStatus::Approved => 'success',
+                        LoanStatus::Rejected => 'danger',
+                        default => 'warning',
+                    })
+                    ->sortable(),
                 TextColumn::make('loan_type')
                     ->label(__('Loan type'))
                     ->searchable()

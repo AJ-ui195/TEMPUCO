@@ -2,12 +2,21 @@
 
 namespace App\Filament\User\Pages;
 
+use App\Enums\PosSaleChannel;
+use App\Models\User;
+use App\Support\MemberPosCredit;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\HtmlString;
 
 class Credits extends Page
 {
@@ -26,12 +35,78 @@ class Credits extends Page
         return static::$title ?? __('Credits');
     }
 
+    protected function memberCredit(): MemberPosCredit
+    {
+        /** @var User $user */
+        $user = auth()->user();
+
+        return new MemberPosCredit($user);
+    }
+
+    public function viewOutstandingBalancesAction(): Action
+    {
+        return Action::make('viewOutstandingBalances')
+            ->label(__('View outstanding balance'))
+            ->icon(Heroicon::OutlinedBanknotes)
+            ->modalHeading(__('Outstanding balance'))
+            ->modalContent(fn (): View => view('filament.user.credits-outstanding-modal', [
+                'user' => auth()->user(),
+            ]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('Close'));
+    }
+
+    public function viewGroceryCreditDetailsAction(): Action
+    {
+        return $this->creditDetailsAction(
+            name: 'viewGroceryCreditDetails',
+            channel: PosSaleChannel::Grocery,
+        );
+    }
+
+    public function viewCanteenCreditDetailsAction(): Action
+    {
+        return $this->creditDetailsAction(
+            name: 'viewCanteenCreditDetails',
+            channel: PosSaleChannel::Canteen,
+        );
+    }
+
+    protected function creditDetailsAction(string $name, PosSaleChannel $channel): Action
+    {
+        return Action::make($name)
+            ->modalHeading(__('Unpaid :channel items', ['channel' => $channel->getLabel()]))
+            ->modalContent(fn (): View => view('filament.user.credits-unpaid-items', [
+                'items' => $this->memberCredit()->unpaidLineItems($channel),
+                'channelLabel' => $channel->getLabel(),
+            ]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('Close'));
+    }
+
     public function content(Schema $schema): Schema
     {
+        /** @var User $user */
+        $user = auth()->user();
+
         return $schema
             ->components([
                 Section::make(__('Credits'))
-                    ->description(__('View your credit balance and transaction history.')),
+                    ->description(__('View your outstanding grocery and canteen balances.'))
+                    ->schema([
+                        TextEntry::make('balances_summary')
+                            ->hiddenLabel()
+                            ->state(fn (): HtmlString => new HtmlString(
+                                view('filament.user.credits-summary', ['user' => $user])->render()
+                            ))
+                            ->columnSpanFull(),
+                    ])
+                    ->columnSpanFull(),
+                Actions::make([
+                    $this->viewOutstandingBalancesAction(),
+                ])
+                    ->alignment(Alignment::Center)
+                    ->columnSpanFull(),
             ]);
     }
 }

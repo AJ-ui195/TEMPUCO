@@ -90,15 +90,13 @@ class BranchInventoryPage extends Page implements HasTable
                 $itemId = (int) $data['pos_inventory_item_id'];
                 $quantity = (int) $data['quantity'];
 
-                if ($this->branchRecord->inventoryItems()->where('pos_inventory_items.id', $itemId)->exists()) {
-                    $this->branchRecord->inventoryItems()->updateExistingPivot($itemId, [
-                        'quantity' => $quantity,
-                    ]);
-                } else {
-                    $this->branchRecord->inventoryItems()->attach($itemId, [
-                        'quantity' => $quantity,
-                    ]);
-                }
+                PosBranchInventory::query()->updateOrCreate(
+                    [
+                        'pos_branch_id' => $this->branchRecord->id,
+                        'pos_inventory_item_id' => $itemId,
+                    ],
+                    ['quantity' => $quantity],
+                );
 
                 Notification::make()
                     ->title(__('Product added to branch inventory'))

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -68,5 +69,35 @@ class PosInventoryItem extends Model
         }
 
         return $branchQuantity <= $this->reorder_level;
+    }
+
+    /**
+     * @param  Builder<PosInventoryItem>  $query
+     * @return Builder<PosInventoryItem>
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where($query->qualifyColumn('is_active'), true);
+    }
+
+    /**
+     * @param  Builder<PosInventoryItem>  $query
+     * @return Builder<PosInventoryItem>
+     */
+    public function scopeMatchingSearch(Builder $query, string $term): Builder
+    {
+        return $query->where(function (Builder $inner) use ($term): void {
+            $inner->where($inner->qualifyColumn('name'), 'like', "%{$term}%")
+                ->orWhere($inner->qualifyColumn('sku'), 'like', "%{$term}%");
+        });
+    }
+
+    /**
+     * @param  Builder<PosInventoryItem>  $query
+     * @return Builder<PosInventoryItem>
+     */
+    public function scopeOrderedByName(Builder $query): Builder
+    {
+        return $query->orderBy($query->qualifyColumn('name'));
     }
 }

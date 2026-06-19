@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -74,5 +75,41 @@ class User extends Authenticatable implements FilamentUser
     public function loans(): HasMany
     {
         return $this->hasMany(Loan::class);
+    }
+
+    public function posSales(): HasMany
+    {
+        return $this->hasMany(PosSale::class);
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    public function scopeMembers(Builder $query): Builder
+    {
+        return $query->where($query->qualifyColumn('role'), UserRole::User);
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    public function scopeMatchingSearch(Builder $query, string $term): Builder
+    {
+        return $query->where(function (Builder $inner) use ($term): void {
+            $inner->where($inner->qualifyColumn('name'), 'like', "%{$term}%")
+                ->orWhere($inner->qualifyColumn('email'), 'like', "%{$term}%")
+                ->orWhere($inner->qualifyColumn('cellphone'), 'like', "%{$term}%");
+        });
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    public function scopeOrderedByName(Builder $query): Builder
+    {
+        return $query->orderBy($query->qualifyColumn('name'));
     }
 }

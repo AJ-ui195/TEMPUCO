@@ -2,9 +2,13 @@
 
 namespace App\Filament\Cashier\Pages;
 
+use App\Enums\PosSaleChannel;
 use App\Models\PosInventoryItem;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
+use App\Models\User;
+use App\Support\PhilippineTime;
+use App\Support\MemberQrCodeLookup;
 use App\Support\PosBarcodeLookup;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -35,9 +39,34 @@ class PosGroceryPage extends BaseDashboard
 
     public string $amountPaid = '';
 
+    /** @var 'cash'|'credit' */
+    public string $paymentType = 'cash';
+
+    public string $memberQrInput = '';
+
+    public string $memberSearch = '';
+
+    public ?int $memberId = null;
+
+    public ?string $memberName = null;
+
+    public ?string $memberEmail = null;
+
+    public ?string $memberScanFeedback = null;
+
+    public bool $memberScanFeedbackIsError = false;
+
     public ?string $scanFeedback = null;
 
     public bool $scanFeedbackIsError = false;
+
+    public bool $showReceiptModal = false;
+
+    public ?int $receiptSaleId = null;
+
+    public bool $showConfirmModal = false;
+
+    public string $pendingConfirmAction = '';
 
     public function getTitle(): string|Htmlable
     {
@@ -57,6 +86,13 @@ class PosGroceryPage extends BaseDashboard
             return;
         }
 
+        if ($this->tryAssignMemberFromScan($code)) {
+            $this->barcodeInput = '';
+            $this->dispatch('focus-barcode-scanner');
+
+            return;
+        }
+
         $result = PosBarcodeLookup::find($code);
 
         if (! $result) {
@@ -72,6 +108,85 @@ class PosGroceryPage extends BaseDashboard
         $this->dispatch('focus-barcode-scanner');
     }
 
+    public function updatedMemberQrInput(string $value): void
+    {
+        $code = trim($value);
+
+        if ($code === '' || ! str_contains($code, '{')) {
+            return;
+        }
+
+        if (! str_ends_with($code, '}')) {
+            return;
+        }
+
+        $this->processMemberQrScan($code);
+    }
+
+    public function scanMemberQr(): void
+    {
+        $this->processMemberQrScan(trim($this->memberQrInput));
+    }
+
+    public function clearMember(): void
+    {
+        $this->memberId = null;
+        $this->memberName = null;
+        $this->memberEmail = null;
+        $this->memberQrInput = '';
+        $this->memberSearch = '';
+        $this->memberScanFeedback = null;
+        $this->memberScanFeedbackIsError = false;
+    }
+
+    public function updatedPaymentType(string $value): void
+    {
+        if ($value === 'cash') {
+            $this->clearMember();
+        }
+    }
+
+    /**
+     * @return Collection<int, User>|EloquentCollection<int, User>
+     */
+    public function getMemberSearchResults(): Collection|EloquentCollection
+    {
+        $term = trim($this->memberSearch);
+
+        if (strlen($term) < 2) {
+            return collect();
+        }
+
+        return User::query()
+            ->members()
+            ->matchingSearch($term)
+            ->orderedByName()
+            ->limit(15)
+            ->get();
+    }
+
+    public function selectMember(int $userId): void
+    {
+        $member = User::query()
+            ->members()
+            ->find($userId);
+
+        if (! $member instanceof User) {
+            $this->setMemberScanFeedback(__('Member not found.'), true);
+
+            return;
+        }
+
+        $this->assignMember($member);
+        $this->setMemberScanFeedback(__('Member selected. Verify the name below.'), false);
+        $this->setScanFeedback(__('Member: :name', ['name' => $member->name]), false);
+    }
+
+    public function isCreditSale(): bool
+    {
+        return $this->paymentType === 'credit';
+    }
+
     /**
      * @return Collection<int, PosInventoryItem>|EloquentCollection<int, PosInventoryItem>
      */
@@ -84,12 +199,9 @@ class PosGroceryPage extends BaseDashboard
         }
 
         return PosInventoryItem::query()
-            ->where('is_active', true)
-            ->where(function ($query) use ($term): void {
-                $query->where('name', 'like', "%{$term}%")
-                    ->orWhere('sku', 'like', "%{$term}%");
-            })
-            ->orderBy('name')
+            ->active()
+            ->matchingSearch($term)
+            ->orderedByName()
             ->limit(20)
             ->get();
     }
@@ -97,7 +209,7 @@ class PosGroceryPage extends BaseDashboard
     public function addProductFromSearch(int $productId): void
     {
         $product = PosInventoryItem::query()
-            ->where('is_active', true)
+            ->active()
             ->find($productId);
 
         if (! $product) {
@@ -155,6 +267,8 @@ class PosGroceryPage extends BaseDashboard
     {
         $this->cartLines = [];
         $this->amountPaid = '';
+        $this->clearMember();
+        $this->paymentType = 'cash';
         $this->scanFeedback = null;
         $this->scanFeedbackIsError = false;
     }
@@ -170,7 +284,27 @@ class PosGroceryPage extends BaseDashboard
         $total = $this->getCartTotal();
         $paid = (float) $this->amountPaid;
 
-        if ($paid < $total) {
+        if ($this->isCreditSale()) {
+            if ($this->memberId === null) {
+                Notification::make()
+                    ->title(__('Member required'))
+                    ->body(__('Scan the member QR code before charging to account.'))
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            if ($paid > $total) {
+                Notification::make()
+                    ->title(__('Payment exceeds total'))
+                    ->body(__('Total: ₱:total', ['total' => number_format($total, 2)]))
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+        } elseif ($paid < $total) {
             Notification::make()
                 ->title(__('Payment is less than total'))
                 ->body(__('Total: ₱:total', ['total' => number_format($total, 2)]))
@@ -180,15 +314,17 @@ class PosGroceryPage extends BaseDashboard
             return;
         }
 
-        $userId = auth()->id();
+        $memberId = $this->memberId;
+        $isCredit = $this->isCreditSale();
 
-        DB::transaction(function () use ($userId, $total, $paid): void {
+        $sale = DB::transaction(function () use ($memberId, $isCredit, $total, $paid): PosSale {
             $sale = PosSale::query()->create([
                 'pos_branch_id' => null,
-                'user_id' => $userId,
+                'user_id' => $isCredit ? $memberId : auth()->id(),
+                'sale_channel' => PosSaleChannel::Grocery,
                 'total' => $total,
                 'amount_paid' => $paid,
-                'change_amount' => round($paid - $total, 2),
+                'change_amount' => $isCredit ? 0 : round(max(0, $paid - $total), 2),
                 'reference' => $this->generateSaleReference(),
             ]);
 
@@ -205,16 +341,108 @@ class PosGroceryPage extends BaseDashboard
                     ->whereKey($line['product_id'])
                     ->decrement('quantity', $line['quantity']);
             }
+
+            return $sale;
         });
 
-        Notification::make()
-            ->title(__('Sale completed'))
-            ->body(__('Change: ₱:change', ['change' => number_format($paid - $total, 2)]))
-            ->success()
-            ->send();
+        if ($isCredit) {
+            $outstanding = round($total - $paid, 2);
+            Notification::make()
+                ->title(__('Charged to member account'))
+                ->body($paid > 0
+                    ? __(':member — outstanding: ₱:amount', [
+                        'member' => $this->memberName,
+                        'amount' => number_format($outstanding, 2),
+                    ])
+                    : __(':member — full amount on credit: ₱:amount', [
+                        'member' => $this->memberName,
+                        'amount' => number_format($outstanding, 2),
+                    ]))
+                ->success()
+                ->send();
+        } else {
+            Notification::make()
+                ->title(__('Sale completed'))
+                ->body(__('Change: ₱:change', ['change' => number_format($paid - $total, 2)]))
+                ->success()
+                ->send();
+        }
 
         $this->clearCart();
+        $this->receiptSaleId = $sale->id;
+        $this->showReceiptModal = true;
+    }
+
+    public function closeReceiptModal(): void
+    {
+        $this->showReceiptModal = false;
+        $this->receiptSaleId = null;
         $this->dispatch('focus-barcode-scanner');
+    }
+
+    public function openConfirmModal(string $action): void
+    {
+        $this->pendingConfirmAction = $action;
+        $this->showConfirmModal = true;
+    }
+
+    public function closeConfirmModal(): void
+    {
+        $this->showConfirmModal = false;
+        $this->pendingConfirmAction = '';
+        $this->dispatch('focus-barcode-scanner');
+    }
+
+    public function confirmPendingAction(): void
+    {
+        $action = $this->pendingConfirmAction;
+        $this->closeConfirmModal();
+
+        match ($action) {
+            'complete_sale' => $this->completeSale(),
+            'clear_cart' => $this->clearCart(),
+            default => null,
+        };
+    }
+
+    public function getConfirmModalTitle(): string
+    {
+        return match ($this->pendingConfirmAction) {
+            'complete_sale' => $this->isCreditSale() ? __('Charge to account') : __('Complete sale'),
+            'clear_cart' => __('Clear cart'),
+            default => __('Confirm'),
+        };
+    }
+
+    public function getConfirmModalMessage(): string
+    {
+        return match ($this->pendingConfirmAction) {
+            'complete_sale' => $this->isCreditSale()
+                ? __('Charge this sale to the member account and update stock?')
+                : __('Complete this sale and update stock?'),
+            'clear_cart' => __('Clear all items from the cart?'),
+            default => '',
+        };
+    }
+
+    public function getConfirmModalButtonLabel(): string
+    {
+        return match ($this->pendingConfirmAction) {
+            'complete_sale' => $this->isCreditSale() ? __('Charge to account') : __('Complete sale'),
+            'clear_cart' => __('Clear cart'),
+            default => __('Confirm'),
+        };
+    }
+
+    public function getReceiptSale(): ?PosSale
+    {
+        if ($this->receiptSaleId === null) {
+            return null;
+        }
+
+        return PosSale::query()
+            ->with(['items.inventoryItem', 'user'])
+            ->find($this->receiptSaleId);
     }
 
     public function getCartSubtotal(): float
@@ -224,12 +452,16 @@ class PosGroceryPage extends BaseDashboard
 
     public function getCartTotal(): float
     {
-        return round(collect($this->cartLines)->sum('line_total'), 2);
+        return round(collect($this->cartLines)->sum(
+            fn (array $line): float => (float) ($line['line_total'] ?? 0),
+        ), 2);
     }
 
     public function getCartItemCount(): int
     {
-        return (int) collect($this->cartLines)->sum('quantity');
+        return (int) collect($this->cartLines)->sum(
+            fn (array $line): int => (int) ($line['quantity'] ?? 0),
+        );
     }
 
     public function getChangeAmount(): float
@@ -295,9 +527,55 @@ class PosGroceryPage extends BaseDashboard
     protected function generateSaleReference(): string
     {
         do {
-            $reference = 'POS-'.now()->format('Ymd').'-'.strtoupper(Str::random(6));
-        } while (PosSale::query()->where('reference', $reference)->exists());
+            $reference = 'POS-'.PhilippineTime::now()->format('Ymd').'-'.strtoupper(Str::random(6));
+        } while (PosSale::referenceExists($reference));
 
         return $reference;
+    }
+
+    protected function processMemberQrScan(string $code): void
+    {
+        if ($code === '') {
+            return;
+        }
+
+        if ($this->tryAssignMemberFromScan($code)) {
+            $this->memberQrInput = '';
+
+            return;
+        }
+
+        $this->setMemberScanFeedback(__('Invalid or unrecognized member QR code.'), true);
+        $this->setScanFeedback(__('Invalid or unrecognized member QR code.'), true);
+    }
+
+    protected function tryAssignMemberFromScan(string $code): bool
+    {
+        $member = MemberQrCodeLookup::resolveFromScan($code);
+
+        if (! $member instanceof User) {
+            return false;
+        }
+
+        $this->assignMember($member);
+        $this->setMemberScanFeedback(__('Member identified. Verify the name below.'), false);
+        $this->setScanFeedback(__('Member: :name', ['name' => $member->name]), false);
+
+        return true;
+    }
+
+    protected function assignMember(User $member): void
+    {
+        $this->memberId = $member->id;
+        $this->memberName = $member->name;
+        $this->memberEmail = $member->email;
+        $this->memberSearch = '';
+        $this->memberQrInput = '';
+    }
+
+    protected function setMemberScanFeedback(string $message, bool $isError): void
+    {
+        $this->memberScanFeedback = $message;
+        $this->memberScanFeedbackIsError = $isError;
     }
 }

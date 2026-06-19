@@ -76,6 +76,14 @@
                 border-top-color: rgba(255, 255, 255, 0.1);
             }
 
+            .fi-pos-ui .pos-table tbody tr.pos-line-item td {
+                background: rgb(248 250 252);
+            }
+
+            .dark .fi-pos-ui .pos-table tbody tr.pos-line-item td {
+                background: rgba(31, 41, 55, 0.5);
+            }
+
             .fi-pos-ui .pos-stat {
                 padding: 1rem 1.25rem;
             }

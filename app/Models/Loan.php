@@ -7,6 +7,7 @@ use App\Support\AmountInWords;
 use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Loan extends Model
 {
+    private const LOAN_DATE_COLUMN = 'loan_date';
+
     protected $fillable = [
         'user_id',
         'status',
@@ -74,5 +77,15 @@ class Loan extends Model
     public function amountInWords(): string
     {
         return AmountInWords::format($this->loan_amount);
+    }
+
+    public function scopeForUser(Builder $query, User $user): Builder
+    {
+        return $query->whereBelongsTo($user);
+    }
+
+    public function scopeOrderedByLoanDate(Builder $query): Builder
+    {
+        return $query->orderByDesc(self::LOAN_DATE_COLUMN);
     }
 }

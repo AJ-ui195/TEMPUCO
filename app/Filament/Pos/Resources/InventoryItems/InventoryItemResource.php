@@ -134,6 +134,30 @@ class InventoryItemResource extends Resource
                     ->label(__('Reorder at'))
                     ->placeholder('—')
                     ->alignEnd(),
+                TextColumn::make('stock_status')
+                    ->label(__('Status'))
+                    ->badge()
+                    ->getStateUsing(function (PosInventoryItem $record): string {
+                        if ($record->isLowStock()) {
+                            return 'low';
+                        }
+
+                        if (! $record->is_active) {
+                            return 'inactive';
+                        }
+
+                        return 'ok';
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'low' => __('Low stock'),
+                        'inactive' => __('Inactive'),
+                        default => __('OK'),
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        'low' => 'warning',
+                        'inactive' => 'gray',
+                        default => 'success',
+                    }),
                 IconColumn::make('is_active')
                     ->label(__('Active'))
                     ->boolean(),
