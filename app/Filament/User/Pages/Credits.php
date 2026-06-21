@@ -9,10 +9,7 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Actions;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View;
@@ -46,7 +43,7 @@ class Credits extends Page
     public function viewOutstandingBalancesAction(): Action
     {
         return Action::make('viewOutstandingBalances')
-            ->label(__('View outstanding balance'))
+            ->label(__('View full breakdown'))
             ->icon(Heroicon::OutlinedBanknotes)
             ->modalHeading(__('Outstanding balance'))
             ->modalContent(fn (): View => view('filament.user.credits-outstanding-modal', [
@@ -91,21 +88,11 @@ class Credits extends Page
 
         return $schema
             ->components([
-                Section::make(__('Credits'))
-                    ->description(__('View your outstanding grocery and canteen balances.'))
-                    ->schema([
-                        TextEntry::make('balances_summary')
-                            ->hiddenLabel()
-                            ->state(fn (): HtmlString => new HtmlString(
-                                view('filament.user.credits-summary', ['user' => $user])->render()
-                            ))
-                            ->columnSpanFull(),
-                    ])
-                    ->columnSpanFull(),
-                Actions::make([
-                    $this->viewOutstandingBalancesAction(),
-                ])
-                    ->alignment(Alignment::Center)
+                TextEntry::make('balances_summary')
+                    ->hiddenLabel()
+                    ->state(fn (): HtmlString => new HtmlString(
+                        view('filament.user.credits-summary', ['user' => $user])->render()
+                    ))
                     ->columnSpanFull(),
             ]);
     }

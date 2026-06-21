@@ -10,7 +10,6 @@ use Filament\Actions\Action;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Icons\Heroicon;
@@ -41,26 +40,23 @@ class MemberQrCodePage extends Page
 
         return $schema
             ->components([
-                Section::make(__('My member QR code'))
-                    ->description(__('This QR code identifies you as a TEMPUCO member. Show it when requested by the cooperative.'))
-                    ->schema([
-                        TextEntry::make('qr_code_display')
-                            ->hiddenLabel()
-                            ->state(fn (): HtmlString => new HtmlString(
-                                view('filament.user.member-qr-code', [
-                                    'user' => $user,
-                                    'qrCodeDataUri' => MemberQrCode::dataUriFor($user, scale: 2),
-                                ])->render()
-                            ))
-                            ->columnSpanFull(),
-                    ])
+                TextEntry::make('qr_code_display')
+                    ->hiddenLabel()
+                    ->state(fn (): HtmlString => new HtmlString(
+                        view('filament.user.member-qr-code', [
+                            'user' => $user,
+                            'qrCodeDataUri' => MemberQrCode::dataUriFor($user, scale: 2),
+                        ])->render()
+                    ))
                     ->columnSpanFull(),
                 Actions::make([
                     Action::make('printQrCode')
                         ->label(__('Print QR code'))
                         ->icon(Heroicon::OutlinedPrinter)
                         ->url(fn (): string => PrintMemberQrCode::printUrl($user))
-                        ->openUrlInNewTab(),
+                        ->openUrlInNewTab()
+                        ->color('primary')
+                        ->size('lg'),
                 ])
                     ->alignment(Alignment::Center)
                     ->columnSpanFull(),

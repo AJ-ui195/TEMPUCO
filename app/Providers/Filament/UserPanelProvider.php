@@ -12,6 +12,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -28,6 +29,7 @@ class UserPanelProvider extends PanelProvider
         $panel = $panel
             ->id('user')
             ->path('portal')
+            ->spa()
             ->login(Login::class)
             ->brandName(__('Members Portal'))
             ->brandLogo(asset('images/DICNHSLOGO1.png'))
@@ -57,6 +59,10 @@ class UserPanelProvider extends PanelProvider
                 Authenticate::class,
             ]);
 
-        return $this->registerPortalUi($panel);
+        return $this->registerPortalUi($panel)
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): string => view('filament.hooks.member-portal-ui')->render(),
+            );
     }
 }
