@@ -5,10 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class PosInventoryItem extends Model
+class PosCanteenInventoryItem extends Model
 {
     protected $fillable = [
         'name',
@@ -41,18 +39,6 @@ class PosInventoryItem extends Model
         return $this->belongsTo(PosSupplier::class, 'supplier_id');
     }
 
-    public function branchInventory(): HasMany
-    {
-        return $this->hasMany(PosBranchInventory::class, 'pos_inventory_item_id');
-    }
-
-    public function branches(): BelongsToMany
-    {
-        return $this->belongsToMany(PosBranch::class, 'pos_branch_inventory', 'pos_inventory_item_id', 'pos_branch_id')
-            ->withPivot('quantity')
-            ->withTimestamps();
-    }
-
     public function isLowStock(): bool
     {
         if ($this->reorder_level === null) {
@@ -62,18 +48,9 @@ class PosInventoryItem extends Model
         return $this->quantity <= $this->reorder_level;
     }
 
-    public function isLowStockAtBranch(int $branchQuantity): bool
-    {
-        if ($this->reorder_level === null) {
-            return false;
-        }
-
-        return $branchQuantity <= $this->reorder_level;
-    }
-
     /**
-     * @param  Builder<PosInventoryItem>  $query
-     * @return Builder<PosInventoryItem>
+     * @param  Builder<PosCanteenInventoryItem>  $query
+     * @return Builder<PosCanteenInventoryItem>
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -81,8 +58,8 @@ class PosInventoryItem extends Model
     }
 
     /**
-     * @param  Builder<PosInventoryItem>  $query
-     * @return Builder<PosInventoryItem>
+     * @param  Builder<PosCanteenInventoryItem>  $query
+     * @return Builder<PosCanteenInventoryItem>
      */
     public function scopeMatchingSearch(Builder $query, string $term): Builder
     {
@@ -93,8 +70,8 @@ class PosInventoryItem extends Model
     }
 
     /**
-     * @param  Builder<PosInventoryItem>  $query
-     * @return Builder<PosInventoryItem>
+     * @param  Builder<PosCanteenInventoryItem>  $query
+     * @return Builder<PosCanteenInventoryItem>
      */
     public function scopeLowStockCatalog(Builder $query): Builder
     {
@@ -115,8 +92,8 @@ class PosInventoryItem extends Model
     }
 
     /**
-     * @param  Builder<PosInventoryItem>  $query
-     * @return Builder<PosInventoryItem>
+     * @param  Builder<PosCanteenInventoryItem>  $query
+     * @return Builder<PosCanteenInventoryItem>
      */
     public function scopeOrderedByName(Builder $query): Builder
     {

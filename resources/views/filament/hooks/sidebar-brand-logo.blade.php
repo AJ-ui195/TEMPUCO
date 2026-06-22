@@ -5,7 +5,7 @@
 @endphp
 
 @if (filled($logo))
-    <div class="fi-sidebar-brand-logo mb-6 hidden w-full lg:flex lg:justify-center">
+    <div class="fi-sidebar-brand-logo mb-6 w-full">
         @if ($homeUrl)
             <a {{ \Filament\Support\generate_href_html($homeUrl) }} class="fi-sidebar-brand-logo-link block">
                 <img
@@ -27,9 +27,12 @@
 @endif
 
 <style>
+    /* Single sidebar logo: custom hook only (Filament also renders brandLogo in the header). */
     .fi-sidebar-brand-logo {
+        display: flex !important;
         justify-content: center !important;
         padding-inline: 0;
+        width: 100%;
     }
 
     .fi-sidebar-brand-logo-link,
@@ -37,28 +40,11 @@
         margin-inline: auto !important;
     }
 
-    .fi-sidebar-header-logo-ctn {
-        display: flex !important;
-        flex: none;
-        width: 100% !important;
-        justify-content: center !important;
-        align-items: center !important;
-        text-align: center;
+    .fi-body-has-topbar .fi-sidebar-header-ctn {
+        display: none !important;
     }
 
-    .fi-sidebar-header-logo-ctn > a {
-        display: block;
-        margin-inline: auto !important;
-    }
-
-    .fi-sidebar-header-logo-ctn .fi-logo,
-    .fi-sidebar-header-logo-ctn img.fi-logo {
-        margin-inline: auto !important;
-        margin-inline-start: auto !important;
-    }
-
-    .fi-sidebar-brand-logo-img,
-    .fi-sidebar-header-logo-ctn img.fi-logo {
+    .fi-sidebar-brand-logo-img {
         filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.95))
             drop-shadow(0 0 8px rgba(255, 255, 255, 0.7))
             drop-shadow(0 0 14px rgba(147, 197, 253, 0.55));

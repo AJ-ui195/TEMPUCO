@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Filament\Pos\Resources\InventoryItems\Pages;
+namespace App\Filament\Canteen\Resources\InventoryItems\Pages;
 
-use App\Filament\Pos\Resources\InventoryItems\InventoryItemResource;
+use App\Filament\Canteen\Resources\InventoryItems\CanteenInventoryItemResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 
-class ManageInventoryItems extends ManageRecords
+class ManageCanteenInventoryItems extends ManageRecords
 {
-    protected static string $resource = InventoryItemResource::class;
+    protected static string $resource = CanteenInventoryItemResource::class;
 
     protected static ?string $title = 'Products';
 

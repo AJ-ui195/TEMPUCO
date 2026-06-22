@@ -1,14 +1,14 @@
-@if (! in_array($currentPanel ?? null, ['pos', 'inventory'], true))
+@if (! in_array($currentPanel ?? null, ['pos', 'pos-canteen'], true))
     @php
         $panels = [
             'user' => [
                 'loginLabel' => __('Member sign in'),
             ],
             'pos' => [
-                'loginLabel' => __('Cashier sign in'),
+                'loginLabel' => __('Grocery cashier sign in'),
             ],
-            'inventory' => [
-                'loginLabel' => __('Inventory sign in'),
+            'pos-canteen' => [
+                'loginLabel' => __('Canteen cashier sign in'),
             ],
             'admin' => [
                 'loginLabel' => __('Admin sign in'),

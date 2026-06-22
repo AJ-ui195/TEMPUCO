@@ -56,6 +56,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->role === UserRole::Cashier;
     }
 
+    public function isCanteenCashier(): bool
+    {
+        return $this->role === UserRole::CanteenCashier;
+    }
+
     public function isInventory(): bool
     {
         return $this->role === UserRole::Inventory;
@@ -67,7 +72,7 @@ class User extends Authenticatable implements FilamentUser
             'admin' => $this->role === UserRole::Admin,
             'user' => $this->role === UserRole::User,
             'pos' => $this->role === UserRole::Cashier,
-            'inventory' => $this->role === UserRole::Inventory,
+            'pos-canteen' => $this->role === UserRole::CanteenCashier,
             default => false,
         };
     }
@@ -102,6 +107,24 @@ class User extends Authenticatable implements FilamentUser
                 ->orWhere($inner->qualifyColumn('email'), 'like', "%{$term}%")
                 ->orWhere($inner->qualifyColumn('cellphone'), 'like', "%{$term}%");
         });
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    public function scopeGroceryCashiers(Builder $query): Builder
+    {
+        return $query->where($query->qualifyColumn('role'), UserRole::Cashier);
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    public function scopeCanteenCashiers(Builder $query): Builder
+    {
+        return $query->where($query->qualifyColumn('role'), UserRole::CanteenCashier);
     }
 
     /**

@@ -3,6 +3,8 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Pages\Login;
+use App\Filament\Pos\Pages\BranchInventoryPage;
+use App\Filament\Pos\Pages\BranchesPage;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -40,6 +42,11 @@ class PosPanelProvider extends PanelProvider
             ->sidebarFullyCollapsibleOnDesktop()
             ->userMenu(false)
             ->discoverPages(in: app_path('Filament/Cashier/Pages'), for: 'App\Filament\Cashier\Pages')
+            ->discoverResources(in: app_path('Filament/Pos/Resources'), for: 'App\Filament\Pos\Resources')
+            ->pages([
+                BranchesPage::class,
+                BranchInventoryPage::class,
+            ])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

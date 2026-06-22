@@ -29,7 +29,7 @@
             </button>
             <div style="display: flex; flex-direction: column; gap: 0.5rem; padding: 0 1rem 1rem;">
                 <a
-                    href="{{ BranchInventoryPage::getUrl(['branch' => $branch->id], panel: 'inventory') }}"
+                    href="{{ BranchInventoryPage::getUrl(['branch' => $branch->id], panel: 'pos') }}"
                     style="display: block; width: 100%; padding: 0.5rem 0.75rem; font-size: 0.8125rem; font-weight: 600; color: #fff; background: #0284c7; border: none; border-radius: 0.5rem; cursor: pointer; text-align: center; text-decoration: none; box-sizing: border-box;"
                 >
                     {{ __('View inventory') }}

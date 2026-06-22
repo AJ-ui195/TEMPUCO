@@ -39,7 +39,7 @@ class PosSalesReport
 
     public function query(): Builder
     {
-        $query = PosSale::query()->with(['user', 'items.inventoryItem']);
+        $query = PosSale::query()->with(['user', 'items.inventoryItem', 'items.canteenInventoryItem']);
 
         match ($this->period) {
             self::PERIOD_TODAY => $query->whereDate('created_at', today()),
@@ -134,6 +134,7 @@ class PosSalesReport
                 'pos_inventory_item_id',
                 DB::raw('SUM(quantity) as quantity_sold'),
             ])
+            ->whereNotNull('pos_inventory_item_id')
             ->with('inventoryItem:id,name,sku')
             ->whereIn('pos_sale_id', $allSaleIds)
             ->groupBy('pos_inventory_item_id')
@@ -146,12 +147,13 @@ class PosSalesReport
                 DB::raw('SUM(line_total) as revenue'),
             ])
             ->whereIn('pos_sale_id', $cashSaleIds)
+            ->whereNotNull('pos_inventory_item_id')
             ->groupBy('pos_inventory_item_id')
             ->pluck('revenue', 'pos_inventory_item_id');
 
         return $rows->map(fn (PosSaleItem $row): array => [
-            'name' => $row->inventoryItem?->name ?? __('Unknown product'),
-            'sku' => $row->inventoryItem?->sku,
+            'name' => $row->catalogProduct()?->name ?? __('Unknown product'),
+            'sku' => $row->catalogProduct()?->sku,
             'quantity_sold' => (int) $row->quantity_sold,
             'revenue' => (float) ($cashRevenueByItem[$row->pos_inventory_item_id] ?? 0),
         ]);

@@ -20,7 +20,7 @@ final class PrintPosSaleReceipt
      */
     public static function viewData(PosSale $sale, ?User $cashier, bool $autoPrint = false): array
     {
-        $sale->loadMissing(['items.inventoryItem', 'user']);
+        $sale->loadMissing(['items.inventoryItem', 'items.canteenInventoryItem', 'user']);
 
         return [
             'sale' => $sale,

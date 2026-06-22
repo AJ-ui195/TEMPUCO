@@ -7,6 +7,7 @@ enum UserRole: string
     case Admin = 'admin';
     case User = 'user';
     case Cashier = 'cashier';
+    case CanteenCashier = 'canteen_cashier';
     case Inventory = 'inventory';
 
     public function getLabel(): string
@@ -14,7 +15,8 @@ enum UserRole: string
         return match ($this) {
             self::Admin => 'Admin',
             self::User => 'User',
-            self::Cashier => __('Cashier'),
+            self::Cashier => __('Grocery cashier'),
+            self::CanteenCashier => __('Canteen cashier'),
             self::Inventory => __('Inventory'),
         };
     }

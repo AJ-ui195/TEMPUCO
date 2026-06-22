@@ -12,6 +12,6 @@ trait InteractsWithInventoryPanel
      */
     protected static function inventoryPageUrl(string $pageClass, array $parameters = []): string
     {
-        return $pageClass::getUrl($parameters, panel: 'inventory');
+        return $pageClass::getUrl($parameters, panel: 'pos');
     }
 }

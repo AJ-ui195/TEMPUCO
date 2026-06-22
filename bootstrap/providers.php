@@ -2,7 +2,7 @@
 
 use App\Providers\AppServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
-use App\Providers\Filament\InventoryPanelProvider;
+use App\Providers\Filament\PosCanteenPanelProvider;
 use App\Providers\Filament\PosPanelProvider;
 use App\Providers\Filament\UserPanelProvider;
 
@@ -11,5 +11,5 @@ return [
     AdminPanelProvider::class,
     UserPanelProvider::class,
     PosPanelProvider::class,
-    InventoryPanelProvider::class,
+    PosCanteenPanelProvider::class,
 ];

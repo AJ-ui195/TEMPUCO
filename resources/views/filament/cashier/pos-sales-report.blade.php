@@ -233,9 +233,9 @@
                                 @foreach ($sale->items as $line)
                                     <tr class="pos-line-item">
                                         <td colspan="6" style="padding: 0.25rem 0.75rem 0.5rem 1.5rem; font-size: 0.75rem;">
-                                            <span style="font-weight: 600;">{{ $line->inventoryItem?->name ?? __('Unknown product') }}</span>
+                                            <span style="font-weight: 600;">{{ $line->productName() }}</span>
                                             <span class="pos-muted">
-                                                · {{ $line->inventoryItem?->sku ?? __('No SKU') }}
+                                                · {{ $line->productSku() ?? __('No SKU') }}
                                                 · {{ __('Qty') }}: {{ $line->quantity }}
                                                 · ₱{{ number_format((float) $line->unit_price, 2) }}
                                                 · {{ __('Line total') }}: ₱{{ number_format((float) $line->line_total, 2) }}

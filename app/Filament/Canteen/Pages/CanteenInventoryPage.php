@@ -1,47 +1,57 @@
 <?php
 
-namespace App\Filament\Pos\Pages;
+namespace App\Filament\Canteen\Pages;
 
-use App\Models\PosInventoryItem;
+use App\Enums\PosSaleChannel;
+use App\Models\PosCanteenInventoryItem;
+use App\Support\CanteenLowStockNotifier;
 use App\Support\FastMovingItemsReport;
-use App\Support\LowStockNotifier;
-use Filament\Facades\Filament;
+use BackedEnum;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Pages\Dashboard as BaseDashboard;
+use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
 
-class InventoryDashboard extends BaseDashboard
+class CanteenInventoryPage extends Page
 {
-    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
+    protected static ?string $navigationLabel = 'Overview';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Inventory';
+
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $slug = 'inventory';
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBox;
+
+    protected static ?string $title = 'Canteen inventory';
+
+    public function getTitle(): string|Htmlable
+    {
+        return static::$title ?? __('Canteen inventory');
+    }
 
     public function mount(): void
     {
-        LowStockNotifier::notifyDashboardSummary();
+        CanteenLowStockNotifier::notifyDashboardSummary();
     }
 
-    #[\Override]
-    public function getWidgets(): array
-    {
-        return Filament::getWidgets();
-    }
-
-    #[\Override]
     public function content(Schema $schema): Schema
     {
-        $totalItems = PosInventoryItem::query()->count();
-        $activeItems = PosInventoryItem::query()->active()->count();
-        $lowStockItems = LowStockNotifier::lowStockCatalogItems();
+        $totalItems = PosCanteenInventoryItem::query()->count();
+        $activeItems = PosCanteenInventoryItem::query()->active()->count();
+        $lowStockItems = CanteenLowStockNotifier::lowStockCatalogItems();
         $lowStockCount = $lowStockItems->count();
-        $fastMovingReport = new FastMovingItemsReport;
+        $fastMovingReport = new FastMovingItemsReport(saleChannel: PosSaleChannel::Canteen);
         $fastMovingItems = $fastMovingReport->top(10);
 
         $lowStockList = $lowStockItems->isEmpty()
             ? __('No products are below their reorder level.')
             : $lowStockItems
-                ->map(fn (PosInventoryItem $item): string => __(':name — :qty in stock (reorder at :level)', [
+                ->map(fn (PosCanteenInventoryItem $item): string => __(':name — :qty in stock (reorder at :level)', [
                     'name' => $item->name,
                     'qty' => $item->quantity,
                     'level' => $item->reorder_level,
@@ -50,15 +60,12 @@ class InventoryDashboard extends BaseDashboard
 
         return $schema
             ->components([
-                Section::make(__('Welcome'))
-                    ->description(__('You are signed in to the inventory portal. Use the sidebar to manage products, suppliers, and branches.')),
                 Section::make(__('Inventory overview'))
-                    ->description(__('Total: :total · Active: :active · Low stock: :low', [
+                    ->description(__('Manage canteen product stock from the sidebar. Total: :total · Active: :active · Low stock: :low', [
                         'total' => $totalItems,
                         'active' => $activeItems,
                         'low' => $lowStockCount,
                     ])),
-                $this->getWidgetsContentComponent(),
                 Section::make(__('Top 10 fast moving items'))
                     ->description(__('Products with the highest quantity sold — :period.', [
                         'period' => $fastMovingReport->periodLabel(),

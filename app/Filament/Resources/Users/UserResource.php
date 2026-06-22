@@ -20,6 +20,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class UserResource extends Resource
@@ -59,7 +60,7 @@ class UserResource extends Resource
                         UserRole::Admin->value => UserRole::Admin->getLabel(),
                         UserRole::User->value => UserRole::User->getLabel(),
                         UserRole::Cashier->value => UserRole::Cashier->getLabel(),
-                        UserRole::Inventory->value => UserRole::Inventory->getLabel(),
+                        UserRole::CanteenCashier->value => UserRole::CanteenCashier->getLabel(),
                     ])
                     ->required()
                     ->default(UserRole::User->value)
@@ -116,6 +117,7 @@ class UserResource extends Resource
                             UserRole::Admin => 'danger',
                             UserRole::User => 'gray',
                             UserRole::Cashier => 'info',
+                            UserRole::CanteenCashier => 'warning',
                             UserRole::Inventory => 'success',
                             default => 'gray',
                         };
@@ -139,6 +141,14 @@ class UserResource extends Resource
                     ->extraImgAttributes(fn (User $record): array => [
                         'alt' => "QR code for {$record->name}",
                     ]),
+            ])
+            ->filters([
+                SelectFilter::make('role')
+                    ->label(__('Role'))
+                    ->options(collect(UserRole::cases())->mapWithKeys(
+                        fn (UserRole $role): array => [$role->value => $role->getLabel()],
+                    )->all())
+                    ->native(false),
             ])
             ->defaultSort('name')
             ->deferLoading()

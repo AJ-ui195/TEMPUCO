@@ -2,18 +2,24 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\User;
+use App\Models\Loan;
 use Filament\Widgets\ChartWidget;
 
-class UserRegistrationsChartWidget extends ChartWidget
+class LoanApplicationsChartWidget extends ChartWidget
 {
     protected static ?int $sort = -1;
 
-    protected ?string $heading = 'User registrations';
-
-    protected ?string $description = 'New accounts per day over the last 30 days';
-
     protected int | string | array $columnSpan = 'full';
+
+    public function getHeading(): ?string
+    {
+        return __('Loan applications');
+    }
+
+    public function getDescription(): ?string
+    {
+        return __('Member loan applications per day over the last 30 days');
+    }
 
     protected function getType(): string
     {
@@ -31,14 +37,17 @@ class UserRegistrationsChartWidget extends ChartWidget
         for ($i = 29; $i >= 0; $i--) {
             $day = now()->subDays($i)->startOfDay();
             $labels[] = $day->format('M j');
-            $counts[] = User::whereDate('created_at', $day)->count();
+            $counts[] = Loan::query()
+                ->whereHas('user', fn ($query) => $query->members())
+                ->whereLoanDate($day)
+                ->count();
         }
 
         return [
             'labels' => $labels,
             'datasets' => [
                 [
-                    'label' => 'Registrations',
+                    'label' => __('Applications'),
                     'data' => $counts,
                 ],
             ],

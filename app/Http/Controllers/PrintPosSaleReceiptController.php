@@ -14,7 +14,7 @@ class PrintPosSaleReceiptController extends Controller
         $user = $request->user();
 
         abort_unless(
-            $user?->isCashier() || $user?->isAdmin(),
+            $user?->isCashier() || $user?->isCanteenCashier() || $user?->isAdmin(),
             403,
         );
 

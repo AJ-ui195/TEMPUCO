@@ -40,7 +40,7 @@
             @foreach ($sale->items as $line)
                 <tr>
                     <td>
-                        {{ $line->inventoryItem?->name ?? __('Unknown item') }}
+                        {{ $line->productName() }}
                         <div class="pos-receipt-paper__muted">@ ₱{{ number_format((float) $line->unit_price, 2) }}</div>
                     </td>
                     <td class="pos-receipt-paper__qty">{{ $line->quantity }}</td>

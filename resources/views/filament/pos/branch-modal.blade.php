@@ -29,7 +29,7 @@
     </div>
     <div style="padding-top: 0.5rem;">
         <a
-            href="{{ \App\Filament\Pos\Pages\BranchInventoryPage::getUrl(['branch' => $branch->id], panel: 'inventory') }}"
+            href="{{ \App\Filament\Pos\Pages\BranchInventoryPage::getUrl(['branch' => $branch->id], panel: 'pos') }}"
             wire:navigate
             style="display: block; width: 100%; padding: 0.625rem 0.875rem; font-size: 0.875rem; font-weight: 600; color: #fff; background: #0284c7; border: none; border-radius: 0.5rem; cursor: pointer; text-align: center; text-decoration: none; box-sizing: border-box;"
         >

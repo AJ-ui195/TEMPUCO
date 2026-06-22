@@ -2,16 +2,16 @@
 
 namespace App\Support;
 
-use App\Models\PosInventoryItem;
+use App\Models\PosCanteenInventoryItem;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as SupportCollection;
 
-final class LowStockNotifier
+final class CanteenLowStockNotifier
 {
-    public static function notifyCatalogItemIfNewlyLow(PosInventoryItem $item, ?int $previousQuantity): void
+    public static function notifyCatalogItemIfNewlyLow(PosCanteenInventoryItem $item, ?int $previousQuantity): void
     {
         if (! $item->is_active || $item->reorder_level === null) {
             return;
@@ -34,37 +34,9 @@ final class LowStockNotifier
         );
     }
 
-    public static function notifyBranchItemIfNewlyLow(
-        PosInventoryItem $item,
-        int $quantity,
-        ?int $previousQuantity,
-        string $branchName,
-    ): void {
-        if (! $item->is_active || $item->reorder_level === null) {
-            return;
-        }
-
-        if (! $item->isLowStockAtBranch($quantity)) {
-            return;
-        }
-
-        if ($previousQuantity !== null && $item->isLowStockAtBranch($previousQuantity)) {
-            return;
-        }
-
-        self::dispatch(
-            title: __('Low stock at :branch', ['branch' => $branchName]),
-            body: __(':name — :qty in stock (reorder at :level).', [
-                'name' => $item->name,
-                'qty' => $quantity,
-                'level' => $item->reorder_level,
-            ]),
-        );
-    }
-
     public static function notifyDashboardSummary(): void
     {
-        if (session('grocery_low_stock_summary_shown')) {
+        if (session('canteen_low_stock_summary_shown')) {
             return;
         }
 
@@ -74,7 +46,7 @@ final class LowStockNotifier
             return;
         }
 
-        session(['grocery_low_stock_summary_shown' => true]);
+        session(['canteen_low_stock_summary_shown' => true]);
 
         $lines = self::buildLowStockSummaryText($items->take(5));
 
@@ -84,7 +56,7 @@ final class LowStockNotifier
 
         Notification::make()
             ->title(trans_choice(
-                ':count product is low on stock|:count products are low on stock',
+                ':count canteen product is low on stock|:count canteen products are low on stock',
                 $items->count(),
                 ['count' => $items->count()],
             ))
@@ -96,17 +68,17 @@ final class LowStockNotifier
     }
 
     /**
-     * @return Collection<int, PosInventoryItem>
+     * @return Collection<int, PosCanteenInventoryItem>
      */
     public static function lowStockCatalogItems(): Collection
     {
-        return PosInventoryItem::query()
+        return PosCanteenInventoryItem::query()
             ->lowStockCatalog()
             ->get();
     }
 
     /**
-     * @param  Collection<int, PosInventoryItem>  $items
+     * @param  Collection<int, PosCanteenInventoryItem>  $items
      */
     protected static function buildLowStockSummaryText(Collection $items): string
     {
@@ -122,16 +94,16 @@ final class LowStockNotifier
     /**
      * @return SupportCollection<int, User>
      */
-    protected static function groceryRecipients(): SupportCollection
+    protected static function canteenRecipients(): SupportCollection
     {
         return User::query()
-            ->groceryCashiers()
+            ->canteenCashiers()
             ->get();
     }
 
     protected static function dispatch(string $title, string $body): void
     {
-        $recipients = self::groceryRecipients();
+        $recipients = self::canteenRecipients();
 
         if ($recipients->isEmpty()) {
             return;
@@ -147,7 +119,7 @@ final class LowStockNotifier
 
         $user = auth()->user();
 
-        if ($user instanceof User && $user->isCashier()) {
+        if ($user instanceof User && $user->isCanteenCashier()) {
             $notification->send();
         }
     }

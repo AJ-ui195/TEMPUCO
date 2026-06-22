@@ -4,8 +4,10 @@ namespace App\Filament\User\Widgets;
 
 use App\Enums\LoanStatus;
 use App\Models\Loan;
+use App\Models\User;
 use App\Support\PrintMemberLoan;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -27,7 +29,7 @@ class UserLoansTableWidget extends TableWidget
             ->description(__('Track the status and details of your loan applications.'))
             ->striped()
             ->paginated([5, 10, 25])
-            ->query(fn (): Builder => Loan::query()->forUser(auth()->user())->orderedByLoanDate())
+            ->query(fn (): Builder => $this->memberLoansQuery())
             ->columns([
                 TextColumn::make('status')
                     ->label(__('Status'))
@@ -72,5 +74,13 @@ class UserLoansTableWidget extends TableWidget
             ])
             ->emptyStateHeading(__('No loans yet'))
             ->emptyStateDescription(__('When you have active or past loans, they will appear here.'));
+    }
+
+    protected function memberLoansQuery(): Builder
+    {
+        /** @var User $user */
+        $user = Filament::auth()->user();
+
+        return Loan::query()->forUser($user)->orderedByLoanDate();
     }
 }

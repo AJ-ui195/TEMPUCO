@@ -88,4 +88,13 @@ class Loan extends Model
     {
         return $query->orderByDesc(self::LOAN_DATE_COLUMN);
     }
+
+    /**
+     * @param  Builder<Loan>  $query
+     * @return Builder<Loan>
+     */
+    public function scopeWhereLoanDate(Builder $query, \DateTimeInterface|string $date): Builder
+    {
+        return $query->whereDate($query->qualifyColumn(self::LOAN_DATE_COLUMN), $date);
+    }
 }

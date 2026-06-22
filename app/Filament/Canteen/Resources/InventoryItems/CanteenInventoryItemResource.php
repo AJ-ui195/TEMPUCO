@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Filament\Pos\Resources\InventoryItems;
+namespace App\Filament\Canteen\Resources\InventoryItems;
 
-use App\Filament\Pos\Resources\InventoryItems\Pages\ManageInventoryItems;
-use App\Models\PosInventoryItem;
+use App\Filament\Canteen\Resources\InventoryItems\Pages\ManageCanteenInventoryItems;
+use App\Models\PosCanteenInventoryItem;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -20,9 +20,9 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
-class InventoryItemResource extends Resource
+class CanteenInventoryItemResource extends Resource
 {
-    protected static ?string $model = PosInventoryItem::class;
+    protected static ?string $model = PosCanteenInventoryItem::class;
 
     protected static ?string $slug = 'products';
 
@@ -137,7 +137,7 @@ class InventoryItemResource extends Resource
                 TextColumn::make('stock_status')
                     ->label(__('Status'))
                     ->badge()
-                    ->getStateUsing(function (PosInventoryItem $record): string {
+                    ->getStateUsing(function (PosCanteenInventoryItem $record): string {
                         if ($record->isLowStock()) {
                             return 'low';
                         }
@@ -177,7 +177,7 @@ class InventoryItemResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ManageInventoryItems::route('/'),
+            'index' => ManageCanteenInventoryItems::route('/'),
         ];
     }
 }

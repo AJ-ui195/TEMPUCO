@@ -10,6 +10,7 @@ class PosSaleItem extends Model
     protected $fillable = [
         'pos_sale_id',
         'pos_inventory_item_id',
+        'pos_canteen_inventory_item_id',
         'quantity',
         'unit_price',
         'line_total',
@@ -35,5 +36,25 @@ class PosSaleItem extends Model
     public function inventoryItem(): BelongsTo
     {
         return $this->belongsTo(PosInventoryItem::class, 'pos_inventory_item_id');
+    }
+
+    public function canteenInventoryItem(): BelongsTo
+    {
+        return $this->belongsTo(PosCanteenInventoryItem::class, 'pos_canteen_inventory_item_id');
+    }
+
+    public function catalogProduct(): PosInventoryItem|PosCanteenInventoryItem|null
+    {
+        return $this->inventoryItem ?? $this->canteenInventoryItem;
+    }
+
+    public function productName(): string
+    {
+        return $this->catalogProduct()?->name ?? __('Unknown item');
+    }
+
+    public function productSku(): ?string
+    {
+        return $this->catalogProduct()?->sku;
     }
 }

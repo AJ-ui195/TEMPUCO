@@ -43,7 +43,7 @@ class MemberPosCredit
     public function unpaidSales(PosSaleChannel $channel): Collection
     {
         return $this->unpaidSalesQuery($channel)
-            ->with(['items.inventoryItem'])
+            ->with(['items.inventoryItem', 'items.canteenInventoryItem'])
             ->latest()
             ->get();
     }
@@ -59,7 +59,7 @@ class MemberPosCredit
             ->flatMap(function (PosSale $sale): Collection {
                 return $sale->items->map(fn (PosSaleItem $item): array => [
                     'date' => PhilippineTime::format($sale->created_at),
-                    'name' => $item->inventoryItem?->name ?? __('Unknown item'),
+                    'name' => $item->productName(),
                     'quantity' => (int) $item->quantity,
                     'unit_price' => (float) $item->unit_price,
                     'line_total' => (float) $item->line_total,

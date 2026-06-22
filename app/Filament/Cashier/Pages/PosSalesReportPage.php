@@ -155,8 +155,8 @@ class PosSalesReportPage extends Page
                 foreach ($sale->items as $line) {
                     fputcsv($handle, [
                         '',
-                        $line->inventoryItem?->name ?? __('Unknown product'),
-                        $line->inventoryItem?->sku ?? '',
+                        $line->productName(),
+                        $line->productSku() ?? '',
                         $line->quantity,
                         number_format((float) $line->unit_price, 2, '.', ''),
                         number_format((float) $line->line_total, 2, '.', ''),

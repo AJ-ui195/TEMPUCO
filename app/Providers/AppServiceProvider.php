@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use App\Auth\Http\Responses\FilamentLoginResponse;
 use App\Models\PosBranchInventory;
+use App\Models\PosCanteenInventoryItem;
 use App\Models\PosInventoryItem;
 use App\Observers\PosBranchInventoryObserver;
+use App\Observers\PosCanteenInventoryItemObserver;
 use App\Observers\PosInventoryItemObserver;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Illuminate\Support\ServiceProvider;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         PosInventoryItem::observe(PosInventoryItemObserver::class);
+        PosCanteenInventoryItem::observe(PosCanteenInventoryItemObserver::class);
         PosBranchInventory::observe(PosBranchInventoryObserver::class);
     }
 }
