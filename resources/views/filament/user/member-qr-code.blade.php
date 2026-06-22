@@ -1,27 +1,27 @@
-<div class="fi-member-qr-code mx-auto max-w-md text-center">
-    <h2 class="text-xl font-semibold text-gray-950 dark:text-white">
-        {{ $user->name }}
-    </h2>
-    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-        {{ $user->email }}
-    </p>
-    @if (filled($user->cellphone))
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-            {{ $user->cellphone }}
-        </p>
+<div class="mp-qr-card">
+    <p class="mp-stat-label" style="text-transform: uppercase; letter-spacing: 0.06em;">{{ __('TEMPUCO Member') }}</p>
+    <h2 class="mp-qr-name" style="margin-top: 0.5rem;">{{ $user->name }}</h2>
+
+    @if (filled($user->email))
+        <p class="mp-qr-detail">{{ $user->email }}</p>
     @endif
 
-    <div style="width: 150px; height: 150px; margin: 1rem auto 0;">
+    @if (filled($user->cellphone))
+        <p class="mp-qr-detail">{{ $user->cellphone }}</p>
+    @endif
+
+    <div class="mp-qr-frame">
         <img
             src="{{ $qrCodeDataUri }}"
             alt="{{ __('QR code for :name', ['name' => $user->name]) }}"
-            width="150"
-            height="150"
-            style="display: block; width: 150px; height: 150px; max-width: 150px; max-height: 150px;"
+            width="160"
+            height="160"
         >
     </div>
 
-    <p style="margin: 1rem 0 0; font-size: 0.875rem; color: #6b7280;">
-        {{ __('Member ID') }}: {{ $user->id }}
+    <span class="mp-qr-badge">{{ __('Member ID') }}: #{{ $user->id }}</span>
+
+    <p class="mp-qr-detail" style="margin-top: 1rem; font-size: 0.8125rem; line-height: 1.5;">
+        {{ __('Present this code when making purchases or when requested by cooperative staff.') }}
     </p>
 </div>

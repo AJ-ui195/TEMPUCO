@@ -1,11 +1,11 @@
-<div class="loan-application-header mb-6 space-y-2 text-center">
-    <p class="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+<div class="mp-loan-header">
+    <p class="mp-loan-header-org">
         {{ __('Digos City National High School Teachers and Employees Multi-Purpose Cooperative (DICNHS TEMPUCO)') }}
     </p>
-    <p class="text-xs text-gray-500 dark:text-gray-500">
+    <p class="mp-loan-header-address">
         {{ __('Rizal Avenue, Digos City') }}
     </p>
-    <h2 class="pt-2 text-xl font-bold uppercase tracking-wide text-gray-950 underline decoration-gray-400 underline-offset-4 dark:text-white dark:decoration-gray-600">
+    <h2 class="mp-loan-header-title">
         {{ __('Loan Application') }}
     </h2>
 </div>

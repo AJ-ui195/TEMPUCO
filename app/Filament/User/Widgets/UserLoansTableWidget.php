@@ -4,6 +4,9 @@ namespace App\Filament\User\Widgets;
 
 use App\Enums\LoanStatus;
 use App\Models\Loan;
+use App\Support\PrintMemberLoan;
+use Filament\Actions\Action;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -21,7 +24,9 @@ class UserLoansTableWidget extends TableWidget
     {
         return $table
             ->heading(__('My loans'))
-            ->description(__('Loans linked to your account.'))
+            ->description(__('Track the status and details of your loan applications.'))
+            ->striped()
+            ->paginated([5, 10, 25])
             ->query(fn (): Builder => Loan::query()->forUser(auth()->user())->orderedByLoanDate())
             ->columns([
                 TextColumn::make('status')
@@ -53,6 +58,17 @@ class UserLoansTableWidget extends TableWidget
                 TextColumn::make('loan_date')
                     ->label(__('Date'))
                     ->date(),
+            ])
+            ->recordActions([
+                Action::make('printLoanDetails')
+                    ->label(__('Print details'))
+                    ->icon(Heroicon::OutlinedPrinter)
+                    ->url(fn (Loan $record): string => PrintMemberLoan::printUrl($record))
+                    ->openUrlInNewTab()
+                    ->disabled(fn (Loan $record): bool => $record->status !== LoanStatus::Approved)
+                    ->tooltip(fn (Loan $record): ?string => $record->status !== LoanStatus::Approved
+                        ? __('Available only for approved loans.')
+                        : __('Open printable loan details form')),
             ])
             ->emptyStateHeading(__('No loans yet'))
             ->emptyStateDescription(__('When you have active or past loans, they will appear here.'));
