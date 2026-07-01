@@ -166,11 +166,14 @@
         display: inline-flex;
         align-items: center;
         gap: 0.375rem;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
 
     .mp-stat-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
         gap: 1rem;
     }
 
@@ -278,7 +281,7 @@
 
     .mp-quick-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
         gap: 0.875rem;
     }
 
@@ -394,7 +397,7 @@
 
     .mp-credit-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
         gap: 1rem;
     }
 
@@ -470,8 +473,9 @@
 
     .mp-qr-frame img {
         display: block;
-        width: 160px;
-        height: 160px;
+        width: min(160px, 100%);
+        height: auto;
+        aspect-ratio: 1;
     }
 
     .mp-qr-name {
@@ -674,5 +678,169 @@
         display: flex;
         flex-direction: column;
         gap: 0.875rem;
+    }
+
+    /* ── Mobile & PWA safe-area (Members Portal only) ── */
+    .fi-panel-user.fi-body {
+        padding-left: env(safe-area-inset-left, 0);
+        padding-right: env(safe-area-inset-right, 0);
+        padding-bottom: env(safe-area-inset-bottom, 0);
+        -webkit-text-size-adjust: 100%;
+    }
+
+    .fi-panel-user .fi-topbar-ctn {
+        padding-top: env(safe-area-inset-top, 0);
+    }
+
+    .fi-panel-user .fi-main-ctn {
+        width: 100%;
+        max-width: 72rem;
+        margin-inline: auto;
+    }
+
+    .fi-panel-user .fi-ta-ctn,
+    .fi-panel-user .mp-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .fi-panel-user .mp-table {
+        min-width: 36rem;
+    }
+
+    .fi-panel-user .fi-ta-table {
+        min-width: 40rem;
+    }
+
+  @media (max-width: 767px) {
+        .fi-panel-user .fi-main {
+            padding: 0.75rem;
+        }
+
+        .fi-panel-user .fi-page-main {
+            gap: 1rem;
+        }
+
+        .fi-panel-user .fi-section:not(.fi-section-not-contained) > .fi-section-header,
+        .fi-panel-user .fi-section:not(.fi-section-not-contained) > .fi-section-content-ctn > .fi-section-content {
+            padding-inline: 0.875rem;
+        }
+
+        .fi-panel-user .fi-topbar-brand-name {
+            max-width: 9.5rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .fi-panel-user .fi-sidebar-brand-logo-img {
+            height: 4rem !important;
+            max-height: 4rem;
+        }
+
+        .fi-panel-user .mp-hero {
+            padding: 1.25rem 1rem;
+            border-radius: 1rem;
+        }
+
+        .fi-panel-user .mp-hero-title {
+            font-size: 1.375rem;
+        }
+
+        .fi-panel-user .mp-hero-subtitle {
+            font-size: 0.875rem;
+        }
+
+        .fi-panel-user .mp-hero-meta {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .fi-panel-user .mp-stat-value {
+            font-size: 1.375rem;
+        }
+
+        .fi-panel-user .mp-total-bar {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.375rem;
+        }
+
+        .fi-panel-user .mp-modal-credit-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .fi-panel-user .mp-modal-credit-row .mp-btn,
+        .fi-panel-user .mp-credit-card .mp-btn,
+        .fi-panel-user .mp-actions-row .mp-btn {
+            width: 100%;
+        }
+
+        .fi-panel-user .mp-qr-card {
+            max-width: none;
+            padding: 1.25rem 1rem;
+        }
+
+        .fi-panel-user .mp-loan-header {
+            padding: 1rem 0.875rem;
+        }
+
+        .fi-panel-user .mp-loan-header-title {
+            font-size: 1rem;
+            line-height: 1.35;
+        }
+
+        .fi-panel-user .mp-loan-header-address {
+            line-height: 1.45;
+        }
+
+        .fi-panel-user .fi-fo-wizard,
+        .fi-panel-user .fi-sc-grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        .fi-panel-user .fi-fo-field-wrp-label span {
+            line-height: 1.35;
+        }
+
+        .fi-panel-user .fi-modal-window {
+            width: calc(100vw - 1rem) !important;
+            max-width: calc(100vw - 1rem) !important;
+            margin-inline: 0.5rem;
+        }
+
+        .fi-panel-user .fi-ta-actions .fi-btn {
+            width: auto;
+        }
+
+        .fi-panel-user .fi-fo-field-wrp:has(.fi-fo-radio) .fi-fo-field-content-col {
+            overflow-x: auto;
+        }
+    }
+
+    /* Login page (member portal sign-in) */
+    @media (max-width: 767px) {
+        .fi-panel-user.fi-body:has(.fi-simple-layout) .fi-simple-layout {
+            background-attachment: scroll;
+        }
+
+        .fi-panel-user.fi-body:has(.fi-simple-layout) .fi-simple-main {
+            width: calc(100% - 1.5rem);
+            max-width: 24rem;
+            margin-inline: auto;
+            padding: 1.25rem 1rem;
+        }
+
+        .fi-panel-user.fi-body:has(.fi-simple-layout) .fi-simple-main .fi-logo,
+        .fi-panel-user.fi-body:has(.fi-simple-layout) .fi-simple-main img.fi-logo {
+            height: 4.5rem !important;
+            max-height: 4.5rem;
+        }
+
+        .fi-panel-user.fi-body:has(.fi-simple-layout) .fi-simple-header {
+            margin-bottom: 1rem;
+        }
     }
 </style>
