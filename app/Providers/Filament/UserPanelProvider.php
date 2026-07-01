@@ -19,6 +19,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use JeffersonGoncalves\Filament\Pwa\FilamentPwaPlugin;
 
 class UserPanelProvider extends PanelProvider
 {
@@ -60,6 +61,20 @@ class UserPanelProvider extends PanelProvider
             ]);
 
         return $this->registerPortalUi($panel)
+            ->plugins([
+                FilamentPwaPlugin::make()
+                    ->themeColor('#0ea5e9')
+                    ->appTitle(__('Members Portal'))
+                    ->manifestUrl('/manifest.json'),
+            ])
+            ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+                fn (): string => view('filament.hooks.member-portal-pwa-install')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => view('filament.hooks.member-portal-pwa-sw')->render(),
+            )
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
                 fn (): string => view('filament.hooks.member-portal-ui')->render(),

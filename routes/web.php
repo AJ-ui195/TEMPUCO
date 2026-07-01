@@ -9,6 +9,14 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/portal/service-worker.js', function () {
+    return response(
+        file_get_contents(public_path('portal-sw.js')),
+        200,
+        ['Content-Type' => 'application/javascript; charset=UTF-8'],
+    );
+})->name('portal.service-worker');
+
 Route::middleware(['auth'])->group(function (): void {
     Route::get('/members/{user}/print-qr', PrintMemberQrCodeController::class)
         ->name('members.print-qr');
