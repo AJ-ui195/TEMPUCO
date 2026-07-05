@@ -2,16 +2,14 @@
 
 namespace App\Filament\Pos\Pages;
 
+use App\Filament\Cashier\Pages\BranchStockTransferPage;
 use App\Filament\Pos\Concerns\InteractsWithInventoryPanel;
 use App\Models\PosBranch;
 use App\Models\PosBranchInventory;
-use App\Models\PosInventoryItem;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Section;
@@ -40,7 +38,6 @@ class BranchInventoryPage extends Page implements HasTable
     public function mount(int|string $branch): void
     {
         $this->branchRecord = PosBranch::query()->findOrFail($branch);
-        $this->branchRecord->ensureInventoryPivotRecords();
     }
 
     public function getTitle(): string|Htmlable
@@ -59,52 +56,11 @@ class BranchInventoryPage extends Page implements HasTable
                 ->icon(Heroicon::OutlinedArrowLeft)
                 ->color('gray')
                 ->url(static::inventoryPageUrl(BranchesPage::class)),
-            $this->addBranchProductAction(),
+            Action::make('transferStock')
+                ->label(__('Transfer to branch'))
+                ->icon(Heroicon::OutlinedArrowsRightLeft)
+                ->url(BranchStockTransferPage::getUrl(panel: 'pos')),
         ];
-    }
-
-    public function addBranchProductAction(): Action
-    {
-        return Action::make('addProduct')
-            ->label(__('Add product'))
-            ->icon(Heroicon::OutlinedPlus)
-            ->modalHeading(__('Add product to branch'))
-            ->form([
-                Select::make('pos_inventory_item_id')
-                    ->label(__('Product'))
-                    ->options(fn (): array => PosInventoryItem::query()
-                        ->orderBy('name')
-                        ->pluck('name', 'id')
-                        ->all())
-                    ->searchable()
-                    ->required()
-                    ->native(false),
-                TextInput::make('quantity')
-                    ->label(__('Quantity'))
-                    ->required()
-                    ->integer()
-                    ->minValue(0)
-                    ->default(0),
-            ])
-            ->action(function (array $data): void {
-                $itemId = (int) $data['pos_inventory_item_id'];
-                $quantity = (int) $data['quantity'];
-
-                PosBranchInventory::query()->updateOrCreate(
-                    [
-                        'pos_branch_id' => $this->branchRecord->id,
-                        'pos_inventory_item_id' => $itemId,
-                    ],
-                    ['quantity' => $quantity],
-                );
-
-                Notification::make()
-                    ->title(__('Product added to branch inventory'))
-                    ->success()
-                    ->send();
-
-                $this->resetTable();
-            });
     }
 
     public function table(Table $table): Table
@@ -130,6 +86,10 @@ class BranchInventoryPage extends Page implements HasTable
                     ->sortable()
                     ->alignEnd()
                     ->numeric(),
+                TextColumn::make('created_at')
+                    ->label(__('Date added'))
+                    ->date()
+                    ->sortable(),
                 TextColumn::make('inventoryItem.reorder_level')
                     ->label(__('Reorder at'))
                     ->placeholder('—')
@@ -159,7 +119,8 @@ class BranchInventoryPage extends Page implements HasTable
                         default => 'success',
                     }),
             ])
-            ->defaultSort('id')
+            ->defaultSort('created_at', 'desc')
+            ->paginated(false)
             ->recordActions([
                 EditAction::make()
                     ->label(__('Edit'))
@@ -175,10 +136,13 @@ class BranchInventoryPage extends Page implements HasTable
                     ])
                     ->after(fn () => $this->resetTable()),
             ])
-            ->emptyStateHeading(__('No products in this branch'))
-            ->emptyStateDescription(__('Add a product from the catalog using the Add product button above.'))
+            ->emptyStateHeading(__('No transferred products'))
+            ->emptyStateDescription(__('Products appear here after you transfer stock from warehouse inventory.'))
             ->emptyStateActions([
-                $this->addBranchProductAction(),
+                Action::make('transferStock')
+                    ->label(__('Transfer to branch'))
+                    ->icon(Heroicon::OutlinedArrowsRightLeft)
+                    ->url(BranchStockTransferPage::getUrl(panel: 'pos')),
             ]);
     }
 
@@ -186,6 +150,7 @@ class BranchInventoryPage extends Page implements HasTable
     {
         return PosBranchInventory::query()
             ->where('pos_branch_id', $this->branchRecord->id)
+            ->transferred()
             ->with(['inventoryItem']);
     }
 

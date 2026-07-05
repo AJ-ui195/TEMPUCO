@@ -56,25 +56,11 @@ class PosBranch extends Model
             ->withTimestamps();
     }
 
-    public function ensureInventoryPivotRecords(): void
-    {
-        $linkedIds = $this->inventoryItems()->pluck('pos_inventory_items.id');
-
-        PosInventoryItem::query()
-            ->whereNotIn('id', $linkedIds)
-            ->pluck('id')
-            ->each(function (int $itemId): void {
-                $this->inventoryItems()->attach($itemId, ['quantity' => 0]);
-            });
-    }
-
     /**
      * @return Collection<int, PosInventoryItem>
      */
     public function monitoringInventoryItems(): Collection
     {
-        $this->ensureInventoryPivotRecords();
-
         return PosInventoryItem::query()
             ->select([
                 'pos_inventory_items.*',
@@ -82,7 +68,8 @@ class PosBranch extends Model
             ])
             ->join('pos_branch_inventory', function ($join): void {
                 $join->on('pos_inventory_items.id', '=', 'pos_branch_inventory.pos_inventory_item_id')
-                    ->where('pos_branch_inventory.pos_branch_id', $this->id);
+                    ->where('pos_branch_inventory.pos_branch_id', $this->id)
+                    ->where('pos_branch_inventory.quantity', '>', 0);
             })
             ->with('supplier')
             ->orderBy('pos_inventory_items.name')

@@ -118,6 +118,7 @@
                     <span class="mp-quick-link-desc">{{ __('Submit a regular or quick loan application.') }}</span>
                 </span>
             </a>
+                            
         </div>
     </div>
 </div>

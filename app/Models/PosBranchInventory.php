@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -33,5 +34,14 @@ class PosBranchInventory extends Model
     public function inventoryItem(): BelongsTo
     {
         return $this->belongsTo(PosInventoryItem::class, 'pos_inventory_item_id');
+    }
+
+    /**
+     * @param  Builder<PosBranchInventory>  $query
+     * @return Builder<PosBranchInventory>
+     */
+    public function scopeTransferred(Builder $query): Builder
+    {
+        return $query->where($query->qualifyColumn('quantity'), '>', 0);
     }
 }

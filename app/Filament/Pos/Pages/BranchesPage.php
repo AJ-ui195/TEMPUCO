@@ -56,8 +56,7 @@ class BranchesPage extends Page
             ->modalHeading(__('Add branch'))
             ->form($this->branchFormSchema())
             ->action(function (array $data): void {
-                $branch = PosBranch::query()->create($data);
-                $branch->ensureInventoryPivotRecords();
+                PosBranch::query()->create($data);
 
                 Notification::make()
                     ->title(__('Branch created'))

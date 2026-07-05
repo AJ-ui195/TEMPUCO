@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pos\Resources\InventoryItems;
 
+use App\Filament\Concerns\ConfiguresInventoryProductBarcode;
 use App\Filament\Pos\Resources\InventoryItems\Pages\ManageInventoryItems;
 use App\Models\PosInventoryItem;
 use BackedEnum;
@@ -22,6 +23,8 @@ use Filament\Tables\Table;
 
 class InventoryItemResource extends Resource
 {
+    use ConfiguresInventoryProductBarcode;
+
     protected static ?string $model = PosInventoryItem::class;
 
     protected static ?string $slug = 'products';
@@ -49,10 +52,7 @@ class InventoryItemResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->columnSpanFull(),
-                TextInput::make('sku')
-                    ->label(__('SKU'))
-                    ->maxLength(64)
-                    ->unique(ignoreRecord: true),
+                ...self::inventoryBarcodeFormFields(),
                 Textarea::make('description')
                     ->label(__('Description'))
                     ->rows(3)
@@ -109,6 +109,17 @@ class InventoryItemResource extends Resource
                     ->sortable(),
                 TextColumn::make('sku')
                     ->label(__('SKU'))
+                    ->formatStateUsing(function (?string $state): string {
+                        if (blank($state)) {
+                            return '—';
+                        }
+
+                        if (ctype_digit($state) && in_array(strlen($state), [8, 12, 13], true)) {
+                            return \App\Support\ProductBarcodeRenderer::formatUpcLabel($state);
+                        }
+
+                        return $state;
+                    })
                     ->searchable()
                     ->placeholder('—'),
                 TextColumn::make('supplier.name')
@@ -163,6 +174,7 @@ class InventoryItemResource extends Resource
                     ->boolean(),
             ])
             ->defaultSort('name')
+            ->paginated(false)
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make(),

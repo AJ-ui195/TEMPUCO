@@ -37,4 +37,7 @@ class PosCanteenPage extends BaseDashboard
     {
         return PosSaleChannel::Canteen;
     }
+
+    
+
 }

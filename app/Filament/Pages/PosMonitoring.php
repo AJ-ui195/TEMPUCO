@@ -2,9 +2,10 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\PosAnalyticsOverviewWidget;
 use BackedEnum;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
@@ -30,8 +31,10 @@ class PosMonitoring extends Page
     {
         return $schema
             ->components([
-                Section::make(__('POS overview'))
-                    ->description(__('Monitor point-of-sale activity, terminals, and transactions from this dashboard.')),
+                Grid::make(2)
+                    ->schema(fn (): array => $this->getWidgetsSchemaComponents([
+                        PosAnalyticsOverviewWidget::class,
+                    ])),
             ]);
     }
 }

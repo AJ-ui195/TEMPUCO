@@ -11,6 +11,8 @@ class LoanApplicationsChartWidget extends ChartWidget
 
     protected int | string | array $columnSpan = 'full';
 
+    protected ?string $maxHeight = '15rem';
+
     public function getHeading(): ?string
     {
         return __('Loan applications');
