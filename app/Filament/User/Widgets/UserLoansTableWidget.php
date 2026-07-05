@@ -47,16 +47,19 @@ class UserLoansTableWidget extends TableWidget
                     ->formatStateUsing(fn (mixed $state): string => (string) $state),
                 TextColumn::make('loan_category')
                     ->label(__('Category'))
-                    ->formatStateUsing(fn (mixed $state): string => $state?->getLabel() ?? '—'),
+                    ->formatStateUsing(fn (mixed $state): string => $state?->getLabel() ?? '—')
+                    ->hiddenFrom('md'),
                 TextColumn::make('loan_amount')
                     ->label(__('Loan amount'))
                     ->formatStateUsing(fn (mixed $state): string => number_format((float) $state, 2)),
                 TextColumn::make('loan_period_months')
                     ->label(__('Loan period'))
-                    ->formatStateUsing(fn (mixed $state): string => ((int) $state).' '.__('months')),
+                    ->formatStateUsing(fn (mixed $state): string => ((int) $state).' '.__('months'))
+                    ->hiddenFrom('md'),
                 TextColumn::make('installment_amount')
                     ->label(__('Installment amount'))
-                    ->formatStateUsing(fn (mixed $state): string => number_format((float) $state, 2)),
+                    ->formatStateUsing(fn (mixed $state): string => number_format((float) $state, 2))
+                    ->hiddenFrom('md'),
                 TextColumn::make('loan_date')
                     ->label(__('Date'))
                     ->date(),
