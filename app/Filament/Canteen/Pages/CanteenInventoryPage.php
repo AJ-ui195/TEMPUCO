@@ -96,4 +96,5 @@ class CanteenInventoryPage extends Page
                     ->visible($lowStockCount > 0 || $totalItems > 0),
             ]);
     }
+    
 }

@@ -474,7 +474,7 @@
                         {{ __('Barcode scanner') }}
                     </label>
                     <p class="pos-muted" style="margin: 0 0 0.75rem; font-size: 0.8125rem;">
-                        {{ __('Scan a product barcode or member QR (JSON), then press Enter. USB scanners work automatically.') }}
+                        {{ __('Scan a product barcode.') }}
                     </p>
                     <input
                         id="barcode-scanner"

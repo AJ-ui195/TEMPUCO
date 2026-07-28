@@ -39,5 +39,5 @@ class PosCanteenPage extends BaseDashboard
     }
 
     
-
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
 }

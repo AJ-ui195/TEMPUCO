@@ -5,9 +5,7 @@ use App\Http\Controllers\PrintMemberLoanController;
 use App\Http\Controllers\PrintPosSaleReceiptController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::redirect('/', '/admin/login');
 
 Route::get('/portal/service-worker.js', function () {
     return response(
