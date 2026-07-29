@@ -69,6 +69,13 @@ class UserPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+                fn (): string => view('filament.hooks.login-panel-switch', [
+                    'url' => url('/admin/login'),
+                    'message' => __('Click here to login to Admin'),
+                ])->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
                 fn (): string => view('filament.hooks.member-portal-pwa-install')->render(),
             )
             ->renderHook(

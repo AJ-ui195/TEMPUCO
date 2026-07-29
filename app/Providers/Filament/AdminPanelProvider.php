@@ -45,6 +45,13 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->userMenu(false)
             ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+                fn (): string => view('filament.hooks.login-panel-switch', [
+                    'url' => url('/portal/login'),
+                    'message' => __('Click here to login to the Members Portal'),
+                ])->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
                 fn (): string => view('filament.hooks.hide-topbar-logo-on-desktop')->render(),
             )
