@@ -9,7 +9,7 @@
     <div class="pos-receipt-paper__center">
         <div class="pos-receipt-paper__brand">{{ __('TEMPUCO') }}</div>
         <div>{{ $channelLabel }} {{ __('POS') }}</div>
-        <div class="pos-receipt-paper__muted">{{ __('Sales receipt') }}</div>
+        <div class="pos-receipt-paper__subtitle">{{ __('Sales receipt') }}</div>
     </div>
 
     <div class="pos-receipt-paper__divider"></div>
@@ -41,7 +41,7 @@
                 <tr>
                     <td>
                         {{ $line->productName() }}
-                        <div class="pos-receipt-paper__muted">@ ₱{{ number_format((float) $line->unit_price, 2) }}</div>
+                        <div class="pos-receipt-paper__unit-price">@ ₱{{ number_format((float) $line->unit_price, 2) }}</div>
                     </td>
                     <td class="pos-receipt-paper__qty">{{ $line->quantity }}</td>
                     <td class="pos-receipt-paper__amount">₱{{ number_format((float) $line->line_total, 2) }}</td>
@@ -80,7 +80,7 @@
 
     <div class="pos-receipt-paper__divider"></div>
 
-    <div class="pos-receipt-paper__center pos-receipt-paper__muted">
+    <div class="pos-receipt-paper__center pos-receipt-paper__footer">
         {{ __('Thank you!') }}
     </div>
 </div>

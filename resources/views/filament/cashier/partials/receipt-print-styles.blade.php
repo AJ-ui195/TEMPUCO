@@ -21,6 +21,18 @@ body {
 .pos-receipt-paper__center { text-align: center; }
 .pos-receipt-paper__brand { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
 .pos-receipt-paper__muted { color: #4b5563; }
+.pos-receipt-paper__subtitle,
+.pos-receipt-paper__footer {
+    color: #000;
+    font-weight: 700;
+    font-size: 12px;
+}
+.pos-receipt-paper__unit-price {
+    color: #000;
+    font-weight: 700;
+    font-size: 12px;
+    margin-top: 0.1rem;
+}
 .pos-receipt-paper__divider { border-top: 1px dashed #9ca3af; margin: 0.625rem 0; }
 .pos-receipt-paper__table { width: 100%; border-collapse: collapse; }
 .pos-receipt-paper__table th,

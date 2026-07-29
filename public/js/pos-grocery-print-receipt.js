@@ -6,6 +6,13 @@ window.posGroceryPrintReceipt = function () {
         return;
     }
 
+    // Avoid overlapping print jobs if auto-print and a manual click overlap.
+    if (window.__posGroceryPrintBusy) {
+        return;
+    }
+
+    window.__posGroceryPrintBusy = true;
+
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
     iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
@@ -32,6 +39,7 @@ window.posGroceryPrintReceipt = function () {
         iframe.contentWindow.print();
         setTimeout(function () {
             iframe.remove();
+            window.__posGroceryPrintBusy = false;
         }, 1000);
     };
 

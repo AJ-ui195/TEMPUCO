@@ -429,6 +429,25 @@
                 .fi-pos-grocery .pos-receipt-paper__brand { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
                 .fi-pos-grocery .pos-receipt-paper__muted { color: #4b5563; }
                 .dark .fi-pos-grocery .pos-receipt-paper__muted { color: rgb(148 163 184); }
+                .fi-pos-grocery .pos-receipt-paper__subtitle,
+                .fi-pos-grocery .pos-receipt-paper__footer {
+                    color: #111827;
+                    font-weight: 700;
+                    font-size: 12px;
+                }
+                .dark .fi-pos-grocery .pos-receipt-paper__subtitle,
+                .dark .fi-pos-grocery .pos-receipt-paper__footer {
+                    color: #f8fafc;
+                }
+                .fi-pos-grocery .pos-receipt-paper__unit-price {
+                    color: #111827;
+                    font-weight: 700;
+                    font-size: 12px;
+                    margin-top: 0.1rem;
+                }
+                .dark .fi-pos-grocery .pos-receipt-paper__unit-price {
+                    color: #f8fafc;
+                }
                 .fi-pos-grocery .pos-receipt-paper__divider { border-top: 1px dashed #9ca3af; margin: 0.625rem 0; }
                 .fi-pos-grocery .pos-receipt-paper__table { width: 100%; border-collapse: collapse; }
                 .fi-pos-grocery .pos-receipt-paper__table th,
@@ -801,6 +820,8 @@
                 class="pos-modal"
                 data-pos-no-refocus
                 wire:key="receipt-modal-{{ $receiptSaleId }}"
+                x-data
+                x-init="$nextTick(() => setTimeout(() => window.posGroceryPrintReceipt?.(), 100))"
             >
                 <div class="pos-modal__backdrop" wire:click="closeReceiptModal"></div>
                 <div class="pos-modal__dialog">

@@ -4,9 +4,15 @@ namespace App\Filament\Cashier\Pages;
 
 use App\Enums\PosSaleChannel;
 use App\Models\PosInventoryItem;
+use App\Support\BirDailySalesExcelExporter;
+use App\Support\BirDailySalesReport;
+use App\Support\CloseInventoryExcelExporter;
 use App\Support\FastMovingItemsReport;
 use App\Support\LowStockNotifier;
+use App\Support\PhilippineTime;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
@@ -14,6 +20,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class GroceryInventoryPage extends Page
 {
@@ -37,6 +44,46 @@ class GroceryInventoryPage extends Page
     public function mount(): void
     {
         LowStockNotifier::notifyDashboardSummary();
+    }
+
+    /**
+     * @return array<Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        $now = PhilippineTime::now();
+
+        return [
+            Action::make('exportCloseInventoryReport')
+                ->label(__('Export close inventory report'))
+                ->icon(Heroicon::OutlinedDocumentArrowDown)
+                ->action(fn (): StreamedResponse => (new CloseInventoryExcelExporter)->download()),
+            Action::make('exportBirDailySales')
+                ->label(__('Export BIR daily sales'))
+                ->icon(Heroicon::OutlinedDocumentText)
+                ->form([
+                    DatePicker::make('from')
+                        ->label(__('From'))
+                        ->default($now->copy()->startOfMonth()->toDateString())
+                        ->required()
+                        ->native(false),
+                    DatePicker::make('to')
+                        ->label(__('To'))
+                        ->default($now->copy()->endOfMonth()->toDateString())
+                        ->required()
+                        ->native(false)
+                        ->afterOrEqual('from'),
+                ])
+                ->action(function (array $data): StreamedResponse {
+                    $report = new BirDailySalesReport(
+                        from: $data['from'],
+                        to: $data['to'],
+                        saleChannel: PosSaleChannel::Grocery,
+                    );
+
+                    return (new BirDailySalesExcelExporter($report))->download();
+                }),
+        ];
     }
 
     public function content(Schema $schema): Schema
