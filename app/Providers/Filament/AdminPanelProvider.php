@@ -52,6 +52,13 @@ class AdminPanelProvider extends PanelProvider
                 ])->render(),
             )
             ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+                fn (): string => view('filament.hooks.login-panel-switch', [
+                    'url' => url('/pos/login'),
+                    'message' => __('Click here to login to POS'),
+                ])->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
                 fn (): string => view('filament.hooks.hide-topbar-logo-on-desktop')->render(),
             )
