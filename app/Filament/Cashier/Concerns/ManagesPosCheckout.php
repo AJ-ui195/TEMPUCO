@@ -9,6 +9,7 @@ use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\User;
 use App\Support\CanteenBarcodeLookup;
+use App\Support\MemberLoyaltyPoints;
 use App\Support\MemberQrCodeLookup;
 use App\Support\PhilippineTime;
 use App\Support\PosBarcodeLookup;
@@ -41,6 +42,8 @@ trait ManagesPosCheckout
     public ?string $memberName = null;
 
     public ?string $memberEmail = null;
+
+    public int $memberPoints = 0;
 
     public ?string $memberScanFeedback = null;
 
@@ -115,17 +118,17 @@ trait ManagesPosCheckout
         $this->memberId = null;
         $this->memberName = null;
         $this->memberEmail = null;
+        $this->memberPoints = 0;
         $this->memberQrInput = '';
         $this->memberSearch = '';
         $this->memberScanFeedback = null;
         $this->memberScanFeedbackIsError = false;
     }
 
-    public function updatedPaymentType(string $value): void
+    public function willEarnLoyaltyPoint(): bool
     {
-        if ($value === 'cash') {
-            $this->clearMember();
-        }
+        return $this->memberId !== null
+            && MemberLoyaltyPoints::qualifies($this->getCartTotal());
     }
 
     /**
@@ -302,7 +305,9 @@ trait ManagesPosCheckout
         $inventoryForeignKey = $this->saleItemInventoryForeignKey();
         $catalogModel = $this->catalogModelClass();
 
-        $sale = DB::transaction(function () use ($memberId, $isCredit, $total, $paid, $saleChannel, $inventoryForeignKey, $catalogModel): PosSale {
+        $pointsAwarded = 0;
+
+        $sale = DB::transaction(function () use ($memberId, $isCredit, $total, $paid, $saleChannel, $inventoryForeignKey, $catalogModel, &$pointsAwarded): PosSale {
             $sale = PosSale::query()->create([
                 'pos_branch_id' => null,
                 'user_id' => $isCredit ? $memberId : auth()->id(),
@@ -327,14 +332,20 @@ trait ManagesPosCheckout
                     ->decrement('quantity', $line['quantity']);
             }
 
+            $pointsAwarded = MemberLoyaltyPoints::awardIfEligible($memberId, $total);
+
             return $sale;
         });
+
+        $pointsNote = $pointsAwarded > 0
+            ? ' '.__('+1 loyalty point earned.')
+            : '';
 
         if ($isCredit) {
             $outstanding = round($total - $paid, 2);
             Notification::make()
                 ->title(__('Charged to member account'))
-                ->body($paid > 0
+                ->body(($paid > 0
                     ? __(':member — outstanding: ₱:amount', [
                         'member' => $this->memberName,
                         'amount' => number_format($outstanding, 2),
@@ -342,13 +353,19 @@ trait ManagesPosCheckout
                     : __(':member — full amount on credit: ₱:amount', [
                         'member' => $this->memberName,
                         'amount' => number_format($outstanding, 2),
-                    ]))
+                    ])).$pointsNote)
                 ->success()
                 ->send();
         } else {
+            $body = __('Change: ₱:change', ['change' => number_format($paid - $total, 2)]);
+
+            if ($pointsAwarded > 0) {
+                $body .= $pointsNote;
+            }
+
             Notification::make()
                 ->title(__('Sale completed'))
-                ->body(__('Change: ₱:change', ['change' => number_format($paid - $total, 2)]))
+                ->body($body)
                 ->success()
                 ->send();
         }
@@ -554,6 +571,7 @@ trait ManagesPosCheckout
         $this->memberId = $member->id;
         $this->memberName = $member->name;
         $this->memberEmail = $member->email;
+        $this->memberPoints = (int) $member->points;
         $this->memberSearch = '';
         $this->memberQrInput = '';
     }

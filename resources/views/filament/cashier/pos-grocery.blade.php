@@ -627,105 +627,116 @@
                     </label>
                 </div>
 
-                @if ($paymentType === 'credit')
-                    <div class="pos-panel pos-panel--member" style="padding: 1rem; margin-bottom: 1rem;">
-                        <label class="pos-label-member" style="display: block; font-size: 0.875rem; font-weight: 700; margin-bottom: 0.375rem;">
-                            {{ __('Member') }}
-                        </label>
-                        <p class="pos-muted" style="margin: 0 0 0.625rem; font-size: 0.75rem;">
+                <div class="pos-panel pos-panel--member" style="padding: 1rem; margin-bottom: 1rem;">
+                    <label class="pos-label-member" style="display: block; font-size: 0.875rem; font-weight: 700; margin-bottom: 0.375rem;">
+                        {{ __('Member') }}
+                        @if ($paymentType !== 'credit')
+                            <span class="pos-muted" style="font-weight: 500;">({{ __('optional') }})</span>
+                        @endif
+                    </label>
+                    <p class="pos-muted" style="margin: 0 0 0.625rem; font-size: 0.75rem;">
+                        @if ($paymentType === 'credit')
                             {{ __('Required for credit sales. Scan a QR code or search and select a member.') }}
-                        </p>
-
-                        @if ($memberId)
-                            <div class="pos-member-verified" style="margin-bottom: 0.75rem;">
-                                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
-                                    <div style="min-width: 0;">
-                                        <span class="pos-member-verified__label">{{ __('Verify member name') }}</span>
-                                        <span class="pos-member-verified__name">{{ $memberName }}</span>
-                                        @if ($memberEmail)
-                                            <span class="pos-muted" style="display: block; margin-top: 0.375rem; font-size: 0.8125rem;">
-                                                {{ $memberEmail }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                    <button
-                                        type="button"
-                                        wire:click="clearMember"
-                                        class="pos-btn-remove"
-                                        style="flex-shrink: 0; padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-                                    >
-                                        {{ __('Clear') }}
-                                    </button>
-                                </div>
-                            </div>
+                        @else
+                            {{ __('Scan a QR code or search to link a member. Purchases of ₱200 or more earn 1 loyalty point.') }}
                         @endif
+                    </p>
 
-                        @if ($memberScanFeedback)
-                            <p
-                                class="{{ $memberScanFeedbackIsError ? 'pos-member-feedback--error' : 'pos-member-feedback--ok' }}"
-                                style="margin: 0 0 0.625rem; font-size: 0.8125rem; font-weight: 600;"
-                            >
-                                {{ $memberScanFeedback }}
-                            </p>
-                        @endif
-
-                        <label for="member-search" class="pos-muted" style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.375rem;">
-                            {{ __('Search member') }}
-                        </label>
-                        <input
-                            id="member-search"
-                            type="search"
-                            wire:model.live.debounce.300ms="memberSearch"
-                            autocomplete="off"
-                            placeholder="{{ __('Name, email, or phone…') }}"
-                            class="pos-input"
-                            style="padding: 0.625rem 0.75rem; font-size: 0.9375rem; margin-bottom: 0.625rem;"
-                        />
-
-                        @php($memberResults = $this->getMemberSearchResults())
-
-                        @if (strlen(trim($memberSearch)) >= 2)
-                            <div class="pos-panel" style="margin-bottom: 0.75rem; max-height: 11rem; overflow-y: auto; padding: 0;">
-                                @forelse ($memberResults as $member)
-                                    <button
-                                        type="button"
-                                        wire:click="selectMember({{ $member->id }})"
-                                        class="pos-search-result"
-                                    >
-                                        <span>
-                                            <span style="display: block; font-weight: 600; font-size: 0.875rem;">{{ $member->name }}</span>
-                                            <span class="pos-muted" style="font-size: 0.75rem;">
-                                                {{ $member->email }}
-                                                @if ($member->cellphone)
-                                                    · {{ $member->cellphone }}
-                                                @endif
-                                            </span>
+                    @if ($memberId)
+                        <div class="pos-member-verified" style="margin-bottom: 0.75rem;">
+                            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
+                                <div style="min-width: 0;">
+                                    <span class="pos-member-verified__label">{{ __('Verify member name') }}</span>
+                                    <span class="pos-member-verified__name">{{ $memberName }}</span>
+                                    @if ($memberEmail)
+                                        <span class="pos-muted" style="display: block; margin-top: 0.375rem; font-size: 0.8125rem;">
+                                            {{ $memberEmail }}
                                         </span>
-                                    </button>
-                                @empty
-                                    <p class="pos-muted" style="margin: 0; padding: 1rem 0.75rem; font-size: 0.8125rem; text-align: center;">
-                                        {{ __('No members match your search.') }}
-                                    </p>
-                                @endforelse
+                                    @endif
+                                    <span class="pos-muted" style="display: block; margin-top: 0.375rem; font-size: 0.8125rem;">
+                                        {{ __('Points: :count', ['count' => $memberPoints]) }}
+                                        @if ($this->willEarnLoyaltyPoint())
+                                            · {{ __('+1 on this sale') }}
+                                        @endif
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    wire:click="clearMember"
+                                    class="pos-btn-remove"
+                                    style="flex-shrink: 0; padding: 0.25rem 0.5rem; font-size: 0.75rem;"
+                                >
+                                    {{ __('Clear') }}
+                                </button>
                             </div>
-                        @endif
-
-                        <div class="pos-checkout-divider" style="margin: 0.75rem 0; text-align: center; font-size: 0.75rem; font-weight: 600; color: rgb(100 116 139);">
-                            {{ __('or scan QR') }}
                         </div>
+                    @endif
 
-                        <input
-                            id="member-qr-scanner"
-                            type="text"
-                            wire:model.live="memberQrInput"
-                            wire:keydown.enter.prevent="scanMemberQr"
-                            autocomplete="off"
-                            placeholder="{{ __('Scan member QR…') }}"
-                            class="pos-input"
-                            style="padding: 0.625rem 0.75rem; font-size: 0.9375rem;"
-                        />
+                    @if ($memberScanFeedback)
+                        <p
+                            class="{{ $memberScanFeedbackIsError ? 'pos-member-feedback--error' : 'pos-member-feedback--ok' }}"
+                            style="margin: 0 0 0.625rem; font-size: 0.8125rem; font-weight: 600;"
+                        >
+                            {{ $memberScanFeedback }}
+                        </p>
+                    @endif
+
+                    <label for="member-search" class="pos-muted" style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.375rem;">
+                        {{ __('Search member') }}
+                    </label>
+                    <input
+                        id="member-search"
+                        type="search"
+                        wire:model.live.debounce.300ms="memberSearch"
+                        autocomplete="off"
+                        placeholder="{{ __('Name, email, or phone…') }}"
+                        class="pos-input"
+                        style="padding: 0.625rem 0.75rem; font-size: 0.9375rem; margin-bottom: 0.625rem;"
+                    />
+
+                    @php($memberResults = $this->getMemberSearchResults())
+
+                    @if (strlen(trim($memberSearch)) >= 2)
+                        <div class="pos-panel" style="margin-bottom: 0.75rem; max-height: 11rem; overflow-y: auto; padding: 0;">
+                            @forelse ($memberResults as $member)
+                                <button
+                                    type="button"
+                                    wire:click="selectMember({{ $member->id }})"
+                                    class="pos-search-result"
+                                >
+                                    <span>
+                                        <span style="display: block; font-weight: 600; font-size: 0.875rem;">{{ $member->name }}</span>
+                                        <span class="pos-muted" style="font-size: 0.75rem;">
+                                            {{ $member->email }}
+                                            @if ($member->cellphone)
+                                                · {{ $member->cellphone }}
+                                            @endif
+                                        </span>
+                                    </span>
+                                </button>
+                            @empty
+                                <p class="pos-muted" style="margin: 0; padding: 1rem 0.75rem; font-size: 0.8125rem; text-align: center;">
+                                    {{ __('No members match your search.') }}
+                                </p>
+                            @endforelse
+                        </div>
+                    @endif
+
+                    <div class="pos-checkout-divider" style="margin: 0.75rem 0; text-align: center; font-size: 0.75rem; font-weight: 600; color: rgb(100 116 139);">
+                        {{ __('or scan QR') }}
                     </div>
-                @endif
+
+                    <input
+                        id="member-qr-scanner"
+                        type="text"
+                        wire:model.live="memberQrInput"
+                        wire:keydown.enter.prevent="scanMemberQr"
+                        autocomplete="off"
+                        placeholder="{{ __('Scan member QR…') }}"
+                        class="pos-input"
+                        style="padding: 0.625rem 0.75rem; font-size: 0.9375rem;"
+                    />
+                </div>
 
                 <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9375rem;">
                     <span>{{ __('Subtotal') }}</span>
