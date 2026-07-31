@@ -19,13 +19,15 @@ class PosSalesReportPage extends Page
 
     public const PERIOD_YEAR = PosSalesReport::PERIOD_YEAR;
 
+    public const PERIOD_CUSTOM = PosSalesReport::PERIOD_CUSTOM;
+
     protected static ?string $navigationLabel = 'Sales reports';
 
     protected static ?string $title = 'Sales reports';
 
     protected static ?string $slug = 'sales-reports';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 6;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChartBar;
 
@@ -37,10 +39,16 @@ class PosSalesReportPage extends Page
 
     public int $month;
 
+    public string $fromDate = '';
+
+    public string $toDate = '';
+
     public function mount(): void
     {
         $this->year = now()->year;
         $this->month = now()->month;
+        $this->fromDate = now()->startOfMonth()->toDateString();
+        $this->toDate = now()->toDateString();
     }
 
     public function getTitle(): string|Htmlable
@@ -50,7 +58,13 @@ class PosSalesReportPage extends Page
 
     public function report(): PosSalesReport
     {
-        return new PosSalesReport($this->period, $this->year, $this->month);
+        return new PosSalesReport(
+            $this->period,
+            $this->year,
+            $this->month,
+            $this->fromDate,
+            $this->toDate,
+        );
     }
 
     /**
@@ -74,6 +88,22 @@ class PosSalesReportPage extends Page
     public function getItemsSoldByProduct(): Collection
     {
         return $this->report()->itemsSoldByProduct();
+    }
+
+    /**
+     * @return Collection<int, array{
+     *     member_id: int,
+     *     name: string,
+     *     points: int,
+     *     transaction_count: int,
+     *     total_spent: float,
+     *     total_paid: float,
+     *     outstanding: float
+     * }>
+     */
+    public function getMemberPurchases(): Collection
+    {
+        return $this->report()->memberPurchases();
     }
 
     public function exportCsv(): StreamedResponse
@@ -111,13 +141,36 @@ class PosSalesReportPage extends Page
             fputcsv($handle, [__('Credit sales total — excluded (PHP)'), number_format($summary['credit_sales_total'], 2, '.', '')]);
 
             fputcsv($handle, []);
+            fputcsv($handle, [__('Member purchases')]);
+            fputcsv($handle, [
+                __('Member'),
+                __('Transactions'),
+                __('Total purchases (PHP)'),
+                __('Paid (PHP)'),
+                __('Outstanding (PHP)'),
+                __('Points'),
+            ]);
+
+            foreach ($report->memberPurchases() as $row) {
+                fputcsv($handle, [
+                    $row['name'],
+                    $row['transaction_count'],
+                    number_format($row['total_spent'], 2, '.', ''),
+                    number_format($row['total_paid'], 2, '.', ''),
+                    number_format($row['outstanding'], 2, '.', ''),
+                    $row['points'],
+                ]);
+            }
+
+            fputcsv($handle, []);
             fputcsv($handle, [__('Transactions')]);
             fputcsv($handle, [
                 __('Reference'),
                 __('Date'),
                 __('Time'),
                 __('Payment'),
-                __('Member / Cashier'),
+                __('Member'),
+                __('Cashier'),
                 __('Total (PHP)'),
                 __('Paid (PHP)'),
                 __('Outstanding (PHP)'),
@@ -130,9 +183,8 @@ class PosSalesReportPage extends Page
                     PhilippineTime::formatDate($sale->created_at),
                     PhilippineTime::formatTime($sale->created_at),
                     $sale->paymentTypeLabel(),
-                    $sale->isCreditSale()
-                        ? __('Credit — :member', ['member' => $sale->reportPartyLabel()])
-                        : $sale->reportPartyLabel(),
+                    $sale->memberName() ?? '',
+                    $sale->cashierName() ?? '',
                     number_format((float) $sale->total, 2, '.', ''),
                     number_format((float) $sale->amount_paid, 2, '.', ''),
                     $sale->isCreditSale()

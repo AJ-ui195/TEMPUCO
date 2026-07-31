@@ -851,6 +851,9 @@
                             {{ __('Close') }}
                         </button>
                     </div>
+                    <p class="pos-muted" style="margin: 0.75rem 0 0; font-size: 0.75rem; text-align: center;">
+                        {{ __('For no print dialog: open POS with scripts/launch-pos-chrome.bat and set the thermal printer as Windows default.') }}
+                    </p>
                 </div>
             </div>
         @endif

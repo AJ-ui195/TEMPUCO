@@ -22,9 +22,11 @@ final class MemberCreditsLedger
     {
         $memberIds = PosSale::query()
             ->whereColumn('amount_paid', '<', 'total')
-            ->whereHas('user', fn ($query) => $query->members())
+            ->whereNotNull('member_id')
             ->distinct()
-            ->pluck('user_id');
+            ->pluck('member_id');
+
+        // Members whose charges are already fully paid are filtered out below.
 
         if ($memberIds->isEmpty()) {
             return collect();

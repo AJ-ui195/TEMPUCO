@@ -310,7 +310,8 @@ trait ManagesPosCheckout
         $sale = DB::transaction(function () use ($memberId, $isCredit, $total, $paid, $saleChannel, $inventoryForeignKey, $catalogModel, &$pointsAwarded): PosSale {
             $sale = PosSale::query()->create([
                 'pos_branch_id' => null,
-                'user_id' => $isCredit ? $memberId : auth()->id(),
+                'member_id' => $memberId,
+                'cashier_id' => auth()->id(),
                 'sale_channel' => $saleChannel,
                 'total' => $total,
                 'amount_paid' => $paid,
@@ -443,7 +444,7 @@ trait ManagesPosCheckout
         }
 
         return PosSale::query()
-            ->with(['items.inventoryItem', 'items.canteenInventoryItem', 'user'])
+            ->with(['items.inventoryItem', 'items.canteenInventoryItem', 'member', 'cashier'])
             ->find($this->receiptSaleId);
     }
 

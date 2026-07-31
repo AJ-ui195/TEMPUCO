@@ -6,6 +6,7 @@
         $summary = $this->getSummary();
         $sales = $report->sales();
         $itemsSold = $this->getItemsSoldByProduct();
+        $memberPurchases = $this->getMemberPurchases();
         $years = range(now()->year, now()->year - 5);
         $months = collect(range(1, 12))->mapWithKeys(fn (int $m): array => [
             $m => \Carbon\Carbon::createFromDate($this->year, $m, 1)->format('F'),
@@ -61,6 +62,13 @@
                 >
                     {{ __('Per year') }}
                 </button>
+                <button
+                    type="button"
+                    wire:click="$set('period', '{{ \App\Filament\Cashier\Pages\PosSalesReportPage::PERIOD_CUSTOM }}')"
+                    @class(['pos-period-btn', 'pos-period-btn--active' => $period === \App\Filament\Cashier\Pages\PosSalesReportPage::PERIOD_CUSTOM])
+                >
+                    {{ __('Select dates') }}
+                </button>
             </div>
 
             @if ($period === \App\Filament\Cashier\Pages\PosSalesReportPage::PERIOD_MONTH)
@@ -92,6 +100,31 @@
                             <option value="{{ $y }}">{{ $y }}</option>
                         @endforeach
                     </select>
+                </div>
+            @endif
+
+            @if ($period === \App\Filament\Cashier\Pages\PosSalesReportPage::PERIOD_CUSTOM)
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 12rem)); gap: 0.75rem; margin-top: 1rem;">
+                    <div>
+                        <label for="report-from-date" class="pos-muted" style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">{{ __('From date') }}</label>
+                        <input
+                            id="report-from-date"
+                            type="date"
+                            wire:model.live="fromDate"
+                            max="{{ $toDate }}"
+                            class="pos-input"
+                        />
+                    </div>
+                    <div>
+                        <label for="report-to-date" class="pos-muted" style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">{{ __('To date') }}</label>
+                        <input
+                            id="report-to-date"
+                            type="date"
+                            wire:model.live="toDate"
+                            min="{{ $fromDate }}"
+                            class="pos-input"
+                        />
+                    </div>
                 </div>
             @endif
         </div>
@@ -171,6 +204,57 @@
             @endif
         </div>
 
+        <div class="pos-panel" style="padding: 0; overflow: hidden; margin-bottom: 1rem;">
+            <div class="pos-cart-header" style="padding: 0.75rem 1rem;">
+                <span style="font-weight: 700; font-size: 0.9375rem;">{{ __('Member purchases') }}</span>
+                <span class="pos-muted" style="display: block; font-size: 0.6875rem; font-weight: 500; margin-top: 0.125rem;">
+                    {{ __('Total bought by each member who scanned their QR code or was selected during checkout — :period.', ['period' => $report->periodLabel()]) }}
+                </span>
+            </div>
+
+            @if ($memberPurchases->isEmpty())
+                <p class="pos-muted" style="margin: 0; padding: 2rem 1rem; text-align: center; font-size: 0.875rem;">
+                    {{ __('No member purchases for this period.') }}
+                </p>
+            @else
+                <div style="overflow-x: auto;">
+                    <table class="pos-table" style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+                        <thead>
+                            <tr style="text-align: left;">
+                                <th style="padding: 0.5rem 0.75rem;">{{ __('Member') }}</th>
+                                <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Transactions') }}</th>
+                                <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Total purchases') }}</th>
+                                <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Outstanding') }}</th>
+                                <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Points') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($memberPurchases as $row)
+                                <tr>
+                                    <td style="padding: 0.5rem 0.75rem; font-weight: 600;">{{ $row['name'] }}</td>
+                                    <td style="padding: 0.5rem 0.75rem; text-align: end;">{{ number_format($row['transaction_count']) }}</td>
+                                    <td style="padding: 0.5rem 0.75rem; text-align: end; font-weight: 600;">
+                                        ₱{{ number_format($row['total_spent'], 2) }}
+                                    </td>
+                                    <td style="padding: 0.5rem 0.75rem; text-align: end; color: {{ $row['outstanding'] > 0 ? 'rgb(4 120 87)' : 'inherit' }};">
+                                        {{ $row['outstanding'] > 0 ? '₱'.number_format($row['outstanding'], 2) : '—' }}
+                                    </td>
+                                    <td style="padding: 0.5rem 0.75rem; text-align: end;">{{ number_format($row['points']) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr style="border-top: 2px solid rgb(203 213 225); font-weight: 700;">
+                                <td colspan="2" style="padding: 0.75rem; text-align: end;">{{ __('Total') }}</td>
+                                <td style="padding: 0.75rem; text-align: end;">₱{{ number_format($memberPurchases->sum('total_spent'), 2) }}</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
+        </div>
+
         <div class="pos-panel" style="padding: 0; overflow: hidden;">
             <div class="pos-cart-header" style="padding: 0.75rem 1rem;">
                 <span style="font-weight: 700; font-size: 0.9375rem;">{{ __('Transactions') }}</span>
@@ -188,7 +272,8 @@
                                 <th style="padding: 0.5rem 0.75rem;">{{ __('Reference') }}</th>
                                 <th style="padding: 0.5rem 0.75rem;">{{ __('Date & time') }}</th>
                                 <th style="padding: 0.5rem 0.75rem;">{{ __('Payment') }}</th>
-                                <th style="padding: 0.5rem 0.75rem;">{{ __('Member / Cashier') }}</th>
+                                <th style="padding: 0.5rem 0.75rem;">{{ __('Member') }}</th>
+                                <th style="padding: 0.5rem 0.75rem;">{{ __('Cashier') }}</th>
                                 <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Items') }}</th>
                                 <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Total') }}</th>
                             </tr>
@@ -217,13 +302,14 @@
                                         @endif
                                     </td>
                                     <td style="padding: 0.5rem 0.75rem;">
-                                        @if ($sale->isCreditSale())
-                                            <span style="display: block; font-size: 0.6875rem; font-weight: 600; color: rgb(4 120 87); text-transform: uppercase;">{{ __('Member') }}</span>
-                                            <span style="font-weight: 600;">{{ $sale->reportPartyLabel() }}</span>
+                                        @if ($sale->memberName())
+                                            <span style="font-weight: 600;">{{ $sale->memberName() }}</span>
                                         @else
-                                            <span style="display: block; font-size: 0.6875rem; font-weight: 600; color: rgb(100 116 139); text-transform: uppercase;">{{ __('Cashier') }}</span>
-                                            <span>{{ $sale->reportPartyLabel() }}</span>
+                                            <span class="pos-muted">—</span>
                                         @endif
+                                    </td>
+                                    <td class="pos-muted" style="padding: 0.5rem 0.75rem;">
+                                        {{ $sale->cashierName() ?? '—' }}
                                     </td>
                                     <td style="padding: 0.5rem 0.75rem; text-align: end;">{{ $sale->items->sum('quantity') }}</td>
                                     <td style="padding: 0.5rem 0.75rem; text-align: end; font-weight: 600;">
@@ -232,7 +318,7 @@
                                 </tr>
                                 @foreach ($sale->items as $line)
                                     <tr class="pos-line-item">
-                                        <td colspan="6" style="padding: 0.25rem 0.75rem 0.5rem 1.5rem; font-size: 0.75rem;">
+                                        <td colspan="7" style="padding: 0.25rem 0.75rem 0.5rem 1.5rem; font-size: 0.75rem;">
                                             <span style="font-weight: 600;">{{ $line->productName() }}</span>
                                             <span class="pos-muted">
                                                 · {{ $line->productSku() ?? __('No SKU') }}
@@ -247,7 +333,7 @@
                         </tbody>
                         <tfoot>
                             <tr style="border-top: 2px solid rgb(203 213 225); font-weight: 700;">
-                                <td colspan="5" style="padding: 0.75rem; text-align: end;">{{ __('Cash grand total') }}</td>
+                                <td colspan="6" style="padding: 0.75rem; text-align: end;">{{ __('Cash grand total') }}</td>
                                 <td style="padding: 0.75rem; text-align: end;">₱{{ number_format($report->cashSalesGrandTotal(), 2) }}</td>
                             </tr>
                         </tfoot>

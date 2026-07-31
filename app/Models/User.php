@@ -84,9 +84,16 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Loan::class);
     }
 
+    /** Purchases made by this member at the POS. */
     public function posSales(): HasMany
     {
-        return $this->hasMany(PosSale::class);
+        return $this->hasMany(PosSale::class, 'member_id');
+    }
+
+    /** Sales processed by this cashier at the POS. */
+    public function posSalesProcessed(): HasMany
+    {
+        return $this->hasMany(PosSale::class, 'cashier_id');
     }
 
     /**

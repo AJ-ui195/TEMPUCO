@@ -1,21 +1,7 @@
 @echo off
-REM Same as launch-pos-chrome.bat but opens Canteen POS.
+REM TEMPUCO Canteen POS — silent thermal printing (no print dialog)
+REM Double-click this file on the canteen cashier PC.
 
-set "POS_URL=http://127.0.0.1:8000/pos/canteen"
-set "PRINTER_NAME=POS-80"
-
-set "CHROME="
-if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "CHROME=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
-if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "CHROME=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
-if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" set "CHROME=%LocalAppData%\Google\Chrome\Application\chrome.exe"
-
-if not defined CHROME (
-    echo Google Chrome was not found. Install Chrome, then run this again.
-    pause
-    exit /b 1
-)
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "try { $p = Get-Printer -Name '%PRINTER_NAME%' -ErrorAction Stop; (Get-CimInstance -ClassName Win32_Printer -Filter \"Name='%PRINTER_NAME%'\").SetDefaultPrinter() | Out-Null; Write-Host 'Default printer: %PRINTER_NAME%' } catch { Write-Host 'Warning: printer %PRINTER_NAME% not found. Set your receipt printer as Windows default.' }"
-
-start "" "%CHROME%" --kiosk-printing --new-window "%POS_URL%"
+cd /d "%~dp0"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0launch-pos.ps1" -Panel canteen %*
+if errorlevel 1 pause

@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\PosSaleChannel;
-use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,7 +11,8 @@ class PosSale extends Model
 {
     protected $fillable = [
         'pos_branch_id',
-        'user_id',
+        'member_id',
+        'cashier_id',
         'sale_channel',
         'total',
         'amount_paid',
@@ -43,9 +43,14 @@ class PosSale extends Model
         return $this->outstandingAmount() > 0;
     }
 
+    public function hasMember(): bool
+    {
+        return $this->member_id !== null;
+    }
+
     public function isCreditSale(): bool
     {
-        return $this->user?->role === UserRole::User;
+        return $this->hasMember() && $this->isUnsettled();
     }
 
     public function paymentTypeLabel(): string
@@ -53,14 +58,24 @@ class PosSale extends Model
         return $this->isCreditSale() ? __('Credit') : __('Cash');
     }
 
+    public function memberName(): ?string
+    {
+        return $this->member?->name;
+    }
+
+    public function cashierName(): ?string
+    {
+        return $this->cashier?->name;
+    }
+
     public function reportPartyLabel(): string
     {
-        return $this->user?->name ?? '—';
+        return $this->memberName() ?? $this->cashierName() ?? '—';
     }
 
     public function reportPartyColumnLabel(): string
     {
-        return $this->isCreditSale() ? __('Member') : __('Cashier');
+        return $this->hasMember() ? __('Member') : __('Cashier');
     }
 
     public static function referenceExists(string $reference): bool
@@ -75,9 +90,14 @@ class PosSale extends Model
         return $this->belongsTo(PosBranch::class, 'pos_branch_id');
     }
 
-    public function user(): BelongsTo
+    public function member(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'member_id');
+    }
+
+    public function cashier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cashier_id');
     }
 
     public function items(): HasMany

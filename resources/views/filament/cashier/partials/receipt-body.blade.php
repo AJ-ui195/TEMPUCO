@@ -20,8 +20,8 @@
         @if ($cashier)
             <div>{{ __('Cashier') }}: {{ $cashier->name }}</div>
         @endif
-        @if ($isCredit && $sale->user)
-            <div>{{ __('Member') }}: {{ $sale->user->name }}</div>
+        @if ($sale->member)
+            <div>{{ __('Member') }}: {{ $sale->member->name }}</div>
         @endif
         <div>{{ __('Payment') }}: {{ $isCredit ? __('Credit') : __('Cash') }}</div>
     </div>
