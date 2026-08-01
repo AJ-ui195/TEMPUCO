@@ -6,11 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Audit trail of cash received from members to settle POS credit. Each
-     * payment is allocated to the member's oldest unpaid sales, which is what
-     * updates `pos_sales.amount_paid`; this table records who took the money.
-     */
+    
     public function up(): void
     {
         Schema::create('pos_credit_payments', function (Blueprint $table) {

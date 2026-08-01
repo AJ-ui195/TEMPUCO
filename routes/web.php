@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\PrintMemberQrCodeController;
+use App\Http\Controllers\PrintMemberLedgerController;
 use App\Http\Controllers\PrintMemberLoanController;
 use App\Http\Controllers\PrintPosSaleReceiptController;
 use Illuminate\Support\Facades\Route;
@@ -27,4 +28,7 @@ Route::middleware(['auth'])->group(function (): void {
 
     Route::get('/pos/sales/{sale}/receipt', PrintPosSaleReceiptController::class)
         ->name('pos.sales.print-receipt');
+
+    Route::get('/pos/member-ledger/print', PrintMemberLedgerController::class)
+        ->name('pos.member-ledger.print');
 });

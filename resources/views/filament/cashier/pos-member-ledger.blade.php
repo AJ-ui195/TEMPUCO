@@ -67,8 +67,52 @@
             @endif
         </div>
 
+        <div class="pos-panel" style="padding: 1rem 1.25rem; margin-bottom: 1rem;">
+            <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem;">
+                <div>
+                    <label for="ledger-from-date" class="pos-muted" style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.375rem;">
+                        {{ __('From date') }}
+                    </label>
+                    <input id="ledger-from-date" type="date" wire:model.live="fromDate" class="pos-input" style="width: auto;" />
+                </div>
+                <div>
+                    <label for="ledger-to-date" class="pos-muted" style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.375rem;">
+                        {{ __('To date') }}
+                    </label>
+                    <input id="ledger-to-date" type="date" wire:model.live="toDate" class="pos-input" style="width: auto;" />
+                </div>
+
+                @if ($fromDate !== '' || $toDate !== '')
+                    <button type="button" wire:click="clearDates" class="pos-btn-secondary" style="width: auto; padding: 0.5rem 0.875rem; font-size: 0.8125rem;">
+                        {{ __('Clear dates') }}
+                    </button>
+                @endif
+
+                <div style="margin-inline-start: auto; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                    @if ($member)
+                        <a href="{{ $this->getPrintMemberUrl() }}" target="_blank" rel="noopener" class="pos-btn-secondary" style="width: auto; padding: 0.5rem 0.875rem; font-size: 0.8125rem; text-decoration: none;">
+                            {{ __('Print this ledger') }}
+                        </a>
+                    @endif
+                    <a href="{{ $this->getPrintAllUrl() }}" target="_blank" rel="noopener" class="pos-btn-secondary" style="width: auto; padding: 0.5rem 0.875rem; font-size: 0.8125rem; text-decoration: none;">
+                        {{ __('Print all member ledgers (:count)', ['count' => $this->getMembersWithActivityCount()]) }}
+                    </a>
+                </div>
+            </div>
+
+            <p class="pos-muted" style="margin: 0.75rem 0 0; font-size: 0.75rem;">
+                {{ __('Showing :range. Printing uses the same date and channel filters.', ['range' => $this->getRangeLabel()]) }}
+            </p>
+        </div>
+
         @if ($member)
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                @if ($summary['opening'] != 0.0)
+                    <div class="pos-panel pos-stat">
+                        <div class="pos-muted pos-stat-label">{{ __('Balance forward') }}</div>
+                        <div class="pos-stat-value">₱{{ number_format($summary['opening'], 2) }}</div>
+                    </div>
+                @endif
                 <div class="pos-panel pos-stat">
                     <div class="pos-muted pos-stat-label">{{ __('Total charged') }}</div>
                     <div class="pos-stat-value">₱{{ number_format($summary['charged'], 2) }}</div>
@@ -110,7 +154,7 @@
 
                 @if ($entries->isEmpty())
                     <p class="pos-muted" style="margin: 0; padding: 2.5rem 1rem; text-align: center; font-size: 0.875rem;">
-                        {{ __('No credit charges or payments on record for this member.') }}
+                        {{ __('No credit charges or payments for this member in :range.', ['range' => $this->getRangeLabel()]) }}
                     </p>
                 @else
                     <div style="overflow-x: auto;">
@@ -147,6 +191,17 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                @if ($summary['opening'] != 0.0)
+                                    <tr>
+                                        <td class="pos-muted" style="padding: 0.5rem 0.75rem; white-space: nowrap;">—</td>
+                                        <td colspan="2" style="padding: 0.5rem 0.75rem; font-weight: 600;">{{ __('Balance forward') }}</td>
+                                        <td style="padding: 0.5rem 0.75rem; text-align: end;">—</td>
+                                        <td style="padding: 0.5rem 0.75rem; text-align: end;">—</td>
+                                        <td style="padding: 0.5rem 0.75rem; text-align: end; font-weight: 700;">
+                                            ₱{{ number_format($summary['opening'], 2) }}
+                                        </td>
+                                    </tr>
+                                @endif
                             </tbody>
                             <tfoot>
                                 <tr style="border-top: 2px solid rgb(203 213 225); font-weight: 700;">

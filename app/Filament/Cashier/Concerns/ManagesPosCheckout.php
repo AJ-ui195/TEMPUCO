@@ -9,6 +9,7 @@ use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\User;
 use App\Support\CanteenBarcodeLookup;
+use App\Support\MemberCreditLimit;
 use App\Support\MemberLoyaltyPoints;
 use App\Support\MemberQrCodeLookup;
 use App\Support\PhilippineTime;
@@ -172,6 +173,57 @@ trait ManagesPosCheckout
         return $this->paymentType === 'credit';
     }
 
+    public function getMonthlyCreditLimit(): float
+    {
+        return MemberCreditLimit::MONTHLY_LIMIT;
+    }
+
+    public function getCreditUsedThisMonth(): float
+    {
+        return $this->memberId === null
+            ? 0.0
+            : MemberCreditLimit::usedThisMonth($this->memberId, $this->getSaleChannel());
+    }
+
+    public function getCreditRemainingThisMonth(): float
+    {
+        return $this->memberId === null
+            ? MemberCreditLimit::MONTHLY_LIMIT
+            : MemberCreditLimit::remainingThisMonth($this->memberId, $this->getSaleChannel());
+    }
+
+    /** Portion of the cart that would go on the member's account. */
+    public function getCreditPortion(): float
+    {
+        return round(max(0, $this->getCartTotal() - max(0, (float) $this->amountPaid)), 2);
+    }
+
+    /** Cash to collect now so the credit portion fits the monthly limit. */
+    public function getMinimumCashDue(): float
+    {
+        return MemberCreditLimit::minimumCashDue(
+            $this->getCartTotal(),
+            $this->getCreditRemainingThisMonth(),
+        );
+    }
+
+    public function exceedsMonthlyCreditLimit(): bool
+    {
+        if (! $this->isCreditSale() || $this->memberId === null || $this->cartLines === []) {
+            return false;
+        }
+
+        return ! MemberCreditLimit::allows(
+            $this->getCreditPortion(),
+            $this->getCreditRemainingThisMonth(),
+        );
+    }
+
+    public function useMinimumCashDue(): void
+    {
+        $this->amountPaid = (string) $this->getMinimumCashDue();
+    }
+
     /**
      * @return Collection<int, PosInventoryItem|PosCanteenInventoryItem>|EloquentCollection<int, PosInventoryItem|PosCanteenInventoryItem>
      */
@@ -284,6 +336,30 @@ trait ManagesPosCheckout
                 Notification::make()
                     ->title(__('Payment exceeds total'))
                     ->body(__('Total: ₱:total', ['total' => number_format($total, 2)]))
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+
+            $remaining = MemberCreditLimit::remainingThisMonth($this->memberId, $this->getSaleChannel());
+
+            if (! MemberCreditLimit::allows(round($total - max(0, $paid), 2), $remaining)) {
+                Notification::make()
+                    ->title($remaining > 0
+                        ? __('Monthly credit limit reached')
+                        : __('No credit left this month'))
+                    ->body($remaining > 0
+                        ? __(':member has ₱:remaining left of the ₱:limit monthly limit. Collect at least ₱:cash in cash to complete this sale.', [
+                            'member' => $this->memberName,
+                            'remaining' => number_format($remaining, 2),
+                            'limit' => number_format(MemberCreditLimit::MONTHLY_LIMIT, 2),
+                            'cash' => number_format(MemberCreditLimit::minimumCashDue($total, $remaining), 2),
+                        ])
+                        : __(':member has used the full ₱:limit monthly limit. This sale must be paid in cash.', [
+                            'member' => $this->memberName,
+                            'limit' => number_format(MemberCreditLimit::MONTHLY_LIMIT, 2),
+                        ]))
                     ->danger()
                     ->send();
 
