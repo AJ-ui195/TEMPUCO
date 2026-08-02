@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\PrintMemberQrCode;
@@ -15,9 +16,13 @@ class PrintMemberQrCodeController extends Controller
         $authUser = $request->user();
 
         abort_unless(
-            $authUser?->isAdmin() || $authUser?->id === $user->id,
+            $authUser?->isAdmin()
+                || $authUser?->isCashier()
+                || $authUser?->id === $user->id,
             403,
         );
+
+        abort_unless($user->role === UserRole::User, 404);
 
         return view('filament.members.print-qr-code', PrintMemberQrCode::viewData(
             $user,

@@ -52,7 +52,7 @@ class PosBranch extends Model
     public function inventoryItems(): BelongsToMany
     {
         return $this->belongsToMany(PosInventoryItem::class, 'pos_branch_inventory', 'pos_branch_id', 'pos_inventory_item_id')
-            ->withPivot('quantity')
+            ->withPivot('quantity', 'expiration_date')
             ->withTimestamps();
     }
 

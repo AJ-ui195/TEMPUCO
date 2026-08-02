@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\PosBranchInventory;
+use App\Support\ExpirationNotifier;
 use App\Support\LowStockNotifier;
 
 class PosBranchInventoryObserver
@@ -21,27 +22,31 @@ class PosBranchInventoryObserver
             null,
             $record->branch->name,
         );
+
+        ExpirationNotifier::notifyBranchItemIfNewlyExpiring($record);
     }
 
     public function updated(PosBranchInventory $record): void
     {
-        if (! $record->wasChanged('quantity')) {
-            return;
-        }
-
         $record->loadMissing(['inventoryItem', 'branch']);
 
         if (! $record->inventoryItem || ! $record->branch) {
             return;
         }
 
-        $previous = $record->getOriginal('quantity');
+        if ($record->wasChanged('quantity')) {
+            $previous = $record->getOriginal('quantity');
 
-        LowStockNotifier::notifyBranchItemIfNewlyLow(
-            $record->inventoryItem,
-            $record->quantity,
-            is_numeric($previous) ? (int) $previous : null,
-            $record->branch->name,
-        );
+            LowStockNotifier::notifyBranchItemIfNewlyLow(
+                $record->inventoryItem,
+                $record->quantity,
+                is_numeric($previous) ? (int) $previous : null,
+                $record->branch->name,
+            );
+        }
+
+        if ($record->wasChanged('expiration_date') || $record->wasChanged('quantity')) {
+            ExpirationNotifier::notifyBranchItemIfNewlyExpiring($record);
+        }
     }
 }

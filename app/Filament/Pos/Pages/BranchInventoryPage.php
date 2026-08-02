@@ -9,6 +9,7 @@ use App\Models\PosBranchInventory;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -86,6 +87,16 @@ class BranchInventoryPage extends Page implements HasTable
                     ->sortable()
                     ->alignEnd()
                     ->numeric(),
+                TextColumn::make('expiration_date')
+                    ->label(__('Expires'))
+                    ->date()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->color(fn (PosBranchInventory $record): ?string => match (true) {
+                        $record->isExpired() => 'danger',
+                        $record->isExpiringSoon() => 'warning',
+                        default => null,
+                    }),
                 TextColumn::make('created_at')
                     ->label(__('Date added'))
                     ->date()
@@ -98,6 +109,14 @@ class BranchInventoryPage extends Page implements HasTable
                     ->label(__('Status'))
                     ->badge()
                     ->getStateUsing(function (PosBranchInventory $record): string {
+                        if ($record->isExpired()) {
+                            return 'expired';
+                        }
+
+                        if ($record->isExpiringSoon()) {
+                            return 'expiring';
+                        }
+
                         if ($record->inventoryItem->isLowStockAtBranch($record->quantity)) {
                             return 'low';
                         }
@@ -109,12 +128,15 @@ class BranchInventoryPage extends Page implements HasTable
                         return 'ok';
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'expired' => __('Expired'),
+                        'expiring' => __('Expiring soon'),
                         'low' => __('Low stock'),
                         'inactive' => __('Inactive'),
                         default => __('OK'),
                     })
                     ->color(fn (string $state): string => match ($state) {
-                        'low' => 'warning',
+                        'expired' => 'danger',
+                        'expiring', 'low' => 'warning',
                         'inactive' => 'gray',
                         default => 'success',
                     }),
@@ -133,6 +155,10 @@ class BranchInventoryPage extends Page implements HasTable
                             ->required()
                             ->integer()
                             ->minValue(0),
+                        DatePicker::make('expiration_date')
+                            ->label(__('Expiration date'))
+                            ->native(false)
+                            ->helperText(__('Cashiers are notified 2 weeks before this date. Leave blank if this stock has no expiry.')),
                     ])
                     ->after(fn () => $this->resetTable()),
             ])

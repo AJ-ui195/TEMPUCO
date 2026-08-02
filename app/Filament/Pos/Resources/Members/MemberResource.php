@@ -5,6 +5,8 @@ namespace App\Filament\Pos\Resources\Members;
 use App\Enums\UserRole;
 use App\Filament\Pos\Resources\Members\Pages\ManageMembers;
 use App\Models\User;
+use App\Support\MemberQrCode;
+use App\Support\PrintMemberQrCode;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -15,6 +17,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 
 class MemberResource extends Resource
@@ -93,10 +96,33 @@ class MemberResource extends Resource
             ->defaultSort('name')
             ->deferLoading()
             ->recordActions([
+                Action::make('viewQrCode')
+                    ->label(__('View QR'))
+                    ->icon(Heroicon::OutlinedQrCode)
+                    ->modalHeading(fn (User $record): string => __('Member QR code — :name', [
+                        'name' => $record->name,
+                    ]))
+                    ->modalContent(fn (User $record): View => view(
+                        'filament.pos.member-qr-modal',
+                        [
+                            'user' => $record,
+                            'qrCodeDataUri' => MemberQrCode::dataUriFor($record, scale: 4),
+                        ],
+                    ))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel(__('Close'))
+                    ->extraModalFooterActions(fn (User $record): array => [
+                        Action::make('printQrFromView')
+                            ->label(__('Print QR code'))
+                            ->icon(Heroicon::OutlinedPrinter)
+                            ->url(PrintMemberQrCode::printUrl($record))
+                            ->openUrlInNewTab()
+                            ->color('primary'),
+                    ]),
                 Action::make('printQrCode')
                     ->label(__('Print QR code'))
                     ->icon(Heroicon::OutlinedPrinter)
-                    ->url(fn (User $record): string => route('members.print-qr', ['user' => $record]))
+                    ->url(fn (User $record): string => PrintMemberQrCode::printUrl($record))
                     ->openUrlInNewTab(),
                 EditAction::make(),
             ]);

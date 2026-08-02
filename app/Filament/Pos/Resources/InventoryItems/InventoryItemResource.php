@@ -10,6 +10,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -92,6 +93,10 @@ class InventoryItemResource extends Resource
                     ->integer()
                     ->minValue(0)
                     ->helperText(__('Alert when stock is at or below this level.')),
+                DatePicker::make('expiration_date')
+                    ->label(__('Expiration date'))
+                    ->native(false)
+                    ->helperText(__('Cashiers are notified 2 weeks before this date. Leave blank if the product has no expiry.')),
                 Toggle::make('is_active')
                     ->label(__('Active'))
                     ->default(true),
@@ -145,10 +150,28 @@ class InventoryItemResource extends Resource
                     ->label(__('Reorder at'))
                     ->placeholder('—')
                     ->alignEnd(),
+                TextColumn::make('expiration_date')
+                    ->label(__('Expires'))
+                    ->date()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->color(fn (PosInventoryItem $record): ?string => match (true) {
+                        $record->isExpired() => 'danger',
+                        $record->isExpiringSoon() => 'warning',
+                        default => null,
+                    }),
                 TextColumn::make('stock_status')
                     ->label(__('Status'))
                     ->badge()
                     ->getStateUsing(function (PosInventoryItem $record): string {
+                        if ($record->isExpired()) {
+                            return 'expired';
+                        }
+
+                        if ($record->isExpiringSoon()) {
+                            return 'expiring';
+                        }
+
                         if ($record->isLowStock()) {
                             return 'low';
                         }
@@ -160,12 +183,15 @@ class InventoryItemResource extends Resource
                         return 'ok';
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'expired' => __('Expired'),
+                        'expiring' => __('Expiring soon'),
                         'low' => __('Low stock'),
                         'inactive' => __('Inactive'),
                         default => __('OK'),
                     })
                     ->color(fn (string $state): string => match ($state) {
-                        'low' => 'warning',
+                        'expired' => 'danger',
+                        'expiring', 'low' => 'warning',
                         'inactive' => 'gray',
                         default => 'success',
                     }),

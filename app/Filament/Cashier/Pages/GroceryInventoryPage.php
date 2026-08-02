@@ -7,6 +7,7 @@ use App\Models\PosInventoryItem;
 use App\Support\BirDailySalesExcelExporter;
 use App\Support\BirDailySalesReport;
 use App\Support\CloseInventoryExcelExporter;
+use App\Support\ExpirationNotifier;
 use App\Support\FastMovingItemsReport;
 use App\Support\LowStockNotifier;
 use App\Support\PhilippineTime;
@@ -44,6 +45,7 @@ class GroceryInventoryPage extends Page
     public function mount(): void
     {
         LowStockNotifier::notifyDashboardSummary();
+        ExpirationNotifier::notifyDashboardSummary();
     }
 
     /**
@@ -92,6 +94,9 @@ class GroceryInventoryPage extends Page
         $activeItems = PosInventoryItem::query()->active()->count();
         $lowStockItems = LowStockNotifier::lowStockCatalogItems();
         $lowStockCount = $lowStockItems->count();
+        $expiringItems = ExpirationNotifier::expiringCatalogItems();
+        $expiringBranchItems = ExpirationNotifier::expiringBranchItems();
+        $expiringCount = $expiringItems->count() + $expiringBranchItems->count();
         $fastMovingReport = new FastMovingItemsReport(saleChannel: PosSaleChannel::Grocery);
         $fastMovingItems = $fastMovingReport->top(10);
 
@@ -99,13 +104,18 @@ class GroceryInventoryPage extends Page
             ? __('No products are below their reorder level.')
             : $this->formatLowStockList($lowStockItems);
 
+        $expiringList = $expiringCount === 0
+            ? __('No products expire within the next 2 weeks.')
+            : $this->formatExpiringList($expiringItems, $expiringBranchItems);
+
         return $schema
             ->components([
                 Section::make(__('Inventory overview'))
-                    ->description(__('Manage grocery product stock from the sidebar. Total: :total · Active: :active · Low stock: :low', [
+                    ->description(__('Manage grocery product stock from the sidebar. Total: :total · Active: :active · Low stock: :low · Expiring in 2 weeks: :expiring', [
                         'total' => $totalItems,
                         'active' => $activeItems,
                         'low' => $lowStockCount,
+                        'expiring' => $expiringCount,
                     ])),
                 Section::make(__('Top 10 fast moving items'))
                     ->description(__('Products with the highest quantity sold — :period.', [
@@ -121,6 +131,20 @@ class GroceryInventoryPage extends Page
                             ))
                             ->columnSpanFull(),
                     ])
+                    ->columnSpanFull(),
+                Section::make(__('Expiring within 2 weeks'))
+                    ->description($expiringCount > 0
+                        ? __('These products expire today or within the next 14 days.')
+                        : __('No warehouse or branch stock is within 2 weeks of expiration.'))
+                    ->schema([
+                        TextEntry::make('expiring_list')
+                            ->hiddenLabel()
+                            ->state(fn (): HtmlString => new HtmlString(
+                                '<div style="font-size: 0.875rem; line-height: 1.6;">'.$expiringList.'</div>'
+                            ))
+                            ->columnSpanFull(),
+                    ])
+                    ->visible($expiringCount > 0 || $totalItems > 0)
                     ->columnSpanFull(),
                 Section::make(__('Low stock alerts'))
                     ->description($lowStockCount > 0
@@ -150,6 +174,34 @@ class GroceryInventoryPage extends Page
                 'name' => $item->name,
                 'qty' => $item->quantity,
                 'level' => $item->reorder_level,
+            ]);
+        }
+
+        return implode('<br>', $parts);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, PosInventoryItem>  $catalog
+     * @param  \Illuminate\Support\Collection<int, \App\Models\PosBranchInventory>  $branch
+     */
+    protected function formatExpiringList(\Illuminate\Support\Collection $catalog, \Illuminate\Support\Collection $branch): string
+    {
+        $parts = [];
+
+        foreach ($catalog as $item) {
+            $parts[] = __(':name (warehouse) — :qty · expires :date', [
+                'name' => $item->name,
+                'qty' => $item->quantity,
+                'date' => $item->expiration_date?->format('M j, Y') ?? '—',
+            ]);
+        }
+
+        foreach ($branch as $row) {
+            $parts[] = __(':name (:branch) — :qty · expires :date', [
+                'name' => $row->inventoryItem?->name ?? __('Unknown'),
+                'branch' => $row->branch?->name ?? __('Branch'),
+                'qty' => $row->quantity,
+                'date' => $row->expiration_date?->format('M j, Y') ?? '—',
             ]);
         }
 

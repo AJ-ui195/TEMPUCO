@@ -19,6 +19,7 @@ class PosInventoryItem extends Model
         'unit_price',
         'cost',
         'reorder_level',
+        'expiration_date',
         'is_active',
     ];
 
@@ -32,6 +33,7 @@ class PosInventoryItem extends Model
             'unit_price' => 'decimal:2',
             'cost' => 'decimal:2',
             'reorder_level' => 'integer',
+            'expiration_date' => 'date',
             'is_active' => 'boolean',
         ];
     }
@@ -49,7 +51,7 @@ class PosInventoryItem extends Model
     public function branches(): BelongsToMany
     {
         return $this->belongsToMany(PosBranch::class, 'pos_branch_inventory', 'pos_inventory_item_id', 'pos_branch_id')
-            ->withPivot('quantity')
+            ->withPivot('quantity', 'expiration_date')
             ->withTimestamps();
     }
 
@@ -69,6 +71,40 @@ class PosInventoryItem extends Model
         }
 
         return $branchQuantity <= $this->reorder_level;
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->expiration_date !== null
+            && $this->expiration_date->toDateString() <= now()->toDateString();
+    }
+
+    public function isExpiringSoon(int $withinDays = 14): bool
+    {
+        if ($this->expiration_date === null || $this->isExpired()) {
+            return false;
+        }
+
+        return $this->expiration_date->toDateString() <= now()->copy()->addDays($withinDays)->toDateString();
+    }
+
+    /**
+     * Active products with stock that expire today or within the next N days.
+     *
+     * @param  Builder<PosInventoryItem>  $query
+     * @return Builder<PosInventoryItem>
+     */
+    public function scopeExpiringWithin(Builder $query, int $withinDays = 14): Builder
+    {
+        $today = now()->toDateString();
+        $until = now()->copy()->addDays($withinDays)->toDateString();
+
+        return $query
+            ->active()
+            ->where($query->qualifyColumn('quantity'), '>', 0)
+            ->whereNotNull($query->qualifyColumn('expiration_date'))
+            ->whereDate($query->qualifyColumn('expiration_date'), '>=', $today)
+            ->whereDate($query->qualifyColumn('expiration_date'), '<=', $until);
     }
 
     /**

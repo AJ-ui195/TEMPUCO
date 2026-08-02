@@ -7,6 +7,7 @@ use App\Models\PosInventoryItem;
 use App\Support\BranchStockTransfer;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -51,6 +52,7 @@ class BranchStockTransferPage extends Page
                 [
                     'pos_inventory_item_id' => null,
                     'quantity' => 1,
+                    'expiration_date' => null,
                 ],
             ],
         ]);
@@ -104,7 +106,20 @@ class BranchStockTransferPage extends Page
                                     ->required()
                                     ->live()
                                     ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                    ->native(false),
+                                    ->native(false)
+                                    ->afterStateUpdated(function ($state, callable $set): void {
+                                        if (! $state) {
+                                            $set('expiration_date', null);
+
+                                            return;
+                                        }
+
+                                        $expiration = PosInventoryItem::query()
+                                            ->whereKey($state)
+                                            ->value('expiration_date');
+
+                                        $set('expiration_date', $expiration);
+                                    }),
                                 TextInput::make('quantity')
                                     ->label(__('Quantity'))
                                     ->required()
@@ -141,6 +156,11 @@ class BranchStockTransferPage extends Page
                                             'count' => number_format((int) $available),
                                         ]);
                                     }),
+                                DatePicker::make('expiration_date')
+                                    ->label(__('Expiration date'))
+                                    ->native(false)
+                                    ->helperText(__('Filled from warehouse stock; change if this transfer has a different expiry.'))
+                                    ->columnSpanFull(),
                             ])
                             ->defaultItems(1)
                             ->minItems(1)
@@ -201,6 +221,7 @@ class BranchStockTransferPage extends Page
                 [
                     'pos_inventory_item_id' => null,
                     'quantity' => 1,
+                    'expiration_date' => null,
                 ],
             ],
         ]);
