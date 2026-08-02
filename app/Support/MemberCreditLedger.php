@@ -62,7 +62,7 @@ final class MemberCreditLedger
         $charges = $this->chargesQuery($channel)
             ->when($from, fn (Builder $query) => $query->where('created_at', '>=', $from))
             ->when($to, fn (Builder $query) => $query->where('created_at', '<=', $to))
-            ->withSum('items as items_quantity', 'quantity')
+            ->withSum(['items as items_quantity' => fn (Builder $items) => $items->notVoided()], 'quantity')
             ->orderBy('created_at')
             ->orderBy('id')
             ->get()

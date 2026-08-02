@@ -94,7 +94,6 @@ class PosSalesReportPage extends Page
      * @return Collection<int, array{
      *     member_id: int,
      *     name: string,
-     *     points: int,
      *     transaction_count: int,
      *     total_spent: float,
      *     total_paid: float,
@@ -148,7 +147,6 @@ class PosSalesReportPage extends Page
                 __('Total purchases (PHP)'),
                 __('Paid (PHP)'),
                 __('Outstanding (PHP)'),
-                __('Points'),
             ]);
 
             foreach ($report->memberPurchases() as $row) {
@@ -158,7 +156,6 @@ class PosSalesReportPage extends Page
                     number_format($row['total_spent'], 2, '.', ''),
                     number_format($row['total_paid'], 2, '.', ''),
                     number_format($row['outstanding'], 2, '.', ''),
-                    $row['points'],
                 ]);
             }
 

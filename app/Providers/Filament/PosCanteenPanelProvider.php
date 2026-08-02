@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Auth\Pages\Login;
 use App\Filament\Canteen\Pages\CanteenInventoryPage;
 use App\Filament\Canteen\Pages\PosCanteenPage;
+use App\Filament\Cashier\Pages\PosVoidSalePage;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -44,6 +45,7 @@ class PosCanteenPanelProvider extends PanelProvider
             ->pages([
                 PosCanteenPage::class,
                 CanteenInventoryPage::class,
+                PosVoidSalePage::class,
             ])
             ->discoverResources(in: app_path('Filament/Canteen/Resources'), for: 'App\Filament\Canteen\Resources')
             ->middleware([

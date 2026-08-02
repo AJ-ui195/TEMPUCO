@@ -7,6 +7,7 @@ use App\Models\PosCreditPayment;
 use App\Models\User;
 use App\Support\MemberCreditsLedger;
 use App\Support\MemberPosCredit;
+use App\Support\PrintCreditPaymentReceipt;
 use App\Support\SettleMemberCredit;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -38,6 +39,10 @@ class PosMemberCreditsPage extends Page
     public string $paymentAmount = '';
 
     public ?string $paymentError = null;
+
+    public bool $showReceiptModal = false;
+
+    public ?int $receiptPaymentId = null;
 
     public function getTitle(): string|Htmlable
     {
@@ -168,6 +173,35 @@ class PosMemberCreditsPage extends Page
             ->get();
     }
 
+    public function getReceiptPayment(): ?PosCreditPayment
+    {
+        if ($this->receiptPaymentId === null) {
+            return null;
+        }
+
+        return PosCreditPayment::query()
+            ->with(['member', 'cashier'])
+            ->find($this->receiptPaymentId);
+    }
+
+    /**
+     * @return array{payment: PosCreditPayment, cashier: ?User, balanceBefore: float, balanceAfter: float, autoPrint: bool}|null
+     */
+    public function getReceiptData(): ?array
+    {
+        $payment = $this->getReceiptPayment();
+
+        return $payment instanceof PosCreditPayment
+            ? PrintCreditPaymentReceipt::viewData($payment)
+            : null;
+    }
+
+    public function closeReceiptModal(): void
+    {
+        $this->showReceiptModal = false;
+        $this->receiptPaymentId = null;
+    }
+
     public function recordPayment(): void
     {
         $member = $this->getPaymentMember();
@@ -218,6 +252,11 @@ class PosMemberCreditsPage extends Page
             ->send();
 
         $this->closePaymentModal();
+
+        if ($result['payment'] instanceof PosCreditPayment) {
+            $this->receiptPaymentId = $result['payment']->id;
+            $this->showReceiptModal = true;
+        }
     }
 
     protected function findMember(int $memberId): ?User

@@ -1,6 +1,13 @@
 <x-filament-panels::page>
     @include('filament.cashier.partials.pos-ui-styles')
 
+    {{-- Never applied to this page: the print helper copies it into the print iframe. --}}
+    <style
+        id="pos-receipt-iframe-styles"
+        media="not all"
+        data-receipt-title="{{ __('Credit payment receipt') }}"
+    >@include('filament.cashier.partials.receipt-print-styles')</style>
+
     @php
         $members = $this->getMembersWithCredit();
         $totalOutstanding = $this->getTotalOutstanding();
@@ -130,6 +137,15 @@
                                             @if ($payment->cashier)
                                                 · {{ $payment->cashier->name }}
                                             @endif
+                                            ·
+                                            <a
+                                                href="{{ \App\Support\PrintCreditPaymentReceipt::printUrl($payment, autoPrint: false) }}"
+                                                target="_blank"
+                                                rel="noopener"
+                                                style="font-weight: 600; text-decoration: underline;"
+                                            >
+                                                {{ __('Receipt') }}
+                                            </a>
                                         </span>
                                     @endforeach
                                 </div>
@@ -253,6 +269,44 @@
                 </div>
             </div>
         @endif
+
+        @if ($showReceiptModal && ($receipt = $this->getReceiptData()))
+            <div
+                class="pos-credit-modal"
+                wire:key="credit-receipt-{{ $receiptPaymentId }}"
+                x-data
+                x-init="$nextTick(() => setTimeout(() => window.posGroceryPrintReceipt?.(), 100))"
+            >
+                <div class="pos-credit-modal__backdrop" wire:click="closeReceiptModal"></div>
+                <div class="pos-credit-modal__dialog">
+                    <h3 style="margin: 0 0 0.75rem; font-size: 1.0625rem; font-weight: 700;">
+                        {{ __('Credit payment receipt') }}
+                    </h3>
+
+                    <div id="pos-receipt-print-area">
+                        @include('filament.cashier.partials.credit-payment-receipt-body', [
+                            'payment' => $receipt['payment'],
+                            'cashier' => $receipt['cashier'],
+                            'balanceBefore' => $receipt['balanceBefore'],
+                            'balanceAfter' => $receipt['balanceAfter'],
+                        ])
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1.25rem;">
+                        <button type="button" onclick="window.posGroceryPrintReceipt()" class="pos-btn-primary">
+                            {{ __('Print') }}
+                        </button>
+                        <button type="button" wire:click="closeReceiptModal" class="pos-btn-secondary">
+                            {{ __('Close') }}
+                        </button>
+                    </div>
+
+                    <p class="pos-muted" style="margin: 0.75rem 0 0; font-size: 0.75rem; text-align: center;">
+                        {{ __('For no print dialog: open POS with scripts/launch-pos-chrome.bat and set the thermal printer as Windows default.') }}
+                    </p>
+                </div>
+            </div>
+        @endif
     </div>
 
     <style>
@@ -286,5 +340,40 @@
             background: rgb(30 41 59);
             color: #fff;
         }
+
+        .fi-pos-ui .pos-receipt-paper {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.4;
+            color: #000;
+            padding: 0.75rem;
+            border: 1px solid rgb(226 232 240);
+            border-radius: 0.5rem;
+            background: #fff;
+        }
+
+        .dark .fi-pos-ui .pos-receipt-paper {
+            color: #fff;
+            background: rgb(3 7 18);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .fi-pos-ui .pos-receipt-paper__center { text-align: center; }
+        .fi-pos-ui .pos-receipt-paper__brand { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
+        .fi-pos-ui .pos-receipt-paper__subtitle,
+        .fi-pos-ui .pos-receipt-paper__footer { color: #000; font-weight: 700; font-size: 12px; }
+        .dark .fi-pos-ui .pos-receipt-paper__subtitle,
+        .dark .fi-pos-ui .pos-receipt-paper__footer { color: #f8fafc; }
+        .fi-pos-ui .pos-receipt-paper__divider { border-top: 1px dashed #000; margin: 0.625rem 0; }
+        .dark .fi-pos-ui .pos-receipt-paper__divider { border-top-color: rgba(255, 255, 255, 0.35); }
+        .fi-pos-ui .pos-receipt-paper__table { width: 100%; border-collapse: collapse; }
+        .fi-pos-ui .pos-receipt-paper__table td { padding: 0.125rem 0; vertical-align: top; }
+        .fi-pos-ui .pos-receipt-paper__totals td { padding-top: 0.25rem; }
+        .fi-pos-ui .pos-receipt-paper__label { text-align: right; padding-right: 0.5rem; }
+        .fi-pos-ui .pos-receipt-paper__amount { text-align: right; white-space: nowrap; }
+        .fi-pos-ui .pos-receipt-paper__grand { font-weight: 700; font-size: 13px; }
     </style>
+
+    <script src="{{ asset('js/pos-grocery-print-receipt.js') }}"></script>
 </x-filament-panels::page>

@@ -225,7 +225,6 @@
                                 <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Transactions') }}</th>
                                 <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Total purchases') }}</th>
                                 <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Outstanding') }}</th>
-                                <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Points') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -239,7 +238,6 @@
                                     <td style="padding: 0.5rem 0.75rem; text-align: end; color: {{ $row['outstanding'] > 0 ? 'rgb(4 120 87)' : 'inherit' }};">
                                         {{ $row['outstanding'] > 0 ? '₱'.number_format($row['outstanding'], 2) : '—' }}
                                     </td>
-                                    <td style="padding: 0.5rem 0.75rem; text-align: end;">{{ number_format($row['points']) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -247,7 +245,7 @@
                             <tr style="border-top: 2px solid rgb(203 213 225); font-weight: 700;">
                                 <td colspan="2" style="padding: 0.75rem; text-align: end;">{{ __('Total') }}</td>
                                 <td style="padding: 0.75rem; text-align: end;">₱{{ number_format($memberPurchases->sum('total_spent'), 2) }}</td>
-                                <td colspan="2"></td>
+                                <td></td>
                             </tr>
                         </tfoot>
                     </table>

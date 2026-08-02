@@ -25,10 +25,12 @@ final class CloseInventoryReport
      */
     public function rows(): Collection
     {
+        $pullOutByItem = RecordInventoryDamage::quantitiesByItem();
+
         return PosInventoryItem::query()
             ->orderedByName()
             ->get()
-            ->map(function (PosInventoryItem $item): array {
+            ->map(function (PosInventoryItem $item) use ($pullOutByItem): array {
                 $balance = (int) $item->quantity;
                 $unitCost = (float) $item->cost;
 
@@ -38,7 +40,7 @@ final class CloseInventoryReport
                     'selling_price' => (float) $item->unit_price,
                     'beginning' => 0,
                     'sales' => 0,
-                    'pullout' => 0,
+                    'pullout' => $pullOutByItem[$item->id] ?? 0,
                     'delivery' => 0,
                     'return' => 0,
                     'adjustment' => 0,

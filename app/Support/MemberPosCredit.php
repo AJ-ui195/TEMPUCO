@@ -8,6 +8,7 @@ use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
 /**
@@ -60,6 +61,36 @@ class MemberPosCredit
     }
 
     /**
+     * Balance left on the channel the moment the given payment was recorded, so
+     * a reprinted receipt still shows the figures the member was handed.
+     */
+    public function outstandingAfter(PosCreditPayment $payment): float
+    {
+        $channel = $payment->sale_channel;
+
+        if (! $channel instanceof PosSaleChannel) {
+            return 0.0;
+        }
+
+        $charged = (float) $this->creditSalesQuery($channel)
+            ->where('created_at', '<=', $payment->created_at)
+            ->selectRaw('SUM(total - amount_paid) as charged')
+            ->value('charged');
+
+        $paid = (float) $this->paymentsQuery($channel)
+            ->where(function (Builder $query) use ($payment): void {
+                $query->where('created_at', '<', $payment->created_at)
+                    ->orWhere(function (Builder $sameInstant) use ($payment): void {
+                        $sameInstant->where('created_at', $payment->created_at)
+                            ->where('id', '<=', $payment->id);
+                    });
+            })
+            ->sum('amount');
+
+        return round(max(0, $charged - $paid), 2);
+    }
+
+    /**
      * Charges that still have a balance, oldest first, with payments applied in
      * the same order they were received.
      *
@@ -70,7 +101,11 @@ class MemberPosCredit
         $pool = $this->paidFor($channel);
 
         return $this->creditSalesQuery($channel)
-            ->with(['items.inventoryItem', 'items.canteenInventoryItem'])
+            ->with([
+                'items' => fn (HasMany $items) => $items->notVoided(),
+                'items.inventoryItem',
+                'items.canteenInventoryItem',
+            ])
             ->orderBy('created_at')
             ->orderBy('id')
             ->get()

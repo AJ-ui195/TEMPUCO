@@ -315,6 +315,24 @@
                     color: rgb(251 191 36);
                 }
 
+                .fi-pos-grocery .pos-btn-danger {
+                    color: #fff;
+                    font-weight: 600;
+                    background: rgb(220 38 38);
+                    border: none;
+                    border-radius: 0.5rem;
+                    cursor: pointer;
+                }
+
+                .fi-pos-grocery .pos-btn-danger:hover:not(:disabled) {
+                    background: rgb(185 28 28);
+                }
+
+                .fi-pos-grocery .pos-btn-danger:disabled {
+                    cursor: not-allowed;
+                    opacity: 0.5;
+                }
+
                 .fi-pos-grocery .pos-feedback--ok {
                     color: rgb(5 150 105);
                 }
@@ -411,6 +429,7 @@
                 .fi-pos-grocery .pos-receipt-paper {
                     font-family: 'Courier New', Courier, monospace;
                     font-size: 12px;
+                    font-weight: 700;
                     line-height: 1.4;
                     color: #000;
                     padding: 0.75rem;
@@ -427,11 +446,11 @@
 
                 .fi-pos-grocery .pos-receipt-paper__center { text-align: center; }
                 .fi-pos-grocery .pos-receipt-paper__brand { font-size: 14px; font-weight: 700; letter-spacing: 0.04em; }
-                .fi-pos-grocery .pos-receipt-paper__muted { color: #4b5563; }
+                .fi-pos-grocery .pos-receipt-paper__muted { color: #000; }
                 .dark .fi-pos-grocery .pos-receipt-paper__muted { color: rgb(148 163 184); }
                 .fi-pos-grocery .pos-receipt-paper__subtitle,
                 .fi-pos-grocery .pos-receipt-paper__footer {
-                    color: #111827;
+                    color: #000;
                     font-weight: 700;
                     font-size: 12px;
                 }
@@ -440,7 +459,7 @@
                     color: #f8fafc;
                 }
                 .fi-pos-grocery .pos-receipt-paper__unit-price {
-                    color: #111827;
+                    color: #000;
                     font-weight: 700;
                     font-size: 12px;
                     margin-top: 0.1rem;
@@ -448,7 +467,8 @@
                 .dark .fi-pos-grocery .pos-receipt-paper__unit-price {
                     color: #f8fafc;
                 }
-                .fi-pos-grocery .pos-receipt-paper__divider { border-top: 1px dashed #9ca3af; margin: 0.625rem 0; }
+                .fi-pos-grocery .pos-receipt-paper__divider { border-top: 1px dashed #000; margin: 0.625rem 0; }
+                .dark .fi-pos-grocery .pos-receipt-paper__divider { border-top-color: rgba(255, 255, 255, 0.35); }
                 .fi-pos-grocery .pos-receipt-paper__table { width: 100%; border-collapse: collapse; }
                 .fi-pos-grocery .pos-receipt-paper__table th,
                 .fi-pos-grocery .pos-receipt-paper__table td { padding: 0.125rem 0; vertical-align: top; }
@@ -560,12 +580,53 @@
                 </div>
 
                 <div class="pos-panel" style="padding: 0; overflow: hidden;">
-                    <div class="pos-cart-header" style="padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div class="pos-cart-header" style="padding: 0.75rem 1rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem;">
                         <span style="font-weight: 700; font-size: 0.9375rem;">{{ __('Cart') }}</span>
-                        <span class="pos-muted" style="font-size: 0.8125rem;">
-                            {{ trans_choice(':count item|:count items', $this->getCartItemCount(), ['count' => $this->getCartItemCount()]) }}
-                        </span>
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
+                            <span class="pos-muted" style="font-size: 0.8125rem;">
+                                {{ trans_choice(':count item|:count items', $this->getCartItemCount(), ['count' => $this->getCartItemCount()]) }}
+                            </span>
+                            @if ($cartLines !== [])
+                                <button
+                                    type="button"
+                                    wire:click="toggleVoidMode"
+                                    @class(['pos-period-btn', 'pos-period-btn--active' => $voidMode])
+                                >
+                                    {{ $voidMode ? __('Cancel void') : __('Void items') }}
+                                </button>
+                            @endif
+                        </div>
                     </div>
+
+                    @if ($voidMode && $cartLines !== [])
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.625rem 1rem; border-bottom: 1px solid rgb(226 232 240); background: rgba(220, 38, 38, 0.06);">
+                            <span style="font-size: 0.8125rem; font-weight: 600;">
+                                {{ trans_choice(':count item selected|:count items selected', $this->getVoidSelectionCount(), ['count' => $this->getVoidSelectionCount()]) }}
+                            </span>
+                            <button type="button" wire:click="selectAllForVoid" class="pos-period-btn">{{ __('Select all') }}</button>
+                            <button type="button" wire:click="clearVoidSelection" class="pos-period-btn">{{ __('Clear selection') }}</button>
+
+                            <div style="margin-inline-start: auto; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmModal('void_selected')"
+                                    @disabled($this->getVoidSelectionCount() === 0)
+                                    class="pos-btn-danger"
+                                    style="padding: 0.375rem 0.75rem; font-size: 0.8125rem;"
+                                >
+                                    {{ __('Void selected') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmModal('void_all')"
+                                    class="pos-btn-danger"
+                                    style="padding: 0.375rem 0.75rem; font-size: 0.8125rem;"
+                                >
+                                    {{ __('Void all') }}
+                                </button>
+                            </div>
+                        </div>
+                    @endif
 
                     @if ($cartLines === [])
                         <p class="pos-muted" style="padding: 2rem 1rem; text-align: center; font-size: 0.875rem; margin: 0;">
@@ -576,6 +637,9 @@
                             <table class="pos-table" style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
                                 <thead>
                                     <tr style="text-align: left;">
+                                        @if ($voidMode)
+                                            <th style="padding: 0.5rem 0.75rem; width: 2.5rem;"></th>
+                                        @endif
                                         <th style="padding: 0.5rem 0.75rem;">{{ __('Product') }}</th>
                                         <th style="padding: 0.5rem 0.75rem;">{{ __('SKU') }}</th>
                                         <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Price') }}</th>
@@ -586,7 +650,18 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($cartLines as $productId => $line)
-                                        <tr>
+                                        <tr @style(['background: rgba(220, 38, 38, 0.08)' => $voidMode && $this->isVoidSelected((int) $productId)])>
+                                            @if ($voidMode)
+                                                <td style="padding: 0.5rem 0.75rem;">
+                                                    <input
+                                                        type="checkbox"
+                                                        wire:click="toggleVoidLine({{ $productId }})"
+                                                        @checked($this->isVoidSelected((int) $productId))
+                                                        aria-label="{{ __('Void :product', ['product' => $line['name']]) }}"
+                                                        style="width: 1rem; height: 1rem; accent-color: #dc2626;"
+                                                    />
+                                                </td>
+                                            @endif
                                             <td style="padding: 0.5rem 0.75rem; font-weight: 500;">{{ $line['name'] }}</td>
                                             <td class="pos-muted" style="padding: 0.5rem 0.75rem;">{{ $line['sku'] ?? '—' }}</td>
                                             <td style="padding: 0.5rem 0.75rem; text-align: end;">₱{{ number_format($line['unit_price'], 2) }}</td>
@@ -638,7 +713,7 @@
                         @if ($paymentType === 'credit')
                             {{ __('Required for credit sales. Scan a QR code or search and select a member.') }}
                         @else
-                            {{ __('Scan a QR code or search to link a member. Purchases of ₱200 or more earn 1 loyalty point.') }}
+                            {{ __('Scan a QR code or search to link a member.') }}
                         @endif
                     </p>
 
@@ -653,12 +728,6 @@
                                             {{ $memberEmail }}
                                         </span>
                                     @endif
-                                    <span class="pos-muted" style="display: block; margin-top: 0.375rem; font-size: 0.8125rem;">
-                                        {{ __('Points: :count', ['count' => $memberPoints]) }}
-                                        @if ($this->willEarnLoyaltyPoint())
-                                            · {{ __('+1 on this sale') }}
-                                        @endif
-                                    </span>
                                     <span class="pos-muted" style="display: block; margin-top: 0.375rem; font-size: 0.8125rem;">
                                         {{ __('Credit left this month: ₱:remaining of ₱:limit', [
                                             'remaining' => number_format($this->getCreditRemainingThisMonth(), 2),

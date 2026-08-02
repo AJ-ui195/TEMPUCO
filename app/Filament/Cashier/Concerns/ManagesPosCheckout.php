@@ -10,7 +10,6 @@ use App\Models\PosSaleItem;
 use App\Models\User;
 use App\Support\CanteenBarcodeLookup;
 use App\Support\MemberCreditLimit;
-use App\Support\MemberLoyaltyPoints;
 use App\Support\MemberQrCodeLookup;
 use App\Support\PhilippineTime;
 use App\Support\PosBarcodeLookup;
@@ -44,8 +43,6 @@ trait ManagesPosCheckout
 
     public ?string $memberEmail = null;
 
-    public int $memberPoints = 0;
-
     public ?string $memberScanFeedback = null;
 
     public bool $memberScanFeedbackIsError = false;
@@ -61,6 +58,12 @@ trait ManagesPosCheckout
     public bool $showConfirmModal = false;
 
     public string $pendingConfirmAction = '';
+
+    /** Cart void: tick the lines to pull out before the sale is rung up. */
+    public bool $voidMode = false;
+
+    /** @var array<int, int> Product ids ticked for voiding. */
+    public array $voidSelection = [];
 
     abstract protected function getSaleChannel(): PosSaleChannel;
 
@@ -119,17 +122,10 @@ trait ManagesPosCheckout
         $this->memberId = null;
         $this->memberName = null;
         $this->memberEmail = null;
-        $this->memberPoints = 0;
         $this->memberQrInput = '';
         $this->memberSearch = '';
         $this->memberScanFeedback = null;
         $this->memberScanFeedbackIsError = false;
-    }
-
-    public function willEarnLoyaltyPoint(): bool
-    {
-        return $this->memberId !== null
-            && MemberLoyaltyPoints::qualifies($this->getCartTotal());
     }
 
     /**
@@ -308,6 +304,96 @@ trait ManagesPosCheckout
         $this->paymentType = 'cash';
         $this->scanFeedback = null;
         $this->scanFeedbackIsError = false;
+        $this->exitVoidMode();
+    }
+
+    public function toggleVoidMode(): void
+    {
+        $this->voidMode = ! $this->voidMode;
+        $this->voidSelection = [];
+    }
+
+    public function exitVoidMode(): void
+    {
+        $this->voidMode = false;
+        $this->voidSelection = [];
+    }
+
+    public function toggleVoidLine(int $productId): void
+    {
+        if (! isset($this->cartLines[$productId])) {
+            return;
+        }
+
+        $this->voidSelection = in_array($productId, $this->voidSelection, true)
+            ? array_values(array_diff($this->voidSelection, [$productId]))
+            : [...$this->voidSelection, $productId];
+    }
+
+    public function isVoidSelected(int $productId): bool
+    {
+        return in_array($productId, $this->voidSelection, true);
+    }
+
+    public function selectAllForVoid(): void
+    {
+        $this->voidSelection = array_map('intval', array_keys($this->cartLines));
+    }
+
+    public function clearVoidSelection(): void
+    {
+        $this->voidSelection = [];
+    }
+
+    public function getVoidSelectionCount(): int
+    {
+        return count($this->voidSelection);
+    }
+
+    public function voidSelectedLines(): void
+    {
+        $voided = 0;
+
+        foreach ($this->voidSelection as $productId) {
+            if (isset($this->cartLines[$productId])) {
+                unset($this->cartLines[$productId]);
+                $voided++;
+            }
+        }
+
+        $this->exitVoidMode();
+
+        if ($voided === 0) {
+            return;
+        }
+
+        if ($this->cartLines === []) {
+            $this->amountPaid = '';
+        }
+
+        Notification::make()
+            ->title(trans_choice(':count item voided|:count items voided', $voided, ['count' => $voided]))
+            ->success()
+            ->send();
+    }
+
+    public function voidAllLines(): void
+    {
+        $voided = count($this->cartLines);
+
+        $this->cartLines = [];
+        $this->amountPaid = '';
+        $this->exitVoidMode();
+
+        if ($voided === 0) {
+            return;
+        }
+
+        Notification::make()
+            ->title(__('Cart voided'))
+            ->body(trans_choice(':count item removed from the sale.|:count items removed from the sale.', $voided, ['count' => $voided]))
+            ->success()
+            ->send();
     }
 
     public function completeSale(): void
@@ -381,9 +467,7 @@ trait ManagesPosCheckout
         $inventoryForeignKey = $this->saleItemInventoryForeignKey();
         $catalogModel = $this->catalogModelClass();
 
-        $pointsAwarded = 0;
-
-        $sale = DB::transaction(function () use ($memberId, $isCredit, $total, $paid, $saleChannel, $inventoryForeignKey, $catalogModel, &$pointsAwarded): PosSale {
+        $sale = DB::transaction(function () use ($memberId, $isCredit, $total, $paid, $saleChannel, $inventoryForeignKey, $catalogModel): PosSale {
             $sale = PosSale::query()->create([
                 'pos_branch_id' => null,
                 'member_id' => $memberId,
@@ -409,20 +493,14 @@ trait ManagesPosCheckout
                     ->decrement('quantity', $line['quantity']);
             }
 
-            $pointsAwarded = MemberLoyaltyPoints::awardIfEligible($memberId, $total);
-
             return $sale;
         });
-
-        $pointsNote = $pointsAwarded > 0
-            ? ' '.__('+1 loyalty point earned.')
-            : '';
 
         if ($isCredit) {
             $outstanding = round($total - $paid, 2);
             Notification::make()
                 ->title(__('Charged to member account'))
-                ->body(($paid > 0
+                ->body($paid > 0
                     ? __(':member — outstanding: ₱:amount', [
                         'member' => $this->memberName,
                         'amount' => number_format($outstanding, 2),
@@ -430,19 +508,13 @@ trait ManagesPosCheckout
                     : __(':member — full amount on credit: ₱:amount', [
                         'member' => $this->memberName,
                         'amount' => number_format($outstanding, 2),
-                    ])).$pointsNote)
+                    ]))
                 ->success()
                 ->send();
         } else {
-            $body = __('Change: ₱:change', ['change' => number_format($paid - $total, 2)]);
-
-            if ($pointsAwarded > 0) {
-                $body .= $pointsNote;
-            }
-
             Notification::make()
                 ->title(__('Sale completed'))
-                ->body($body)
+                ->body(__('Change: ₱:change', ['change' => number_format($paid - $total, 2)]))
                 ->success()
                 ->send();
         }
@@ -480,6 +552,8 @@ trait ManagesPosCheckout
         match ($action) {
             'complete_sale' => $this->completeSale(),
             'clear_cart' => $this->clearCart(),
+            'void_selected' => $this->voidSelectedLines(),
+            'void_all' => $this->voidAllLines(),
             default => null,
         };
     }
@@ -489,6 +563,8 @@ trait ManagesPosCheckout
         return match ($this->pendingConfirmAction) {
             'complete_sale' => $this->isCreditSale() ? __('Charge to account') : __('Complete sale'),
             'clear_cart' => __('Clear cart'),
+            'void_selected' => __('Void selected items'),
+            'void_all' => __('Void all items'),
             default => __('Confirm'),
         };
     }
@@ -500,6 +576,12 @@ trait ManagesPosCheckout
                 ? __('Charge this sale to the member account and update stock?')
                 : __('Complete this sale and update stock?'),
             'clear_cart' => __('Clear all items from the cart?'),
+            'void_selected' => trans_choice(
+                'Void :count selected item from this sale?|Void :count selected items from this sale?',
+                $this->getVoidSelectionCount(),
+                ['count' => $this->getVoidSelectionCount()],
+            ),
+            'void_all' => __('Void every item in the cart?'),
             default => '',
         };
     }
@@ -509,6 +591,7 @@ trait ManagesPosCheckout
         return match ($this->pendingConfirmAction) {
             'complete_sale' => $this->isCreditSale() ? __('Charge to account') : __('Complete sale'),
             'clear_cart' => __('Clear cart'),
+            'void_selected', 'void_all' => __('Void'),
             default => __('Confirm'),
         };
     }
@@ -648,7 +731,6 @@ trait ManagesPosCheckout
         $this->memberId = $member->id;
         $this->memberName = $member->name;
         $this->memberEmail = $member->email;
-        $this->memberPoints = (int) $member->points;
         $this->memberSearch = '';
         $this->memberQrInput = '';
     }

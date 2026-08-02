@@ -133,11 +133,6 @@ class UserResource extends Resource
                     ->searchable()
                     ->copyable()
                     ->placeholder('—'),
-                TextColumn::make('points')
-                    ->label(__('Points'))
-                    ->numeric()
-                    ->sortable()
-                    ->alignEnd(),
                 ImageColumn::make('qr_code')
                     ->label('QR code')
                     ->getStateUsing(fn (User $record): string => MemberQrCode::dataUriFor($record))

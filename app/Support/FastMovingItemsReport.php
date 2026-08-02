@@ -31,6 +31,7 @@ final class FastMovingItemsReport
                 DB::raw('SUM(line_total) as revenue'),
             ])
             ->whereNotNull($itemForeignKey)
+            ->notVoided()
             ->whereHas('sale', function ($query) use ($since): void {
                 $query->where('created_at', '>=', $since);
 

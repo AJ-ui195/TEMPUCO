@@ -164,6 +164,24 @@
                 color: rgb(148 163 184);
                 border-color: rgb(75 85 99);
             }
+
+            .fi-pos-ui .pos-btn-danger {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.375rem;
+                padding: 0.625rem 1rem;
+                font-size: 0.875rem;
+                font-weight: 700;
+                color: #fff;
+                background: rgb(220 38 38);
+                border: none;
+                border-radius: 0.5rem;
+                cursor: pointer;
+            }
+
+            .fi-pos-ui .pos-btn-danger:hover {
+                background: rgb(185 28 28);
+            }
         </style>
     @endpush
 @endonce

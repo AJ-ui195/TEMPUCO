@@ -89,11 +89,6 @@ class MemberResource extends Resource
                     ->label(__('Cellphone #'))
                     ->searchable()
                     ->placeholder('—'),
-                TextColumn::make('points')
-                    ->label(__('Points'))
-                    ->numeric()
-                    ->sortable()
-                    ->alignEnd(),
             ])
             ->defaultSort('name')
             ->deferLoading()

@@ -104,4 +104,26 @@ class PosSale extends Model
     {
         return $this->hasMany(PosSaleItem::class, 'pos_sale_id');
     }
+
+    /** Lines still part of the sale — `total` only covers these. */
+    public function activeItems(): HasMany
+    {
+        return $this->items()->notVoided();
+    }
+
+    public function voidedItems(): HasMany
+    {
+        return $this->items()->whereHas('voidRecord');
+    }
+
+    public function hasVoidedItems(): bool
+    {
+        return $this->voidedItems()->exists();
+    }
+
+    /** True once every line has been voided, which leaves the sale worth nothing. */
+    public function isFullyVoided(): bool
+    {
+        return $this->items()->exists() && ! $this->activeItems()->exists();
+    }
 }

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PosSaleItem extends Model
 {
@@ -41,6 +43,25 @@ class PosSaleItem extends Model
     public function canteenInventoryItem(): BelongsTo
     {
         return $this->belongsTo(PosCanteenInventoryItem::class, 'pos_canteen_inventory_item_id');
+    }
+
+    public function voidRecord(): HasOne
+    {
+        return $this->hasOne(PosSaleItemVoid::class, 'pos_sale_item_id');
+    }
+
+    public function isVoided(): bool
+    {
+        return $this->voidRecord()->exists();
+    }
+
+    /**
+     * @param  Builder<PosSaleItem>  $query
+     * @return Builder<PosSaleItem>
+     */
+    public function scopeNotVoided(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('voidRecord');
     }
 
     public function catalogProduct(): PosInventoryItem|PosCanteenInventoryItem|null

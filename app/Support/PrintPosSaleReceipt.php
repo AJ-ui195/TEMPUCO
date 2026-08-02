@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\PosSale;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class PrintPosSaleReceipt
 {
@@ -20,7 +21,13 @@ final class PrintPosSaleReceipt
      */
     public static function viewData(PosSale $sale, ?User $cashier, bool $autoPrint = false): array
     {
-        $sale->loadMissing(['items.inventoryItem', 'items.canteenInventoryItem', 'member', 'cashier']);
+        $sale->load([
+            'items' => fn (HasMany $items) => $items->notVoided(),
+            'items.inventoryItem',
+            'items.canteenInventoryItem',
+        ]);
+
+        $sale->loadMissing(['member', 'cashier']);
 
         return [
             'sale' => $sale,

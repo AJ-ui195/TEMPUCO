@@ -7,6 +7,7 @@ use App\Models\PosSaleItem;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -83,7 +84,13 @@ class PosSalesReport
     public function query(): Builder
     {
         return $this->baseQuery()
-            ->with(['member', 'cashier', 'items.inventoryItem', 'items.canteenInventoryItem']);
+            ->with([
+                'member',
+                'cashier',
+                'items' => fn (HasMany $items) => $items->notVoided(),
+                'items.inventoryItem',
+                'items.canteenInventoryItem',
+            ]);
     }
 
     /**
@@ -129,6 +136,7 @@ class PosSalesReport
 
         $itemsSold = (int) PosSaleItem::query()
             ->whereIn('pos_sale_id', $saleIds)
+            ->notVoided()
             ->sum('quantity');
 
         $transactionCount = (clone $allSales)->count();
@@ -160,7 +168,6 @@ class PosSalesReport
      * @return Collection<int, array{
      *     member_id: int,
      *     name: string,
-     *     points: int,
      *     transaction_count: int,
      *     total_spent: float,
      *     total_paid: float,
@@ -199,7 +206,6 @@ class PosSalesReport
                 return [
                     'member_id' => (int) $row->member_id,
                     'name' => $member?->name ?? __('Unknown member'),
-                    'points' => (int) ($member?->points ?? 0),
                     'transaction_count' => (int) $row->transaction_count,
                     'total_spent' => $spent,
                     'total_paid' => round($spent - $outstanding, 2),
@@ -231,6 +237,7 @@ class PosSalesReport
                 DB::raw('SUM(quantity) as quantity_sold'),
             ])
             ->whereNotNull('pos_inventory_item_id')
+            ->notVoided()
             ->with('inventoryItem:id,name,sku')
             ->whereIn('pos_sale_id', $allSaleIds)
             ->groupBy('pos_inventory_item_id')
@@ -244,6 +251,7 @@ class PosSalesReport
             ])
             ->whereIn('pos_sale_id', $cashSaleIds)
             ->whereNotNull('pos_inventory_item_id')
+            ->notVoided()
             ->groupBy('pos_inventory_item_id')
             ->pluck('revenue', 'pos_inventory_item_id');
 
