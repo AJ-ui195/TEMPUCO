@@ -43,6 +43,8 @@ class PosSalesReportPage extends Page
 
     public string $toDate = '';
 
+    public string $memberSearch = '';
+
     public function mount(): void
     {
         $this->year = now()->year;
@@ -103,6 +105,32 @@ class PosSalesReportPage extends Page
     public function getMemberPurchases(): Collection
     {
         return $this->report()->memberPurchases();
+    }
+
+    /**
+     * Cash-only member purchase totals for the current search (credits excluded).
+     *
+     * @return Collection<int, array{
+     *     member_id: int,
+     *     name: string,
+     *     transaction_count: int,
+     *     total_purchases: float
+     * }>
+     */
+    public function getMemberCashSearchResults(): Collection
+    {
+        $term = trim($this->memberSearch);
+
+        if ($term === '') {
+            return collect();
+        }
+
+        return $this->report()->memberCashPurchases($term);
+    }
+
+    public function clearMemberSearch(): void
+    {
+        $this->memberSearch = '';
     }
 
     public function exportCsv(): StreamedResponse

@@ -7,6 +7,8 @@
         $sales = $report->sales();
         $itemsSold = $this->getItemsSoldByProduct();
         $memberPurchases = $this->getMemberPurchases();
+        $memberCashSearch = $this->getMemberCashSearchResults();
+        $memberSearchTerm = trim($memberSearch);
         $years = range(now()->year, now()->year - 5);
         $months = collect(range(1, 12))->mapWithKeys(fn (int $m): array => [
             $m => \Carbon\Carbon::createFromDate($this->year, $m, 1)->format('F'),
@@ -197,6 +199,96 @@
                                 <td colspan="2" style="padding: 0.75rem; text-align: end;">{{ __('Total') }}</td>
                                 <td style="padding: 0.75rem; text-align: end;">{{ number_format($summary['items_sold']) }}</td>
                                 <td style="padding: 0.75rem; text-align: end;">₱{{ number_format($summary['total_revenue'], 2) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            @endif
+        </div>
+
+        <div class="pos-panel" style="padding: 0; overflow: hidden; margin-bottom: 1rem;">
+            <div class="pos-cart-header" style="padding: 0.75rem 1rem;">
+                <span style="font-weight: 700; font-size: 0.9375rem;">{{ __('Search member purchases') }}</span>
+                <span class="pos-muted" style="display: block; font-size: 0.6875rem; font-weight: 500; margin-top: 0.125rem;">
+                    {{ __('Search a member name to see their cash transactions and total purchases for :period. Credit sales are not included.', ['period' => $report->periodLabel()]) }}
+                </span>
+            </div>
+
+            <div style="padding: 0.75rem 1rem; border-bottom: 1px solid rgb(226 232 240); display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end;">
+                <div style="flex: 1 1 16rem; min-width: 12rem;">
+                    <label for="member-purchase-search" class="pos-muted" style="display: block; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">
+                        {{ __('Member name') }}
+                    </label>
+                    <input
+                        id="member-purchase-search"
+                        type="search"
+                        wire:model.live.debounce.300ms="memberSearch"
+                        autocomplete="off"
+                        placeholder="{{ __('Type a member name…') }}"
+                        class="pos-input"
+                    />
+                </div>
+                @if ($memberSearchTerm !== '')
+                    <button
+                        type="button"
+                        wire:click="clearMemberSearch"
+                        class="pos-btn-secondary"
+                        style="width: auto; padding: 0.5rem 0.875rem; font-size: 0.8125rem;"
+                    >
+                        {{ __('Clear') }}
+                    </button>
+                @endif
+            </div>
+
+            @if ($memberSearchTerm === '')
+                <p class="pos-muted" style="margin: 0; padding: 1.25rem 1rem; text-align: center; font-size: 0.8125rem;">
+                    {{ __('Type a member name above to view their cash purchase summary.') }}
+                </p>
+            @elseif ($memberCashSearch->isEmpty())
+                <p class="pos-muted" style="margin: 0; padding: 1.25rem 1rem; text-align: center; font-size: 0.8125rem;">
+                    {{ __('No cash purchases found for “:name” in this period.', ['name' => $memberSearchTerm]) }}
+                </p>
+            @else
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.75rem; padding: 0.75rem 1rem; border-bottom: 1px solid rgb(226 232 240);">
+                    <div>
+                        <div class="pos-muted" style="font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Members found') }}</div>
+                        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.125rem;">{{ number_format($memberCashSearch->count()) }}</div>
+                    </div>
+                    <div>
+                        <div class="pos-muted" style="font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Cash transactions') }}</div>
+                        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.125rem;">{{ number_format($memberCashSearch->sum('transaction_count')) }}</div>
+                    </div>
+                    <div>
+                        <div class="pos-muted" style="font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Total purchases') }}</div>
+                        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.125rem;">₱{{ number_format($memberCashSearch->sum('total_purchases'), 2) }}</div>
+                    </div>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="pos-table" style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+                        <thead>
+                            <tr style="text-align: left;">
+                                <th style="padding: 0.5rem 0.75rem;">{{ __('Member') }}</th>
+                                <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Transactions') }}</th>
+                                <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Total purchases') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($memberCashSearch as $row)
+                                <tr>
+                                    <td style="padding: 0.5rem 0.75rem; font-weight: 600;">{{ $row['name'] }}</td>
+                                    <td style="padding: 0.5rem 0.75rem; text-align: end;">{{ number_format($row['transaction_count']) }}</td>
+                                    <td style="padding: 0.5rem 0.75rem; text-align: end; font-weight: 600;">
+                                        ₱{{ number_format($row['total_purchases'], 2) }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr style="border-top: 2px solid rgb(203 213 225); font-weight: 700;">
+                                <td style="padding: 0.75rem; text-align: end;">{{ __('Total') }}</td>
+                                <td style="padding: 0.75rem; text-align: end;">{{ number_format($memberCashSearch->sum('transaction_count')) }}</td>
+                                <td style="padding: 0.75rem; text-align: end;">₱{{ number_format($memberCashSearch->sum('total_purchases'), 2) }}</td>
                             </tr>
                         </tfoot>
                     </table>

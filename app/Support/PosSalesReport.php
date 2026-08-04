@@ -216,6 +216,69 @@ class PosSalesReport
             ->values();
     }
 
+    /**
+     * Cash purchases grouped per member (credit charges excluded).
+     * Optionally filter by member name.
+     *
+     * @return Collection<int, array{
+     *     member_id: int,
+     *     name: string,
+     *     transaction_count: int,
+     *     total_purchases: float
+     * }>
+     */
+    public function memberCashPurchases(?string $memberSearch = null): Collection
+    {
+        $term = trim((string) $memberSearch);
+
+        $query = $this->cashSalesQuery()
+            ->whereNotNull('member_id')
+            ->groupBy('member_id')
+            ->select([
+                'member_id',
+                DB::raw('COUNT(*) as transaction_count'),
+                DB::raw('SUM(total) as total_purchases'),
+            ]);
+
+        if ($term !== '') {
+            $memberIds = User::query()
+                ->members()
+                ->where('name', 'like', '%'.$term.'%')
+                ->pluck('id');
+
+            if ($memberIds->isEmpty()) {
+                return collect();
+            }
+
+            $query->whereIn('member_id', $memberIds);
+        }
+
+        $rows = $query->get();
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $members = User::query()
+            ->whereIn('id', $rows->pluck('member_id'))
+            ->get()
+            ->keyBy('id');
+
+        return $rows
+            ->map(function (PosSale $row) use ($members): array {
+                $member = $members->get($row->member_id);
+
+                return [
+                    'member_id' => (int) $row->member_id,
+                    'name' => $member?->name ?? __('Unknown member'),
+                    'transaction_count' => (int) $row->transaction_count,
+                    'total_purchases' => round((float) $row->total_purchases, 2),
+                ];
+            })
+            ->sortByDesc('total_purchases')
+            ->values();
+    }
+
     public function memberPurchasesTotal(): float
     {
         return round((float) $this->memberPurchases()->sum('total_spent'), 2);

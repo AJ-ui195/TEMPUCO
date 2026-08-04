@@ -10,6 +10,7 @@
         <div class="pos-receipt-paper__brand">{{ __('TEMPUCO') }}</div>
         <div>{{ $channelLabel }} {{ __('POS') }}</div>
         <div class="pos-receipt-paper__subtitle">{{ __('Sales receipt') }}</div>
+        <div>POS0509202359371</div>
     </div>
 
     <div class="pos-receipt-paper__divider"></div>
