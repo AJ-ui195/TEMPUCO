@@ -459,16 +459,79 @@
     }
 
     .mp-qr-frame {
+        position: relative;
         display: inline-flex;
-        padding: 0.875rem;
+        padding: 1.15rem;
         margin-top: 1.25rem;
-        border-radius: 1rem;
-        background: #fff;
-        box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.12);
+        border-radius: 1.15rem;
+        background:
+            linear-gradient(#fff, #fff) padding-box,
+            linear-gradient(180deg, #38bdf8, #0284c7) border-box;
+        border: 2px solid transparent;
+        box-shadow: 0 10px 24px rgba(14, 116, 144, 0.12);
     }
 
     html.dark .mp-qr-frame {
-        background: #f8fafc;
+        background:
+            linear-gradient(#f8fafc, #f8fafc) padding-box,
+            linear-gradient(180deg, #7dd3fc, #0284c7) border-box;
+        box-shadow: 0 10px 24px rgba(8, 47, 73, 0.35);
+    }
+
+    .mp-qr-pad {
+        display: flex;
+        padding: 0.5rem;
+        border-radius: 0.65rem;
+        border: 1.5px dashed rgba(14, 165, 233, 0.35);
+        background: #fff;
+    }
+
+    html.dark .mp-qr-pad {
+        border-color: rgba(2, 132, 199, 0.35);
+    }
+
+    .mp-qr-corner {
+        position: absolute;
+        width: 1.35rem;
+        height: 1.35rem;
+        pointer-events: none;
+        border: 3px solid #0284c7;
+    }
+
+    html.dark .mp-qr-corner {
+        border-color: #0ea5e9;
+    }
+
+    .mp-qr-corner--tl {
+        top: 0.45rem;
+        left: 0.45rem;
+        border-right: 0;
+        border-bottom: 0;
+        border-radius: 0.35rem 0 0 0;
+    }
+
+    .mp-qr-corner--tr {
+        top: 0.45rem;
+        right: 0.45rem;
+        border-left: 0;
+        border-bottom: 0;
+        border-radius: 0 0.35rem 0 0;
+    }
+
+    .mp-qr-corner--bl {
+        bottom: 0.45rem;
+        left: 0.45rem;
+        border-right: 0;
+        border-top: 0;
+        border-radius: 0 0 0 0.35rem;
+    }
+
+    .mp-qr-corner--br {
+        bottom: 0.45rem;
+        right: 0.45rem;
+        border-left: 0;
+        border-top: 0;
+        border-radius: 0 0 0.35rem 0;
     }
 
     .mp-qr-frame img {
@@ -476,6 +539,19 @@
         width: min(160px, 100%);
         height: auto;
         aspect-ratio: 1;
+    }
+
+    .mp-qr-scan-label {
+        margin-top: 0.75rem;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #0284c7;
+    }
+
+    html.dark .mp-qr-scan-label {
+        color: #7dd3fc;
     }
 
     .mp-qr-name {
