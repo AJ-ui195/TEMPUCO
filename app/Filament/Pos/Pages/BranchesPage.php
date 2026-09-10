@@ -4,6 +4,8 @@ namespace App\Filament\Pos\Pages;
 
 use App\Filament\Pos\Concerns\InteractsWithInventoryPanel;
 use App\Models\PosBranch;
+use App\Models\PosBranchInventory;
+use App\Models\PosBranchStockTransfer;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
@@ -140,16 +142,57 @@ class BranchesPage extends Page
                         TextEntry::make('branches_grid')
                             ->hiddenLabel()
                             ->state(fn (): HtmlString => new HtmlString(
-                                view('filament.pos.branches-grid', [
-                                    'branches' => PosBranch::query()
-                                        ->orderBy('branch_number')
-                                        ->get(),
-                                ])->render()
+                                view('filament.pos.branches-grid', $this->branchGridData())->render()
                             ))
                             ->columnSpanFull(),
                     ])
                     ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * @return array{
+     *     branches: \Illuminate\Support\Collection<int, PosBranch>,
+     *     stockLeft: array<int, array{products: int, units: int}>,
+     *     transfers: array<int, array{products: int, units: int}>
+     * }
+     */
+    protected function branchGridData(): array
+    {
+        $branches = PosBranch::query()
+            ->orderBy('branch_number')
+            ->get();
+
+        $stockLeft = PosBranchInventory::query()
+            ->where('quantity', '>', 0)
+            ->selectRaw('pos_branch_id, COUNT(*) as products, SUM(quantity) as units')
+            ->groupBy('pos_branch_id')
+            ->get()
+            ->mapWithKeys(fn (PosBranchInventory $row): array => [
+                $row->pos_branch_id => [
+                    'products' => (int) $row->products,
+                    'units' => (int) $row->units,
+                ],
+            ])
+            ->all();
+
+        $transfers = PosBranchStockTransfer::query()
+            ->selectRaw('pos_branch_id, COUNT(DISTINCT pos_inventory_item_id) as products, SUM(quantity) as units')
+            ->groupBy('pos_branch_id')
+            ->get()
+            ->mapWithKeys(fn (PosBranchStockTransfer $row): array => [
+                $row->pos_branch_id => [
+                    'products' => (int) $row->products,
+                    'units' => (int) $row->units,
+                ],
+            ])
+            ->all();
+
+        return [
+            'branches' => $branches,
+            'stockLeft' => $stockLeft,
+            'transfers' => $transfers,
+        ];
     }
 
     /**

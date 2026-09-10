@@ -4,7 +4,9 @@ namespace App\Support;
 
 use App\Models\PosBranch;
 use App\Models\PosBranchInventory;
+use App\Models\PosBranchStockTransfer;
 use App\Models\PosInventoryItem;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -94,6 +96,16 @@ class BranchStockTransfer
                         $expirationDate,
                     ),
                 ])->save();
+
+                $cashier = auth()->user();
+
+                PosBranchStockTransfer::query()->create([
+                    'pos_branch_id' => $branch->id,
+                    'pos_inventory_item_id' => $item->id,
+                    'recorded_by' => $cashier instanceof User ? $cashier->id : null,
+                    'quantity' => $quantity,
+                    'expiration_date' => $expirationDate,
+                ]);
 
                 $transferred[] = [
                     'item' => $item->fresh(),

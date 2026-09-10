@@ -6,28 +6,15 @@ use App\Models\PosBranch;
 use App\Models\PosInventoryItem;
 use App\Support\BranchStockTransfer;
 use BackedEnum;
-use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Schemas\Components\Actions;
-use Filament\Schemas\Components\EmbeddedSchema;
-use Filament\Schemas\Components\Form;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class BranchStockTransferPage extends Page
 {
-    /**
-     * @var array<string, mixed>|null
-     */
-    public ?array $data = [];
-
     protected static ?string $navigationLabel = 'Transfer to branch';
 
     protected static ?string $title = 'Transfer to branch';
@@ -40,167 +27,126 @@ class BranchStockTransferPage extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsRightLeft;
 
+    protected string $view = 'filament.cashier.branch-stock-transfer';
+
+    public string $branchId = '';
+
+    public string $search = '';
+
+    /** @var array<int, int|string|null> */
+    public array $quantities = [];
+
+    /** @var array<int, string|null> */
+    public array $expirations = [];
+
+    public function mount(): void
+    {
+        $this->expirations = PosInventoryItem::query()
+            ->active()
+            ->where('quantity', '>', 0)
+            ->get(['id', 'expiration_date'])
+            ->mapWithKeys(fn (PosInventoryItem $item): array => [
+                $item->id => $item->expiration_date?->toDateString(),
+            ])
+            ->all();
+    }
+
     public function getTitle(): string|Htmlable
     {
         return static::$title ?? __('Transfer to branch');
     }
 
-    public function mount(): void
+    /**
+     * @return Collection<int, PosBranch>
+     */
+    public function getBranches(): Collection
     {
-        $this->form->fill([
-            'items' => [
-                [
-                    'pos_inventory_item_id' => null,
-                    'quantity' => 1,
-                    'expiration_date' => null,
-                ],
-            ],
-        ]);
+        return PosBranch::query()
+            ->where('is_active', true)
+            ->orderBy('branch_number')
+            ->get();
     }
 
-    public function defaultForm(Schema $schema): Schema
+    /**
+     * @return Collection<int, PosInventoryItem>
+     */
+    public function getProducts(): Collection
     {
-        return $schema
-            ->columns(1)
-            ->statePath('data');
+        $term = trim($this->search);
+
+        return PosInventoryItem::query()
+            ->active()
+            ->where('quantity', '>', 0)
+            ->when($term !== '', function ($query) use ($term): void {
+                $query->matchingSearch($term);
+            })
+            ->orderedByName()
+            ->get();
     }
 
-    public function form(Schema $schema): Schema
+    public function getSelectedCount(): int
     {
-        return $schema
-            ->components([
-                Section::make(__('Pull stock from warehouse'))
-                    ->description(__('Move units from grocery warehouse inventory into a branch.'))
-                    ->schema([
-                        Select::make('pos_branch_id')
-                            ->label(__('Branch'))
-                            ->options(fn (): array => PosBranch::query()
-                                ->where('is_active', true)
-                                ->orderBy('branch_number')
-                                ->get()
-                                ->mapWithKeys(fn (PosBranch $branch): array => [
-                                    $branch->id => __('Branch :number — :name', [
-                                        'number' => $branch->branch_number,
-                                        'name' => $branch->name,
-                                    ]),
-                                ])
-                                ->all())
-                            ->searchable()
-                            ->required()
-                            ->native(false),
-                        Repeater::make('items')
-                            ->label(__('Products'))
-                            ->schema([
-                                Select::make('pos_inventory_item_id')
-                                    ->label(__('Product'))
-                                    ->options(fn (): array => PosInventoryItem::query()
-                                        ->active()
-                                        ->where('quantity', '>', 0)
-                                        ->orderBy('name')
-                                        ->get()
-                                        ->mapWithKeys(fn (PosInventoryItem $item): array => [
-                                            $item->id => $item->stockQuantityLabel(),
-                                        ])
-                                        ->all())
-                                    ->searchable()
-                                    ->required()
-                                    ->live()
-                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                    ->native(false)
-                                    ->afterStateUpdated(function ($state, callable $set): void {
-                                        if (! $state) {
-                                            $set('expiration_date', null);
-
-                                            return;
-                                        }
-
-                                        $expiration = PosInventoryItem::query()
-                                            ->whereKey($state)
-                                            ->value('expiration_date');
-
-                                        $set('expiration_date', $expiration);
-                                    }),
-                                TextInput::make('quantity')
-                                    ->label(__('Quantity'))
-                                    ->required()
-                                    ->integer()
-                                    ->minValue(1)
-                                    ->default(1)
-                                    ->maxValue(function (callable $get): ?int {
-                                        $itemId = $get('pos_inventory_item_id');
-
-                                        if (! $itemId) {
-                                            return null;
-                                        }
-
-                                        return PosInventoryItem::query()
-                                            ->whereKey($itemId)
-                                            ->value('quantity');
-                                    })
-                                    ->helperText(function (callable $get): ?string {
-                                        $itemId = $get('pos_inventory_item_id');
-
-                                        if (! $itemId) {
-                                            return null;
-                                        }
-
-                                        $available = PosInventoryItem::query()
-                                            ->whereKey($itemId)
-                                            ->value('quantity');
-
-                                        if ($available === null) {
-                                            return null;
-                                        }
-
-                                        return __(':count unit(s) in warehouse.', [
-                                            'count' => number_format((int) $available),
-                                        ]);
-                                    }),
-                                DatePicker::make('expiration_date')
-                                    ->label(__('Expiration date'))
-                                    ->native(false)
-                                    ->helperText(__('Filled from warehouse stock; change if this transfer has a different expiry.'))
-                                    ->columnSpanFull(),
-                            ])
-                            ->defaultItems(1)
-                            ->minItems(1)
-                            ->addActionLabel(__('Add product'))
-                            ->reorderable(false)
-                            ->columns(2)
-                            ->columnSpanFull()
-                            ->helperText(__('Only products with warehouse stock are listed.')),
-                    ])
-                    ->columnSpanFull(),
-            ]);
+        return collect($this->quantities)
+            ->filter(fn (mixed $quantity): bool => (int) $quantity > 0)
+            ->count();
     }
 
-    public function content(Schema $schema): Schema
+    public function clearQuantities(): void
     {
-        return $schema
-            ->components([
-                Form::make([EmbeddedSchema::make('form')])
-                    ->id('branch-stock-transfer-form')
-                    ->livewireSubmitHandler('submit')
-                    ->footer([
-                        Actions::make([
-                            Action::make('submit')
-                                ->label(__('Transfer stock'))
-                                ->submit('submit'),
-                        ]),
-                    ]),
-            ]);
+        $this->quantities = [];
     }
 
-    public function submit(): void
+    public function transfer(): void
     {
-        $data = $this->form->getState();
+        if (! filled($this->branchId)) {
+            Notification::make()
+                ->title(__('Select a branch'))
+                ->body(__('Choose the branch that will receive this stock.'))
+                ->warning()
+                ->send();
 
-        $transferred = BranchStockTransfer::transferMany(
-            (int) $data['pos_branch_id'],
-            $data['items'] ?? [],
-        );
+            return;
+        }
 
-        $branch = PosBranch::query()->findOrFail($data['pos_branch_id']);
+        $items = [];
+
+        foreach ($this->quantities as $itemId => $quantity) {
+            $quantity = (int) $quantity;
+
+            if ($quantity < 1) {
+                continue;
+            }
+
+            $items[] = [
+                'pos_inventory_item_id' => (int) $itemId,
+                'quantity' => $quantity,
+                'expiration_date' => $this->expirations[$itemId] ?? null,
+            ];
+        }
+
+        if ($items === []) {
+            Notification::make()
+                ->title(__('No products selected'))
+                ->body(__('Enter a quantity on the products you want to transfer.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $transferred = BranchStockTransfer::transferMany((int) $this->branchId, $items);
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title(__('Transfer failed'))
+                ->body(collect($exception->errors())->flatten()->first())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $branch = PosBranch::query()->findOrFail((int) $this->branchId);
 
         $summary = collect($transferred)
             ->map(fn (array $row): string => number_format($row['quantity']).' × '.$row['item']->name)
@@ -215,15 +161,7 @@ class BranchStockTransferPage extends Page
             ->success()
             ->send();
 
-        $this->form->fill([
-            'pos_branch_id' => $data['pos_branch_id'],
-            'items' => [
-                [
-                    'pos_inventory_item_id' => null,
-                    'quantity' => 1,
-                    'expiration_date' => null,
-                ],
-            ],
-        ]);
+        $this->quantities = [];
+        $this->expirations = [];
     }
 }
