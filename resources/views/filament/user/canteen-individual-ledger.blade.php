@@ -9,11 +9,9 @@
 @endphp
 
 <div class="ll-sheet">
-    <header class="ll-sheet-head">
-        <div class="ll-sheet-strong">DICNHS TEMPUCO</div>
-        <h3>{{ __('Individual ledger') }}</h3>
-        <div>{{ $department ?? __('Canteen Department') }}</div>
-    </header>
+    @include('filament.user.partials.ledger-letterhead', [
+        'ledgerSubtitle' => $department ?? __('Canteen Department'),
+    ])
 
     <div class="ll-member">
         <div><span>{{ __('Name') }}:</span> {{ $user->name }}</div>

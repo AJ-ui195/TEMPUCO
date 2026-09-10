@@ -10,6 +10,8 @@ class LoanPayment extends Model
     protected $fillable = [
         'loan_id',
         'amount',
+        'kind',
+        'official_receipt_no',
         'received_at',
     ];
 

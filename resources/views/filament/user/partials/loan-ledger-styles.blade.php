@@ -34,16 +34,41 @@
 
     .ll-sheet-head {
         text-align: center;
-        font-size: 0.78rem;
-        line-height: 1.35;
+        color: #111;
+        line-height: 1.25;
         margin-bottom: 1rem;
     }
 
-    .ll-sheet-head h3,
-    .ll-sheet-strong {
-        font-weight: 700;
+    .ll-head-coop {
+        font-size: 0.62rem;
+        font-weight: 500;
         text-transform: uppercase;
-        margin: 0.25rem 0;
+        letter-spacing: 0.02em;
+        margin: 0;
+    }
+
+    .ll-head-school {
+        font-size: 1.05rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.01em;
+        margin: 0.15rem 0 0;
+    }
+
+    .ll-head-city {
+        font-family: "Times New Roman", Times, Georgia, serif;
+        font-size: 0.78rem;
+        font-weight: 400;
+        text-transform: uppercase;
+        margin: 0.1rem 0 0.35rem;
+    }
+
+    .ll-head-title,
+    .ll-head-subtitle {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin: 0.1rem 0 0;
     }
 
     .ll-member {
@@ -55,6 +80,12 @@
 
     .ll-member span {
         font-weight: 700;
+    }
+
+    .ll-member-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.35rem 1.25rem;
     }
 
     .ll-table-wrap {
@@ -77,5 +108,10 @@
     .ll-grid th {
         font-size: 0.68rem;
         text-align: center;
+    }
+
+    .ll-grid td.num {
+        text-align: right;
+        white-space: nowrap;
     }
 </style>

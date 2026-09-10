@@ -8,7 +8,11 @@ use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
 use App\Models\Loan;
 use App\Models\User;
+use App\Support\ApdsRules;
+use App\Support\LoanTypes;
+use App\Support\RegularLoanSchedule;
 use BackedEnum;
+use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
@@ -33,6 +37,8 @@ class ApplyLoan extends Page
 
     private const APPLICATION_TYPE_QUICK = 'quick';
 
+    private const APPLICATION_TYPE_CHARACTER = 'character';
+
     protected static ?string $navigationLabel = 'Loan application';
 
     protected static ?string $title = 'Loan application';
@@ -56,6 +62,7 @@ class ApplyLoan extends Page
             'applicant_name' => $user->name,
             'applicant_address' => $user->address,
             'applicant_signed_at' => now()->toDateString(),
+            'date_of_birth' => $user->date_of_birth?->toDateString(),
             'quick_contact_number' => $user->cellphone,
             'quick_email' => $user->email,
             'loan_period_months' => 1,
@@ -93,9 +100,17 @@ class ApplyLoan extends Page
                             ->options([
                                 self::APPLICATION_TYPE_REGULAR => __('Regular loan'),
                                 self::APPLICATION_TYPE_QUICK => __('Quick loan'),
+                                self::APPLICATION_TYPE_CHARACTER => __('Character loan'),
                             ])
                             ->inline()
                             ->live()
+                            ->afterStateUpdated(function (?string $state, callable $set): void {
+                                match ($state) {
+                                    self::APPLICATION_TYPE_QUICK => $set('loan_type', LoanTypes::QUICK),
+                                    self::APPLICATION_TYPE_CHARACTER => $set('loan_type', LoanTypes::CHARACTER),
+                                    default => $set('loan_type', null),
+                                };
+                            })
                             ->required()
                             ->columnSpanFull(),
                     ])
@@ -109,15 +124,11 @@ class ApplyLoan extends Page
                                 fn (LoanCategory $category): array => [$category->value => $category->getLabel()]
                             )->all())
                             ->inline()
-                            ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
-                            ->visible(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
+                            ->visible(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->columnSpanFull(),
                     ])
-                    ->columnSpanFull(),
-
-                Section::make(__('Purpose and payment'))
-                    ->schema($this->purposeAndPaymentFields())
-                    ->columns(2)
+                    ->visible(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                     ->columnSpanFull(),
 
                 Section::make(__('Applicant\'s request (Regular loan)'))
@@ -125,43 +136,56 @@ class ApplyLoan extends Page
                     ->schema([
                         TextInput::make('applicant_name')
                             ->label(__('Name'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->maxLength(255)
                             ->columnSpanFull(),
                         Textarea::make('applicant_address')
                             ->label(__('Address'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->rows(2)
+                            ->columnSpanFull(),
+                        DatePicker::make('date_of_birth')
+                            ->label(__('Date of birth'))
+                            ->native(false)
+                            ->maxDate(now())
+                            ->helperText(__('Optional. Required only to enforce APDS age limits for 4–7 year terms.'))
                             ->columnSpanFull(),
                         TextInput::make('loan_type')
                             ->label(__('Type of loan'))
                             ->placeholder(__('e.g. Emergency, Educational'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->maxLength(255)
                             ->columnSpanFull(),
                         TextInput::make('loan_amount')
                             ->label(__('Loan amount (PHP)'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->numeric()
                             ->minValue(1)
                             ->step(0.01)
-                            ->prefix('₱'),
+                            ->prefix('₱')
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncRegularInstallment($set, $get)),
                         TextInput::make('loan_period_months')
                             ->label(__('Repayment period'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->integer()
                             ->minValue(1)
-                            ->suffix(__('month(s)')),
+                            ->maxValue(84)
+                            ->suffix(__('month(s)'))
+                            ->helperText(__('APDS age caps (if DOB is set): 4yr≤56, 5yr≤55, 6yr≤54, 7yr≤53.'))
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncRegularInstallment($set, $get)),
                         TextInput::make('installment_amount')
                             ->label(__('Monthly installment (PHP)'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->numeric()
                             ->minValue(0)
                             ->step(0.01)
-                            ->prefix('₱'),
+                            ->prefix('₱')
+                            ->helperText(__('Auto-calculated from APDS declining-balance schedule. You may adjust if needed.')),
                         DatePicker::make('first_payment_due_date')
                             ->label(__('First payment due on'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->native(false),
                         DatePicker::make('applicant_signed_at')
                             ->label(__('Date'))
@@ -169,7 +193,7 @@ class ApplyLoan extends Page
                             ->native(false),
                     ])
                     ->columns(2)
-                    ->visible(fn (callable $get): bool => $get('loan_application_type') !== self::APPLICATION_TYPE_QUICK)
+                    ->visible(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                     ->columnSpanFull(),
 
                 Section::make(__('Quick loan application form'))
@@ -274,6 +298,68 @@ class ApplyLoan extends Page
                     ->columns(2)
                     ->visible(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK)
                     ->columnSpanFull(),
+
+                Section::make(__('Character loan application form'))
+                    ->description(__('Complete all fields below. I hereby certify that all statements made hereon are true and complete.'))
+                    ->schema([
+                        TextInput::make('applicant_name')
+                            ->label(__('Name'))
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                            ->maxLength(255)
+                            ->columnSpanFull(),
+                        Textarea::make('applicant_address')
+                            ->label(__('Address'))
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                            ->rows(2)
+                            ->columnSpanFull(),
+                        TextInput::make('loan_type')
+                            ->label(__('Type of loan'))
+                            ->default(LoanTypes::CHARACTER)
+                            ->readOnly()
+                            ->dehydrated()
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                            ->columnSpanFull(),
+                        TextInput::make('loan_amount')
+                            ->label(__('Loan amount (PHP)'))
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                            ->numeric()
+                            ->minValue(1)
+                            ->step(0.01)
+                            ->prefix('₱'),
+                        TextInput::make('loan_period_months')
+                            ->label(__('Term'))
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                            ->integer()
+                            ->minValue(1)
+                            ->default(3)
+                            ->suffix(__('month(s)'))
+                            ->helperText(__('Character-Emergency is typically 3 months; Short-Term is 12 months.')),
+                        TextInput::make('installment_amount')
+                            ->label(__('Period interest (PHP)'))
+                            ->helperText(__('Default: 2% monthly × term (e.g. ₱30,000 × 6% for 3 months = ₱1,800).'))
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                            ->numeric()
+                            ->minValue(0)
+                            ->step(0.01)
+                            ->prefix('₱'),
+                        DatePicker::make('first_payment_due_date')
+                            ->label(__('First payment due on'))
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                            ->native(false),
+                        DatePicker::make('applicant_signed_at')
+                            ->label(__('Date'))
+                            ->required()
+                            ->native(false),
+                    ])
+                    ->columns(2)
+                    ->visible(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                    ->columnSpanFull(),
+
+                Section::make(__('Purpose and payment'))
+                    ->description(__('Select the purpose of the loan and how you will pay.'))
+                    ->schema($this->purposeAndPaymentFields())
+                    ->columns(2)
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -297,29 +383,94 @@ class ApplyLoan extends Page
     public function submit(): void
     {
         $data = $this->form->getState();
-        $isQuickLoan = ($data['loan_application_type'] ?? self::APPLICATION_TYPE_REGULAR) === self::APPLICATION_TYPE_QUICK;
+        $applicationType = $data['loan_application_type'] ?? self::APPLICATION_TYPE_REGULAR;
+        $isQuickLoan = $applicationType === self::APPLICATION_TYPE_QUICK;
+        $isCharacterLoan = $applicationType === self::APPLICATION_TYPE_CHARACTER;
+        $isRegularLoan = $applicationType === self::APPLICATION_TYPE_REGULAR;
 
         /** @var User $user */
         $user = auth()->user();
-        $user->update(array_filter([
+
+        if ($isRegularLoan) {
+            $dob = filled($data['date_of_birth'] ?? null)
+                ? Carbon::parse($data['date_of_birth'])
+                : $user->date_of_birth;
+
+            $ageError = ApdsRules::ageRequirementError(
+                $dob,
+                (int) ($data['loan_period_months'] ?? 0),
+            );
+
+            if ($ageError !== null) {
+                Notification::make()
+                    ->title(__('APDS age requirement'))
+                    ->body($ageError)
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+
+            $restructureError = ApdsRules::restructureAggregateError(
+                $user,
+                (float) ($data['loan_amount'] ?? 0),
+                ($data['loan_category'] ?? null) === LoanCategory::Restructure->value,
+            );
+
+            if ($restructureError !== null) {
+                Notification::make()
+                    ->title(__('Maximum loanable amount'))
+                    ->body($restructureError)
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+        }
+
+        $userUpdates = array_filter([
             'name' => $data['applicant_name'] ?? null,
             'address' => $data['applicant_address'] ?? null,
             'cellphone' => $isQuickLoan ? ($data['quick_contact_number'] ?? null) : null,
             'email' => $isQuickLoan ? ($data['quick_email'] ?? null) : null,
-        ], fn (mixed $value): bool => filled($value)));
+        ], fn (mixed $value): bool => filled($value));
 
-        $loanType = $isQuickLoan
-            ? 'QUICK LOAN'
-            : ($data['loan_type'] ?? '');
+        if ($isRegularLoan && filled($data['date_of_birth'] ?? null)) {
+            $userUpdates['date_of_birth'] = $data['date_of_birth'];
+        }
+
+        if ($userUpdates !== []) {
+            $user->update($userUpdates);
+        }
+
+        $loanType = match ($applicationType) {
+            self::APPLICATION_TYPE_QUICK => LoanTypes::QUICK,
+            self::APPLICATION_TYPE_CHARACTER => LoanTypes::CHARACTER,
+            default => (string) ($data['loan_type'] ?? ''),
+        };
+
+        $isSecondApds = $isRegularLoan && ApdsRules::isSecondApdsAccount($user);
+        $installmentAmount = $data['installment_amount'];
+
+        if ($isRegularLoan) {
+            $schedule = RegularLoanSchedule::calculate(
+                (float) $data['loan_amount'],
+                (int) $data['loan_period_months'],
+                $isSecondApds,
+            );
+            $installmentAmount = $schedule->monthlyInstallment;
+        }
 
         Loan::query()->create([
             'user_id' => auth()->id(),
             'status' => LoanStatus::Pending,
-            'loan_category' => $isQuickLoan ? LoanCategory::AdditionalNew : $data['loan_category'],
+            'loan_category' => ($isQuickLoan || $isCharacterLoan)
+                ? LoanCategory::AdditionalNew
+                : $data['loan_category'],
             'loan_type' => $loanType,
             'loan_amount' => $data['loan_amount'],
             'loan_period_months' => $data['loan_period_months'],
-            'installment_amount' => $data['installment_amount'],
+            'installment_amount' => $installmentAmount,
             'first_payment_due_date' => $data['first_payment_due_date'] ?? null,
             'purpose_of_loan' => $isQuickLoan ? null : $data['purpose_of_loan'],
             'purpose_of_loan_other' => $isQuickLoan ? null : (
@@ -342,6 +493,34 @@ class ApplyLoan extends Page
     }
 
     /**
+     * @param  callable(string, mixed): void  $set
+     * @param  callable(string): mixed  $get
+     */
+    private function syncRegularInstallment(callable $set, callable $get): void
+    {
+        if ($get('loan_application_type') !== self::APPLICATION_TYPE_REGULAR) {
+            return;
+        }
+
+        $amount = (float) ($get('loan_amount') ?? 0);
+        $months = (int) ($get('loan_period_months') ?? 0);
+
+        if ($amount <= 0 || $months < 1) {
+            return;
+        }
+
+        /** @var User $user */
+        $user = auth()->user();
+        $schedule = RegularLoanSchedule::calculate(
+            $amount,
+            $months,
+            ApdsRules::isSecondApdsAccount($user),
+        );
+
+        $set('installment_amount', $schedule->monthlyInstallment);
+    }
+
+    /**
      * @return array<int, Select|Textarea>
      */
     private function purposeAndPaymentFields(): array
@@ -352,24 +531,26 @@ class ApplyLoan extends Page
                 ->options(collect(LoanPurpose::cases())->mapWithKeys(
                     fn (LoanPurpose $purpose): array => [$purpose->value => $purpose->getLabel()]
                 )->all())
+                ->placeholder(__('Select an option'))
                 ->required()
                 ->live()
                 ->native(false)
-                ->columnSpanFull(),
+                ->searchable(false),
+            Select::make('mode_of_payment')
+                ->label(__('Mode of payment'))
+                ->options(collect(ModeOfPayment::cases())->mapWithKeys(
+                    fn (ModeOfPayment $mode): array => [$mode->value => $mode->getLabel()]
+                )->all())
+                ->placeholder(__('Select an option'))
+                ->required()
+                ->native(false)
+                ->searchable(false),
             Textarea::make('purpose_of_loan_other')
                 ->label(__('Please specify purpose'))
                 ->required(fn (callable $get): bool => $get('purpose_of_loan') === LoanPurpose::Others->value)
                 ->visible(fn (callable $get): bool => $get('purpose_of_loan') === LoanPurpose::Others->value)
                 ->rows(3)
                 ->maxLength(1000)
-                ->columnSpanFull(),
-            Select::make('mode_of_payment')
-                ->label(__('Mode of payment'))
-                ->options(collect(ModeOfPayment::cases())->mapWithKeys(
-                    fn (ModeOfPayment $mode): array => [$mode->value => $mode->getLabel()]
-                )->all())
-                ->required()
-                ->native(false)
                 ->columnSpanFull(),
         ];
     }
