@@ -12,12 +12,15 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -71,6 +74,15 @@ class UserResource extends Resource
                     ->label('Cellphone #')
                     ->tel()
                     ->maxLength(32),
+                DatePicker::make('date_of_birth')
+                    ->label('Date of birth')
+                    ->native(false)
+                    ->maxDate(now())
+                    ->helperText('Optional. Used for APDS age requirements on extended-term regular loans.'),
+                Toggle::make('is_retiree')
+                    ->label('Retiree')
+                    ->helperText('Retirees can access the Emergency loan ledger.')
+                    ->default(false),
                 DateTimePicker::make('email_verified_at')
                     ->label('Email verified at')
                     ->seconds(false),
@@ -133,6 +145,10 @@ class UserResource extends Resource
                     ->searchable()
                     ->copyable()
                     ->placeholder('—'),
+                IconColumn::make('is_retiree')
+                    ->label('Retiree')
+                    ->boolean()
+                    ->sortable(),
                 ImageColumn::make('qr_code')
                     ->label('QR code')
                     ->getStateUsing(fn (User $record): string => MemberQrCode::dataUriFor($record))

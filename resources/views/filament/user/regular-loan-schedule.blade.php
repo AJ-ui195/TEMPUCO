@@ -49,7 +49,7 @@
                 <td>{{ __('Contractual interest rate') }}</td>
                 <td>{{ __('Per annum') }}</td>
                 <td class="eq">=</td>
-                <td class="num">{{ $percent(\App\Support\RegularLoanSchedule::ANNUAL_INTEREST_RATE) }}</td>
+                <td class="num">{{ $percent($schedule->annualInterestRate) }}</td>
             </tr>
             <tr>
                 <td>2</td>
@@ -59,7 +59,7 @@
                 <td></td>
                 <td>{{ __('Per month') }}</td>
                 <td class="eq">=</td>
-                <td class="num">{{ $percent(\App\Support\RegularLoanSchedule::MONTHLY_INTEREST_RATE) }}</td>
+                <td class="num">{{ $percent($schedule->monthlyInterestRate) }}</td>
             </tr>
             <tr>
                 <td>3</td>
@@ -69,7 +69,7 @@
                 <td>{{ __('Nominal interest rate') }}</td>
                 <td>{{ __('Per month') }}</td>
                 <td class="eq">=</td>
-                <td class="num">{{ $percent(\App\Support\RegularLoanSchedule::MONTHLY_INTEREST_RATE) }}</td>
+                <td class="num">{{ $percent($schedule->monthlyInterestRate) }}</td>
             </tr>
             <tr>
                 <td>4</td>
@@ -93,8 +93,8 @@
             </tr>
             <tr>
                 <td>6</td>
-                <td>{{ __('Other charges') }}</td>
-                <td class="num">{{ $percent(\App\Support\RegularLoanSchedule::OTHER_CHARGES_RATE) }}</td>
+                <td>{{ __('Other charges') }}{{ $schedule->isSecondApdsAccount ? ' ('.__('2nd APDS').')' : '' }}</td>
+                <td class="num">{{ $percent($schedule->otherChargesRate) }}</td>
                 <td colspan="4"></td>
             </tr>
             @foreach ($schedule->otherChargeLines as $line)
@@ -105,6 +105,14 @@
                     <td colspan="5"></td>
                 </tr>
             @endforeach
+            @if (! $blankAmounts && $schedule->capitalBuildUpRetention > 0)
+                <tr>
+                    <td></td>
+                    <td class="indent">{{ __('Capital build-up retention (2nd APDS)') }}</td>
+                    <td class="num">{{ $money($schedule->capitalBuildUpRetention) }}</td>
+                    <td colspan="5"></td>
+                </tr>
+            @endif
             <tr>
                 <td>7</td>
                 <td>{{ __('Monthly installment') }}</td>

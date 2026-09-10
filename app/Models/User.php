@@ -24,6 +24,8 @@ class User extends Authenticatable implements FilamentUser
         'role',
         'address',
         'cellphone',
+        'date_of_birth',
+        'is_retiree',
         'password',
     ];
 
@@ -41,8 +43,10 @@ class User extends Authenticatable implements FilamentUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'date_of_birth' => 'date',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'is_retiree' => 'boolean',
         ];
     }
 
@@ -64,6 +68,11 @@ class User extends Authenticatable implements FilamentUser
     public function isInventory(): bool
     {
         return $this->role === UserRole::Inventory;
+    }
+
+    public function isRetiree(): bool
+    {
+        return (bool) $this->is_retiree;
     }
 
     public function canAccessPanel(Panel $panel): bool

@@ -1,7 +1,6 @@
 <div class="ll-page">
-    @include('filament.user.quick-loan-individual-ledger', [
+    @include('filament.user.character-individual-ledger', [
         'user' => $user,
-        'loan' => $loan ?? null,
         'entries' => $entries ?? collect(),
     ])
 </div>
