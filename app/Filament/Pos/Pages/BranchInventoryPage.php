@@ -6,6 +6,8 @@ use App\Filament\Cashier\Pages\BranchStockTransferPage;
 use App\Filament\Pos\Concerns\InteractsWithInventoryPanel;
 use App\Models\PosBranch;
 use App\Models\PosBranchInventory;
+use App\Support\BranchStockExcelExporter;
+use App\Support\BranchStockReport;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -22,6 +24,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BranchInventoryPage extends Page implements HasTable
 {
@@ -61,6 +64,14 @@ class BranchInventoryPage extends Page implements HasTable
                 ->label(__('Transfer to branch'))
                 ->icon(Heroicon::OutlinedArrowsRightLeft)
                 ->url(BranchStockTransferPage::getUrl(panel: 'pos')),
+            Action::make('exportStockLeft')
+                ->label(__('Stock left report'))
+                ->icon(Heroicon::OutlinedDocumentArrowDown)
+                ->action(fn (): StreamedResponse => (new BranchStockExcelExporter($this->branchRecord))->downloadStockLeft()),
+            Action::make('exportTransfers')
+                ->label(__('Transfer report'))
+                ->icon(Heroicon::OutlinedDocumentText)
+                ->action(fn (): StreamedResponse => (new BranchStockExcelExporter($this->branchRecord))->downloadTransfers()),
         ];
     }
 
@@ -186,10 +197,20 @@ class BranchInventoryPage extends Page implements HasTable
             ->components([
                 Section::make()
                     ->heading($this->branchRecord->name)
-                    ->description(__('Branch :number · :code', [
-                        'number' => $this->branchRecord->branch_number,
-                        'code' => $this->branchRecord->code,
-                    ]))
+                    ->description(function (): string {
+                        $report = new BranchStockReport($this->branchRecord);
+                        $left = $report->stockLeftTotals();
+                        $moved = $report->transferTotals();
+
+                        return __('Branch :number · :code · On hand: :left_products products, :left_units units · Transferred: :moved_products products, :moved_units units', [
+                            'number' => $this->branchRecord->branch_number,
+                            'code' => $this->branchRecord->code,
+                            'left_products' => number_format($left['products']),
+                            'left_units' => number_format($left['units']),
+                            'moved_products' => number_format($moved['products']),
+                            'moved_units' => number_format($moved['units']),
+                        ]);
+                    })
                     ->schema([
                         EmbeddedTable::make(),
                     ])

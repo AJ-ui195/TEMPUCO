@@ -27,6 +27,24 @@
         <strong>{{ __('POS') }}</strong><br>
         {{ $branch->has_pos ? __('Enabled') : __('Not available (head office)') }}
     </div>
+    @php
+        $stock = (new \App\Support\BranchStockReport($branch))->stockLeftTotals();
+        $moved = (new \App\Support\BranchStockReport($branch))->transferTotals();
+    @endphp
+    <div>
+        <strong>{{ __('On hand') }}</strong><br>
+        {{ __(':products products · :units units left', [
+            'products' => number_format($stock['products']),
+            'units' => number_format($stock['units']),
+        ]) }}
+    </div>
+    <div>
+        <strong>{{ __('Transferred') }}</strong><br>
+        {{ __(':products products · :units units sent', [
+            'products' => number_format($moved['products']),
+            'units' => number_format($moved['units']),
+        ]) }}
+    </div>
     <div style="padding-top: 0.5rem;">
         <a
             href="{{ \App\Filament\Pos\Pages\BranchInventoryPage::getUrl(['branch' => $branch->id], panel: 'pos') }}"

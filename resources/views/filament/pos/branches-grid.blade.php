@@ -21,6 +21,22 @@
                 <span style="font-size: 0.8125rem; color: #64748b;">
                     {{ $branch->code }}
                 </span>
+                @php
+                    $onHand = $stockLeft[$branch->id] ?? ['products' => 0, 'units' => 0];
+                    $moved = $transfers[$branch->id] ?? ['products' => 0, 'units' => 0];
+                @endphp
+                <span style="font-size: 0.75rem; color: #0f172a;">
+                    {{ __('On hand: :products products · :units units', [
+                        'products' => number_format($onHand['products']),
+                        'units' => number_format($onHand['units']),
+                    ]) }}
+                </span>
+                <span style="font-size: 0.75rem; color: #64748b;">
+                    {{ __('Transferred: :products products · :units units', [
+                        'products' => number_format($moved['products']),
+                        'units' => number_format($moved['units']),
+                    ]) }}
+                </span>
                 @if (! $branch->is_active)
                     <span style="font-size: 0.75rem; color: #b45309;">{{ __('Inactive') }}</span>
                 @elseif (! $branch->has_pos)

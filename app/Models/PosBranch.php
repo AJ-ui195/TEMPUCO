@@ -49,6 +49,11 @@ class PosBranch extends Model
         return $this->hasMany(PosBranchInventory::class, 'pos_branch_id');
     }
 
+    public function stockTransfers(): HasMany
+    {
+        return $this->hasMany(PosBranchStockTransfer::class, 'pos_branch_id');
+    }
+
     public function inventoryItems(): BelongsToMany
     {
         return $this->belongsToMany(PosInventoryItem::class, 'pos_branch_inventory', 'pos_branch_id', 'pos_inventory_item_id')
