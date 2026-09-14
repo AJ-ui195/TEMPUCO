@@ -4,7 +4,7 @@ namespace App\Filament\User\Widgets;
 
 use App\Enums\LoanStatus;
 use App\Models\Loan;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\PrintMemberLoan;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -81,7 +81,7 @@ class UserLoansTableWidget extends TableWidget
 
     protected function memberLoansQuery(): Builder
     {
-        /** @var User $user */
+        /** @var Member $user */
         $user = Filament::auth()->user();
 
         return Loan::query()->forUser($user)->orderedByLoanDate();

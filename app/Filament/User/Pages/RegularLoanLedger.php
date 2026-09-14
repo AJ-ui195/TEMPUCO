@@ -4,7 +4,7 @@ namespace App\Filament\User\Pages;
 
 use App\Enums\LoanStatus;
 use App\Models\Loan;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\LoanTypes;
 use App\Support\RegularLoanSchedule;
 use BackedEnum;
@@ -36,7 +36,7 @@ class RegularLoanLedger extends Page
 
     public function content(Schema $schema): Schema
     {
-        /** @var User $user */
+        /** @var Member $user */
         $user = auth()->user();
         $loan = $this->latestRegularLoan($user);
         $schedule = $loan ? RegularLoanSchedule::fromLoan($loan) : null;
@@ -56,7 +56,7 @@ class RegularLoanLedger extends Page
             ]);
     }
 
-    protected function latestRegularLoan(User $user): ?Loan
+    protected function latestRegularLoan(Member $user): ?Loan
     {
         return Loan::query()
             ->forUser($user)

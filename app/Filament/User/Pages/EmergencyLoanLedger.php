@@ -4,7 +4,7 @@ namespace App\Filament\User\Pages;
 
 use App\Enums\LoanStatus;
 use App\Models\Loan;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\CharacterLoanLedgerEntries;
 use App\Support\LoanTypes;
 use BackedEnum;
@@ -34,14 +34,14 @@ class EmergencyLoanLedger extends Page
     {
         $user = Auth::user();
 
-        return $user instanceof User && $user->isRetiree();
+        return $user instanceof Member && $user->isRetiree();
     }
 
     public static function canAccess(): bool
     {
         $user = Auth::user();
 
-        return $user instanceof User && $user->isRetiree();
+        return $user instanceof Member && $user->isRetiree();
     }
 
     public function getTitle(): string|Htmlable
@@ -51,7 +51,7 @@ class EmergencyLoanLedger extends Page
 
     public function content(Schema $schema): Schema
     {
-        /** @var User $user */
+        /** @var Member $user */
         $user = auth()->user();
         $loans = $this->emergencyLoans($user);
 
@@ -72,7 +72,7 @@ class EmergencyLoanLedger extends Page
     /**
      * @return Collection<int, Loan>
      */
-    protected function emergencyLoans(User $user): Collection
+    protected function emergencyLoans(Member $user): Collection
     {
         return Loan::query()
             ->forUser($user)
