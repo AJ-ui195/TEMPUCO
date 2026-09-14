@@ -4,7 +4,7 @@ namespace App\Support;
 
 use App\Enums\LoanStatus;
 use App\Models\Loan;
-use App\Models\User;
+use App\Models\Member;
 use Illuminate\Support\Carbon;
 
 /**
@@ -105,7 +105,7 @@ final class ApdsRules
         return null;
     }
 
-    public static function isSecondApdsAccount(User $user, ?int $excludeLoanId = null): bool
+    public static function isSecondApdsAccount(Member $user, ?int $excludeLoanId = null): bool
     {
         $query = Loan::query()
             ->forUser($user)
@@ -130,7 +130,7 @@ final class ApdsRules
      * @return string|null Validation error message, or null if OK.
      */
     public static function restructureAggregateError(
-        User $user,
+        Member $user,
         float $newLoanAmount,
         bool $isRestructure,
         ?int $excludeLoanId = null,

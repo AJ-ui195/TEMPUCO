@@ -9,6 +9,7 @@ use App\Enums\ModeOfPayment;
 use App\Enums\UserRole;
 use App\Models\Loan;
 use App\Models\User;
+use App\Support\MemberAccount;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -27,10 +28,18 @@ class DatabaseSeeder extends Seeder
             'role' => UserRole::Admin,
         ]);
 
-        $member = User::factory()->create([
+        $member = MemberAccount::create([
             'name' => 'Member User',
             'email' => 'member@example.com',
-            'role' => UserRole::User,
+            'date_of_birth' => '1990-01-15',
+            'sex' => 'female',
+            'civil_status' => 'married',
+            'address' => 'Temuco, Philippines',
+            'contact_number' => '09171234567',
+            'occupation' => 'Teacher',
+            'employer_department' => 'DepEd',
+            'is_retiree' => false,
+            'password' => 'password',
         ]);
 
         User::factory()->create([

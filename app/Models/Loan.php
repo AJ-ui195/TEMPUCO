@@ -56,7 +56,12 @@ class Loan extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Member::class, 'user_id');
+    }
+
+    public function member(): BelongsTo
+    {
+        return $this->belongsTo(Member::class, 'user_id');
     }
 
     public function payments(): HasMany
@@ -79,9 +84,9 @@ class Loan extends Model
         return AmountInWords::format($this->loan_amount);
     }
 
-    public function scopeForUser(Builder $query, User $user): Builder
+    public function scopeForUser(Builder $query, Member $user): Builder
     {
-        return $query->whereBelongsTo($user);
+        return $query->where('user_id', $user->id);
     }
 
     public function scopeOrderedByLoanDate(Builder $query): Builder

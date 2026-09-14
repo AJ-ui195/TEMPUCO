@@ -2,9 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\Member;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
-use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -241,8 +241,7 @@ class PosSalesReport
             ]);
 
         if ($term !== '') {
-            $memberIds = User::query()
-                ->members()
+            $memberIds = Member::query()
                 ->where('name', 'like', '%'.$term.'%')
                 ->pluck('id');
 
@@ -259,7 +258,7 @@ class PosSalesReport
             return collect();
         }
 
-        $members = User::query()
+        $members = Member::query()
             ->whereIn('id', $rows->pluck('member_id'))
             ->get()
             ->keyBy('id');

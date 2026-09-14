@@ -2,12 +2,11 @@
 
 namespace App\Support;
 
-use App\Enums\UserRole;
-use App\Models\User;
+use App\Models\Member;
 
 final class MemberQrCodeLookup
 {
-    public static function resolveFromScan(string $raw): ?User
+    public static function resolveFromScan(string $raw): ?Member
     {
         $payload = self::parsePayload($raw);
 
@@ -15,16 +14,13 @@ final class MemberQrCodeLookup
             return null;
         }
 
-        $memberId = (int) $payload['member_id'];
+        $id = (int) $payload['member_id'];
 
-        if ($memberId < 1) {
+        if ($id < 1) {
             return null;
         }
 
-        return User::query()
-            ->whereKey($memberId)
-            ->where('role', UserRole::User)
-            ->first();
+        return Member::query()->whereKey($id)->first();
     }
 
     /**

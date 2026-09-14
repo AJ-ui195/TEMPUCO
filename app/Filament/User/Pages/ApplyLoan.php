@@ -7,7 +7,7 @@ use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
 use App\Models\Loan;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\ApdsRules;
 use App\Support\LoanTypes;
 use App\Support\RegularLoanSchedule;
@@ -54,17 +54,26 @@ class ApplyLoan extends Page
 
     public function mount(): void
     {
-        /** @var User $user */
-        $user = auth()->user();
+        /** @var Member $member */
+        $member = auth()->user();
+
+        $dateOfBirth = $member->date_of_birth?->toDateString();
 
         $this->form->fill([
             'loan_application_type' => self::APPLICATION_TYPE_REGULAR,
-            'applicant_name' => $user->name,
-            'applicant_address' => $user->address,
+            'applicant_name' => $member->name,
+            'applicant_address' => $member->address,
             'applicant_signed_at' => now()->toDateString(),
-            'date_of_birth' => $user->date_of_birth?->toDateString(),
-            'quick_contact_number' => $user->cellphone,
-            'quick_email' => $user->email,
+            'date_of_birth' => $dateOfBirth,
+            'quick_date_of_birth' => $dateOfBirth,
+            'quick_age' => $member->age()
+                ?? ($dateOfBirth ? Carbon::parse($dateOfBirth)->age : null),
+            'quick_sex' => $member->sex,
+            'quick_civil_status' => $member->civil_status,
+            'quick_contact_number' => $member->contact_number,
+            'quick_email' => $member->email,
+            'quick_occupation' => $member->occupation,
+            'quick_employer_department' => $member->employer_department,
             'loan_period_months' => 1,
             'loan_type' => 'QUICK LOAN',
         ]);
@@ -206,12 +215,18 @@ class ApplyLoan extends Page
                         DatePicker::make('quick_date_of_birth')
                             ->label(__('Date of birth'))
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK)
-                            ->native(false),
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function (?string $state, callable $set): void {
+                                $set('quick_age', filled($state) ? Carbon::parse($state)->age : null);
+                            }),
                         TextInput::make('quick_age')
                             ->label(__('Age'))
                             ->integer()
                             ->minValue(1)
                             ->maxValue(120)
+                            ->disabled()
+                            ->dehydrated()
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK),
                         Radio::make('quick_sex')
                             ->label(__('Sex'))
@@ -388,13 +403,13 @@ class ApplyLoan extends Page
         $isCharacterLoan = $applicationType === self::APPLICATION_TYPE_CHARACTER;
         $isRegularLoan = $applicationType === self::APPLICATION_TYPE_REGULAR;
 
-        /** @var User $user */
-        $user = auth()->user();
+        /** @var Member $member */
+        $member = auth()->user();
 
         if ($isRegularLoan) {
             $dob = filled($data['date_of_birth'] ?? null)
                 ? Carbon::parse($data['date_of_birth'])
-                : $user->date_of_birth;
+                : $member->date_of_birth;
 
             $ageError = ApdsRules::ageRequirementError(
                 $dob,
@@ -412,7 +427,7 @@ class ApplyLoan extends Page
             }
 
             $restructureError = ApdsRules::restructureAggregateError(
-                $user,
+                $member,
                 (float) ($data['loan_amount'] ?? 0),
                 ($data['loan_category'] ?? null) === LoanCategory::Restructure->value,
             );
@@ -428,19 +443,29 @@ class ApplyLoan extends Page
             }
         }
 
-        $userUpdates = array_filter([
+        $memberUpdates = array_filter([
             'name' => $data['applicant_name'] ?? null,
             'address' => $data['applicant_address'] ?? null,
-            'cellphone' => $isQuickLoan ? ($data['quick_contact_number'] ?? null) : null,
-            'email' => $isQuickLoan ? ($data['quick_email'] ?? null) : null,
         ], fn (mixed $value): bool => filled($value));
 
         if ($isRegularLoan && filled($data['date_of_birth'] ?? null)) {
-            $userUpdates['date_of_birth'] = $data['date_of_birth'];
+            $memberUpdates['date_of_birth'] = $data['date_of_birth'];
         }
 
-        if ($userUpdates !== []) {
-            $user->update($userUpdates);
+        if ($isQuickLoan) {
+            $memberUpdates = array_merge($memberUpdates, array_filter([
+                'email' => $data['quick_email'] ?? null,
+                'date_of_birth' => $data['quick_date_of_birth'] ?? null,
+                'sex' => $data['quick_sex'] ?? null,
+                'civil_status' => $data['quick_civil_status'] ?? null,
+                'contact_number' => $data['quick_contact_number'] ?? null,
+                'occupation' => $data['quick_occupation'] ?? null,
+                'employer_department' => $data['quick_employer_department'] ?? null,
+            ], fn (mixed $value): bool => filled($value)));
+        }
+
+        if ($memberUpdates !== []) {
+            $member->update($memberUpdates);
         }
 
         $loanType = match ($applicationType) {
@@ -449,7 +474,7 @@ class ApplyLoan extends Page
             default => (string) ($data['loan_type'] ?? ''),
         };
 
-        $isSecondApds = $isRegularLoan && ApdsRules::isSecondApdsAccount($user);
+        $isSecondApds = $isRegularLoan && ApdsRules::isSecondApdsAccount($member);
         $installmentAmount = $data['installment_amount'];
 
         if ($isRegularLoan) {

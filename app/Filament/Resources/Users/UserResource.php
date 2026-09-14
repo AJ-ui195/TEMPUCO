@@ -5,86 +5,72 @@ namespace App\Filament\Resources\Users;
 use App\Enums\UserRole;
 use App\Filament\Resources\Users\Pages\ManageUsers;
 use App\Models\User;
-use App\Support\MemberQrCode;
 use BackedEnum;
-use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static ?string $slug = 'members';
+    protected static ?string $slug = 'users';
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?string $modelLabel = 'member';
+    protected static ?string $modelLabel = 'user';
 
-    protected static ?string $pluralModelLabel = 'members';
+    protected static ?string $pluralModelLabel = 'users';
 
-    protected static ?string $navigationLabel = 'Members';
+    protected static ?string $navigationLabel = 'Users';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 11;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
                 TextInput::make('name')
+                    ->label(__('Full name'))
                     ->required()
                     ->maxLength(255),
                 TextInput::make('email')
-                    ->label('Email address')
+                    ->label(__('Email address'))
                     ->email()
                     ->required()
                     ->maxLength(255)
                     ->unique(ignoreRecord: true),
                 Select::make('role')
-                    ->label('Role')
+                    ->label(__('Role'))
                     ->options([
                         UserRole::Admin->value => UserRole::Admin->getLabel(),
-                        UserRole::User->value => UserRole::User->getLabel(),
                         UserRole::Cashier->value => UserRole::Cashier->getLabel(),
                         UserRole::CanteenCashier->value => UserRole::CanteenCashier->getLabel(),
+                        UserRole::Inventory->value => UserRole::Inventory->getLabel(),
                     ])
                     ->required()
-                    ->default(UserRole::User->value)
+                    ->default(UserRole::Admin->value)
                     ->native(false),
-                TextInput::make('address')
-                    ->maxLength(255),
-                TextInput::make('cellphone')
-                    ->label('Cellphone #')
-                    ->tel()
-                    ->maxLength(32),
-                DatePicker::make('date_of_birth')
-                    ->label('Date of birth')
-                    ->native(false)
-                    ->maxDate(now())
-                    ->helperText('Optional. Used for APDS age requirements on extended-term regular loans.'),
-                Toggle::make('is_retiree')
-                    ->label('Retiree')
-                    ->helperText('Retirees can access the Emergency loan ledger.')
-                    ->default(false),
                 DateTimePicker::make('email_verified_at')
-                    ->label('Email verified at')
+                    ->label(__('Email verified at'))
                     ->seconds(false),
                 TextInput::make('password')
                     ->password()
@@ -92,7 +78,7 @@ class UserResource extends Resource
                     ->required(fn (string $operation): bool => $operation === 'create')
                     ->minLength(8)
                     ->dehydrated(fn (?string $state): bool => filled($state))
-                    ->helperText('Leave blank when editing to keep the current password.'),
+                    ->helperText(__('Leave blank when editing to keep the current password.')),
             ]);
     }
 
@@ -104,7 +90,7 @@ class UserResource extends Resource
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('email')
-                    ->label('Email')
+                    ->label(__('Email'))
                     ->searchable()
                     ->copyable(),
                 TextColumn::make('role')
@@ -127,7 +113,6 @@ class UserResource extends Resource
 
                         return match ($role) {
                             UserRole::Admin => 'danger',
-                            UserRole::User => 'gray',
                             UserRole::Cashier => 'info',
                             UserRole::CanteenCashier => 'warning',
                             UserRole::Inventory => 'success',
@@ -135,45 +120,26 @@ class UserResource extends Resource
                         };
                     })
                     ->sortable(),
-                TextColumn::make('address')
-                    ->label('Address')
-                    ->searchable()
-                    ->wrap()
-                    ->placeholder('—'),
-                TextColumn::make('cellphone')
-                    ->label('Cellphone #')
-                    ->searchable()
-                    ->copyable()
-                    ->placeholder('—'),
-                IconColumn::make('is_retiree')
-                    ->label('Retiree')
-                    ->boolean()
+                TextColumn::make('email_verified_at')
+                    ->label(__('Verified'))
+                    ->dateTime()
+                    ->placeholder('—')
                     ->sortable(),
-                ImageColumn::make('qr_code')
-                    ->label('QR code')
-                    ->getStateUsing(fn (User $record): string => MemberQrCode::dataUriFor($record))
-                    ->imageHeight(64)
-                    ->imageWidth(64)
-                    ->extraImgAttributes(fn (User $record): array => [
-                        'alt' => "QR code for {$record->name}",
-                    ]),
             ])
             ->filters([
                 SelectFilter::make('role')
                     ->label(__('Role'))
-                    ->options(collect(UserRole::cases())->mapWithKeys(
-                        fn (UserRole $role): array => [$role->value => $role->getLabel()],
-                    )->all())
+                    ->options([
+                        UserRole::Admin->value => UserRole::Admin->getLabel(),
+                        UserRole::Cashier->value => UserRole::Cashier->getLabel(),
+                        UserRole::CanteenCashier->value => UserRole::CanteenCashier->getLabel(),
+                        UserRole::Inventory->value => UserRole::Inventory->getLabel(),
+                    ])
                     ->native(false),
             ])
             ->defaultSort('name')
             ->deferLoading()
             ->recordActions([
-                Action::make('printQrCode')
-                    ->label(__('Print QR code'))
-                    ->icon(Heroicon::OutlinedPrinter)
-                    ->url(fn (User $record): string => route('members.print-qr', ['user' => $record]))
-                    ->openUrlInNewTab(),
                 EditAction::make(),
                 DeleteAction::make(),
             ])
@@ -182,6 +148,12 @@ class UserResource extends Resource
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('role', '!=', UserRole::User->value);
     }
 
     public static function getPages(): array

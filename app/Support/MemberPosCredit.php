@@ -3,10 +3,10 @@
 namespace App\Support;
 
 use App\Enums\PosSaleChannel;
+use App\Models\Member;
 use App\Models\PosCreditPayment;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
@@ -23,7 +23,7 @@ class MemberPosCredit
     public const EPSILON = 0.005;
 
     public function __construct(
-        public User $user,
+        public Member $user,
     ) {}
 
     public function groceryOutstanding(): float

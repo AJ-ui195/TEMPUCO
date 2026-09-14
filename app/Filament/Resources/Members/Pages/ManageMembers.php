@@ -1,0 +1,139 @@
+<?php
+
+namespace App\Filament\Resources\Members\Pages;
+
+use App\Enums\UserRole;
+use App\Filament\Resources\Members\MemberResource;
+use App\Filament\Resources\Members\Schemas\MemberForm;
+use App\Models\Member;
+use App\Models\User;
+use App\Support\MemberAccount;
+use App\Support\MemberQrCode;
+use App\Support\PrintMemberQrCode;
+use Filament\Actions\Action;
+use Filament\Actions\CreateAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Resources\Pages\ManageRecords;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\View\View;
+
+class ManageMembers extends ManageRecords
+{
+    protected static string $resource = MemberResource::class;
+
+    protected static ?string $title = 'Members';
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('newRecord')
+                ->label(__('New member'))
+                ->icon(Heroicon::OutlinedPlus)
+                ->color('primary')
+                ->modalHeading(__('Create account'))
+                ->modalDescription(__('Choose what you want to create.'))
+                ->modalContent(fn (): View => view('filament.members.create-type-picker'))
+                ->modalSubmitAction(false)
+                ->modalCancelAction(false),
+        ];
+    }
+
+    public function createMemberAction(): CreateAction
+    {
+        return CreateAction::make('createMember')
+            ->modalHeading(__('Create Member'))
+            ->createAnother(false)
+            ->schema(MemberForm::components())
+            ->using(fn (array $data): Member => MemberAccount::create($data))
+            ->after(function (Member $record): void {
+                $this->replaceMountedAction('showAccountQr', [
+                    'member' => $record->getKey(),
+                ]);
+            });
+    }
+
+    public function createAdminAction(): CreateAction
+    {
+        return CreateAction::make('createAdmin')
+            ->modalHeading(__('Create Admin'))
+            ->model(User::class)
+            ->modelLabel(__('admin'))
+            ->createAnother(false)
+            ->successNotificationTitle(__('Admin user created'))
+            ->schema([
+                TextInput::make('name')
+                    ->label(__('Full name'))
+                    ->required()
+                    ->maxLength(255),
+                TextInput::make('email')
+                    ->label(__('Email address'))
+                    ->email()
+                    ->required()
+                    ->maxLength(255)
+                    ->unique(User::class),
+                Select::make('role')
+                    ->label(__('Role'))
+                    ->options([
+                        UserRole::Admin->value => UserRole::Admin->getLabel(),
+                        UserRole::Cashier->value => UserRole::Cashier->getLabel(),
+                        UserRole::CanteenCashier->value => UserRole::CanteenCashier->getLabel(),
+                        UserRole::Inventory->value => UserRole::Inventory->getLabel(),
+                    ])
+                    ->required()
+                    ->default(UserRole::Admin->value)
+                    ->native(false),
+                DateTimePicker::make('email_verified_at')
+                    ->label(__('Email verified at'))
+                    ->seconds(false)
+                    ->default(now()),
+                TextInput::make('password')
+                    ->password()
+                    ->revealable()
+                    ->required()
+                    ->minLength(8),
+            ])
+            ->using(function (array $data): User {
+                return User::query()->create([
+                    'name' => $data['name'],
+                    'email' => $data['email'],
+                    'role' => $data['role'],
+                    'email_verified_at' => $data['email_verified_at'] ?? now(),
+                    'password' => $data['password'],
+                    'created_by' => MemberAccount::creatorName(),
+                ]);
+            });
+    }
+
+    public function showAccountQrAction(): Action
+    {
+        return Action::make('showAccountQr')
+            ->modalHeading(fn (array $arguments): string => __('QR code — :name', [
+                'name' => Member::query()->findOrFail($arguments['member'])->name,
+            ]))
+            ->modalContent(function (array $arguments): View {
+                $member = Member::query()->findOrFail($arguments['member']);
+
+                return view(
+                    'filament.pos.member-qr-modal',
+                    [
+                        'user' => $member,
+                        'qrCodeDataUri' => MemberQrCode::dataUriFor($member, scale: 4),
+                    ],
+                );
+            })
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('Close'))
+            ->extraModalFooterActions(fn (array $arguments): array => [
+                Action::make('printQrCode')
+                    ->label(__('Print QR code'))
+                    ->icon(Heroicon::OutlinedPrinter)
+                    ->url(fn (): string => PrintMemberQrCode::printUrl(
+                        Member::query()->findOrFail($arguments['member']),
+                    ))
+                    ->openUrlInNewTab()
+                    ->color('primary'),
+            ]);
+    }
+}

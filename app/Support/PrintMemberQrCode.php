@@ -2,26 +2,26 @@
 
 namespace App\Support;
 
-use App\Models\User;
+use App\Models\Member;
 
 final class PrintMemberQrCode
 {
-    public static function printUrl(User $user, bool $autoPrint = true): string
+    public static function printUrl(Member $member, bool $autoPrint = true): string
     {
         return route('members.print-qr', [
-            'user' => $user,
+            'member' => $member,
             'auto' => $autoPrint ? 1 : 0,
         ]);
     }
 
     /**
-     * @return array{user: User, qrSvg: string, autoPrint: bool}
+     * @return array{user: Member, qrSvg: string, autoPrint: bool}
      */
-    public static function viewData(User $user, bool $autoPrint = false): array
+    public static function viewData(Member $member, bool $autoPrint = false): array
     {
         return [
-            'user' => $user,
-            'qrSvg' => MemberQrCode::printSvgMarkupFor($user),
+            'user' => $member,
+            'qrSvg' => MemberQrCode::printSvgMarkupFor($member),
             'autoPrint' => $autoPrint,
         ];
     }

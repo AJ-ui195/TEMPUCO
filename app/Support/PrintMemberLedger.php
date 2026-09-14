@@ -3,17 +3,17 @@
 namespace App\Support;
 
 use App\Enums\PosSaleChannel;
-use App\Models\User;
+use App\Models\Member;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 final class PrintMemberLedger
 {
     /**
-     * @param  User|null  $member  Null prints every member with activity.
+     * @param  Member|null  $member  Null prints every member with activity.
      */
     public static function url(
-        ?User $member = null,
+        ?Member $member = null,
         ?PosSaleChannel $channel = null,
         ?string $from = null,
         ?string $to = null,
@@ -30,7 +30,7 @@ final class PrintMemberLedger
 
     /**
      * @return array{
-     *     ledgers: Collection<int, array{member: User, entries: Collection<int, array<string, mixed>>, summary: array<string, float|int>}>,
+     *     ledgers: Collection<int, array{member: Member, entries: Collection<int, array<string, mixed>>, summary: array<string, float|int>}>,
      *     channelLabel: string,
      *     rangeLabel: string,
      *     printedAt: string,
@@ -39,13 +39,13 @@ final class PrintMemberLedger
      * }
      */
     public static function viewData(
-        ?User $member,
+        ?Member $member,
         ?PosSaleChannel $channel,
         ?Carbon $from,
         ?Carbon $to,
         bool $autoPrint = false,
     ): array {
-        $members = $member instanceof User
+        $members = $member instanceof Member
             ? collect([$member])
             : MemberCreditLedger::membersWithActivity($channel, $from, $to);
 

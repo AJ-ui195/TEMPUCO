@@ -31,6 +31,7 @@ class UserPanelProvider extends PanelProvider
             ->id('user')
             ->path('portal')
             ->spa()
+            ->authGuard('member')
             ->login(Login::class)
             ->brandName(__('Members Portal'))
             ->brandLogo(asset('images/DICNHSLOGO1.png'))

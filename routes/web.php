@@ -17,14 +17,14 @@ Route::get('/portal/service-worker.js', function () {
     );
 })->name('portal.service-worker');
 
-Route::middleware(['auth'])->group(function (): void {
-    Route::get('/members/{user}/print-qr', PrintMemberQrCodeController::class)
+Route::middleware(['auth:web,member'])->group(function (): void {
+    Route::get('/members/{member}/print-qr', [PrintMemberQrCodeController::class, 'member'])
         ->name('members.print-qr');
 
     Route::get('/members/loans/{loan}/print', PrintMemberLoanController::class)
         ->name('members.loans.print');
 
-    Route::get('/admin/members/{user}/print-qr', PrintMemberQrCodeController::class)
+    Route::get('/admin/members/{member}/print-qr', [PrintMemberQrCodeController::class, 'member'])
         ->name('admin.members.print-qr');
 
     Route::get('/pos/sales/{sale}/receipt', PrintPosSaleReceiptController::class)

@@ -3,7 +3,7 @@
 namespace App\Filament\Cashier\Pages;
 
 use App\Enums\PosSaleChannel;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\MemberCreditLedger;
 use App\Support\PrintMemberLedger;
 use BackedEnum;
@@ -44,7 +44,7 @@ class PosMemberLedgerPage extends Page
     {
         $member = request()->integer('member');
 
-        if ($member > 0 && User::query()->members()->whereKey($member)->exists()) {
+        if ($member > 0 && Member::query()->whereKey($member)->exists()) {
             $this->selectedMemberId = $member;
         }
     }
@@ -55,7 +55,7 @@ class PosMemberLedgerPage extends Page
     }
 
     /**
-     * @return Collection<int, User>|EloquentCollection<int, User>
+     * @return Collection<int, Member>|EloquentCollection<int, Member>
      */
     public function getMemberSearchResults(): Collection|EloquentCollection
     {
@@ -65,8 +65,7 @@ class PosMemberLedgerPage extends Page
             return collect();
         }
 
-        return User::query()
-            ->members()
+        return Member::query()
             ->matchingSearch($term)
             ->orderedByName()
             ->limit(15)
@@ -75,7 +74,7 @@ class PosMemberLedgerPage extends Page
 
     public function selectMember(int $memberId): void
     {
-        if (User::query()->members()->whereKey($memberId)->exists()) {
+        if (Member::query()->whereKey($memberId)->exists()) {
             $this->selectedMemberId = $memberId;
             $this->memberSearch = '';
         }
@@ -93,11 +92,11 @@ class PosMemberLedgerPage extends Page
         $this->toDate = '';
     }
 
-    public function getSelectedMember(): ?User
+    public function getSelectedMember(): ?Member
     {
         return $this->selectedMemberId === null
             ? null
-            : User::query()->members()->find($this->selectedMemberId);
+            : Member::query()->find($this->selectedMemberId);
     }
 
     public function getChannelFilter(): ?PosSaleChannel

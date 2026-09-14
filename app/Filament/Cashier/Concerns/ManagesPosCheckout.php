@@ -3,6 +3,7 @@
 namespace App\Filament\Cashier\Concerns;
 
 use App\Enums\PosSaleChannel;
+use App\Models\Member;
 use App\Models\PosCanteenInventoryItem;
 use App\Models\PosInventoryItem;
 use App\Models\PosSale;
@@ -129,7 +130,7 @@ trait ManagesPosCheckout
     }
 
     /**
-     * @return Collection<int, User>|EloquentCollection<int, User>
+     * @return Collection<int, Member>|EloquentCollection<int, Member>
      */
     public function getMemberSearchResults(): Collection|EloquentCollection
     {
@@ -139,21 +140,18 @@ trait ManagesPosCheckout
             return collect();
         }
 
-        return User::query()
-            ->members()
+        return Member::query()
             ->matchingSearch($term)
             ->orderedByName()
             ->limit(15)
             ->get();
     }
 
-    public function selectMember(int $userId): void
+    public function selectMember(int $memberId): void
     {
-        $member = User::query()
-            ->members()
-            ->find($userId);
+        $member = Member::query()->find($memberId);
 
-        if (! $member instanceof User) {
+        if (! $member instanceof Member) {
             $this->setMemberScanFeedback(__('Member not found.'), true);
 
             return;
@@ -715,7 +713,7 @@ trait ManagesPosCheckout
     {
         $member = MemberQrCodeLookup::resolveFromScan($code);
 
-        if (! $member instanceof User) {
+        if (! $member instanceof Member) {
             return false;
         }
 
@@ -726,7 +724,7 @@ trait ManagesPosCheckout
         return true;
     }
 
-    protected function assignMember(User $member): void
+    protected function assignMember(Member $member): void
     {
         $this->memberId = $member->id;
         $this->memberName = $member->name;

@@ -3,7 +3,7 @@
 namespace App\Filament\User\Pages;
 
 use App\Enums\PosSaleChannel;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\MemberPosCredit;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -34,7 +34,7 @@ class Credits extends Page
 
     protected function memberCredit(): MemberPosCredit
     {
-        /** @var User $user */
+        /** @var Member $user */
         $user = auth()->user();
 
         return new MemberPosCredit($user);

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PosSaleChannel;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\PrintMemberLedger;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -22,10 +22,10 @@ class PrintMemberLedgerController extends Controller
 
         $memberId = $request->integer('member');
         $member = $memberId > 0
-            ? User::query()->members()->find($memberId)
+            ? Member::query()->find($memberId)
             : null;
 
-        abort_if($memberId > 0 && ! $member instanceof User, 404);
+        abort_if($memberId > 0 && ! $member instanceof Member, 404);
 
         return view('filament.cashier.print-member-ledger', PrintMemberLedger::viewData(
             $member,

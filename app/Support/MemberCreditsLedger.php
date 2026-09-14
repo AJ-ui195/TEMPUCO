@@ -3,15 +3,15 @@
 namespace App\Support;
 
 use App\Enums\PosSaleChannel;
+use App\Models\Member;
 use App\Models\PosSale;
-use App\Models\User;
 use Illuminate\Support\Collection;
 
 final class MemberCreditsLedger
 {
     /**
      * @return Collection<int, array{
-     *     member: User,
+     *     member: Member,
      *     grocery_outstanding: float,
      *     canteen_outstanding: float,
      *     total_outstanding: float,
@@ -26,18 +26,15 @@ final class MemberCreditsLedger
             ->distinct()
             ->pluck('member_id');
 
-        // Members whose charges are already fully paid are filtered out below.
-
         if ($memberIds->isEmpty()) {
             return collect();
         }
 
-        return User::query()
-            ->members()
+        return Member::query()
             ->whereIn('id', $memberIds)
             ->orderedByName()
             ->get()
-            ->map(function (User $member): array {
+            ->map(function (Member $member): array {
                 $credit = new MemberPosCredit($member);
 
                 $items = $credit->unpaidLineItems(PosSaleChannel::Grocery)
@@ -59,20 +56,11 @@ final class MemberCreditsLedger
             ->filter(function (array $row): bool {
                 return $row['total_outstanding'] > 0;
             })
-            ->sortByDesc(function (array $row): float {
-                return $row['total_outstanding'];
-            })
             ->values();
     }
 
     public static function totalOutstanding(): float
     {
-        $total = 0.0;
-
-        foreach (self::membersWithCredit() as $row) {
-            $total += $row['total_outstanding'];
-        }
-
-        return round($total, 2);
+        return round((float) self::membersWithCredit()->sum('total_outstanding'), 2);
     }
 }

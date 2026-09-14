@@ -3,7 +3,6 @@
 namespace App\Filament\Widgets;
 
 use App\Enums\LoanStatus;
-use App\Enums\UserRole;
 use App\Models\Loan;
 use App\Models\LoanPayment;
 use Filament\Widgets\StatsOverviewWidget;
@@ -21,7 +20,6 @@ class AnalyticsOverviewWidget extends StatsOverviewWidget
         $monthEnd = now()->endOfMonth();
 
         $memberLoansQuery = Loan::query()
-            ->whereHas('user', fn ($query) => $query->where('role', UserRole::User))
             ->whereBetween('created_at', [$monthStart, $monthEnd]);
 
         $totalMemberLoanAmount = (float) (clone $memberLoansQuery)->sum('loan_amount');

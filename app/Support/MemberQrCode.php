@@ -2,23 +2,23 @@
 
 namespace App\Support;
 
-use App\Models\User;
+use App\Models\Member;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
 
 final class MemberQrCode
 {
-    public static function dataUriFor(User $user, int $scale = 3): string
+    public static function dataUriFor(Member $member, int $scale = 3): string
     {
-        return self::renderDataUri(self::payloadFor($user), $scale);
+        return self::renderDataUri(self::payloadFor($member), $scale);
     }
 
-    public static function printDataUriFor(User $user): string
+    public static function printDataUriFor(Member $member): string
     {
-        return self::dataUriFor($user, scale: 10);
+        return self::dataUriFor($member, scale: 10);
     }
 
-    public static function printSvgMarkupFor(User $user): string
+    public static function printSvgMarkupFor(Member $member): string
     {
         $options = new QROptions([
             'scale' => 10,
@@ -27,19 +27,19 @@ final class MemberQrCode
         ]);
 
         return (string) (new QRCode($options))->render(
-            json_encode(self::payloadFor($user), JSON_THROW_ON_ERROR),
+            json_encode(self::payloadFor($member), JSON_THROW_ON_ERROR),
         );
     }
 
     /**
      * @return array{member_id: int, name: string, email: string}
      */
-    public static function payloadFor(User $user): array
+    public static function payloadFor(Member $member): array
     {
         return [
-            'member_id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
+            'member_id' => $member->id,
+            'name' => $member->name,
+            'email' => $member->email,
         ];
     }
 

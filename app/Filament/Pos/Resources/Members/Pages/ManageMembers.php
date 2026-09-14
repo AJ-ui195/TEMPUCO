@@ -3,7 +3,8 @@
 namespace App\Filament\Pos\Resources\Members\Pages;
 
 use App\Filament\Pos\Resources\Members\MemberResource;
-use App\Models\User;
+use App\Models\Member;
+use App\Support\MemberAccount;
 use App\Support\MemberQrCode;
 use App\Support\PrintMemberQrCode;
 use Filament\Actions\Action;
@@ -26,7 +27,8 @@ class ManageMembers extends ManageRecords
                 ->modalHeading(__('Add member'))
                 ->createAnother(false)
                 ->successNotificationTitle(__('Member added'))
-                ->after(function (User $record): void {
+                ->using(fn (array $data): Member => MemberAccount::create($data))
+                ->after(function (Member $record): void {
                     $this->replaceMountedAction('showMemberQr', [
                         'member' => $record->getKey(),
                     ]);
@@ -38,15 +40,19 @@ class ManageMembers extends ManageRecords
     {
         return Action::make('showMemberQr')
             ->modalHeading(fn (array $arguments): string => __('Member QR code — :name', [
-                'name' => User::query()->findOrFail($arguments['member'])->name,
+                'name' => Member::query()->findOrFail($arguments['member'])->name,
             ]))
-            ->modalContent(fn (array $arguments): View => view(
-                'filament.pos.member-qr-modal',
-                [
-                    'user' => $user = User::query()->findOrFail($arguments['member']),
-                    'qrCodeDataUri' => MemberQrCode::dataUriFor($user, scale: 4),
-                ],
-            ))
+            ->modalContent(function (array $arguments): View {
+                $member = Member::query()->findOrFail($arguments['member']);
+
+                return view(
+                    'filament.pos.member-qr-modal',
+                    [
+                        'user' => $member,
+                        'qrCodeDataUri' => MemberQrCode::dataUriFor($member, scale: 4),
+                    ],
+                );
+            })
             ->modalSubmitAction(false)
             ->modalCancelActionLabel(__('Close'))
             ->extraModalFooterActions(fn (array $arguments): array => [
@@ -54,7 +60,7 @@ class ManageMembers extends ManageRecords
                     ->label(__('Print QR code'))
                     ->icon(Heroicon::OutlinedPrinter)
                     ->url(fn (): string => PrintMemberQrCode::printUrl(
-                        User::query()->findOrFail($arguments['member']),
+                        Member::query()->findOrFail($arguments['member']),
                     ))
                     ->openUrlInNewTab()
                     ->color('primary'),

@@ -3,9 +3,9 @@
 namespace App\Support;
 
 use App\Enums\PosSaleChannel;
+use App\Models\Member;
 use App\Models\PosCreditPayment;
 use App\Models\PosSale;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -18,7 +18,7 @@ use Illuminate\Support\Collection;
 final class MemberCreditLedger
 {
     public function __construct(
-        public User $member,
+        public Member $member,
     ) {}
 
     /**
@@ -142,7 +142,7 @@ final class MemberCreditLedger
     /**
      * Members with account activity in the period, or a balance brought into it.
      *
-     * @return Collection<int, User>
+     * @return Collection<int, Member>
      */
     public static function membersWithActivity(?PosSaleChannel $channel = null, ?Carbon $from = null, ?Carbon $to = null): Collection
     {
@@ -165,8 +165,7 @@ final class MemberCreditLedger
             return collect();
         }
 
-        return User::query()
-            ->members()
+        return Member::query()
             ->whereIn('id', $memberIds)
             ->orderedByName()
             ->get();
