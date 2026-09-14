@@ -4,7 +4,7 @@ namespace App\Filament\User\Pages;
 
 use App\Enums\LoanStatus;
 use App\Models\Loan;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\CharacterLoanLedgerEntries;
 use App\Support\LoanTypes;
 use BackedEnum;
@@ -36,7 +36,7 @@ class CharacterLoanLedger extends Page
 
     public function content(Schema $schema): Schema
     {
-        /** @var User $user */
+        /** @var Member $user */
         $user = auth()->user();
         $loans = $this->characterLoans($user);
 
@@ -57,7 +57,7 @@ class CharacterLoanLedger extends Page
     /**
      * @return Collection<int, Loan>
      */
-    protected function characterLoans(User $user): Collection
+    protected function characterLoans(Member $user): Collection
     {
         return Loan::query()
             ->forUser($user)

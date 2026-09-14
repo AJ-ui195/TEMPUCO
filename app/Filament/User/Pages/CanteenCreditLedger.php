@@ -3,7 +3,7 @@
 namespace App\Filament\User\Pages;
 
 use App\Enums\PosSaleChannel;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\MemberCreditLedger;
 use BackedEnum;
 use Filament\Infolists\Components\TextEntry;
@@ -33,7 +33,7 @@ class CanteenCreditLedger extends Page
 
     public function content(Schema $schema): Schema
     {
-        /** @var User $user */
+        /** @var Member $user */
         $user = auth()->user();
 
         return $schema

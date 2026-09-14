@@ -4,7 +4,7 @@ namespace App\Filament\User\Pages;
 
 use App\Enums\LoanStatus;
 use App\Models\Loan;
-use App\Models\User;
+use App\Models\Member;
 use App\Support\LoanTypes;
 use App\Support\QuickLoanLedgerEntries;
 use BackedEnum;
@@ -36,7 +36,7 @@ class QuickLoanLedger extends Page
 
     public function content(Schema $schema): Schema
     {
-        /** @var User $user */
+        /** @var Member $user */
         $user = auth()->user();
         $loans = $this->quickLoans($user);
         $activeLoan = $loans->first();
@@ -59,7 +59,7 @@ class QuickLoanLedger extends Page
     /**
      * @return Collection<int, Loan>
      */
-    protected function quickLoans(User $user): Collection
+    protected function quickLoans(Member $user): Collection
     {
         return Loan::query()
             ->forUser($user)

@@ -83,7 +83,7 @@ class Credits extends Page
 
     public function content(Schema $schema): Schema
     {
-        /** @var User $user */
+        /** @var Member $user */
         $user = auth()->user();
 
         return $schema

@@ -2,7 +2,7 @@
 
 namespace App\Filament\User\Pages;
 
-use App\Models\User;
+use App\Models\Member;
 use Filament\Facades\Filament;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Pages\Dashboard as BaseDashboard;
@@ -27,7 +27,7 @@ class UserDashboard extends BaseDashboard
     #[\Override]
     public function content(Schema $schema): Schema
     {
-        /** @var User $user */
+        /** @var Member $user */
         $user = auth()->user();
 
         return $schema

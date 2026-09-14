@@ -92,7 +92,7 @@ class PosSale extends Model
 
     public function member(): BelongsTo
     {
-        return $this->belongsTo(Member::class, 'member_id');
+        return $this->belongsTo(User::class, 'member_id');
     }
 
     public function cashier(): BelongsTo

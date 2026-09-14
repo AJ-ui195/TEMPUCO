@@ -534,7 +534,7 @@ class ApplyLoan extends Page
             return;
         }
 
-        /** @var User $user */
+        /** @var Member $user */
         $user = auth()->user();
         $schedule = RegularLoanSchedule::calculate(
             $amount,
