@@ -63,4 +63,9 @@ final class MemberCreditsLedger
     {
         return round((float) self::membersWithCredit()->sum('total_outstanding'), 2);
     }
+
+    public static function canteenOutstandingTotal(): float
+    {
+        return round((float) self::membersWithCredit()->sum('canteen_outstanding'), 2);
+    }
 }

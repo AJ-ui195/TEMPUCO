@@ -2,7 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Loan;
+use App\Support\MemberLoans;
 use Filament\Widgets\ChartWidget;
 
 class LoanApplicationsChartWidget extends ChartWidget
@@ -39,9 +39,7 @@ class LoanApplicationsChartWidget extends ChartWidget
         for ($i = 29; $i >= 0; $i--) {
             $day = now()->subDays($i)->startOfDay();
             $labels[] = $day->format('M j');
-            $counts[] = Loan::query()
-                ->whereLoanDate($day)
-                ->count();
+            $counts[] = MemberLoans::countOnLoanDate($day);
         }
 
         return [

@@ -79,6 +79,47 @@
         overflow: visible;
     }
 
+    /* Glass + backdrop-filter creates a stacking context. Raise the schema
+       grid item so later cards do not cover selects/date pickers.
+       Date picker panels stay in the DOM when closed, so do not raise on
+       :has(.fi-fo-date-time-picker-panel). Collapse buttons also use
+       aria-expanded — only match the select trigger. */
+    .fi-panel-user .fi-sc-section,
+    .fi-panel-user .fi-section:not(.fi-section-not-contained):not(.fi-aside) {
+        position: relative;
+        z-index: 1;
+    }
+
+    .fi-panel-user .fi-sc-section:focus-within,
+    .fi-panel-user .fi-sc-section:has(.fi-select-input-btn[aria-expanded="true"]),
+    .fi-panel-user .fi-section:not(.fi-section-not-contained):not(.fi-aside):focus-within,
+    .fi-panel-user .fi-section:not(.fi-section-not-contained):not(.fi-aside):has(.fi-select-input-btn[aria-expanded="true"]) {
+        z-index: 80;
+    }
+
+    .fi-panel-user .fi-fo-date-time-picker {
+        position: relative;
+        z-index: 1;
+    }
+
+    .fi-panel-user .fi-fo-date-time-picker:focus-within {
+        z-index: 2;
+    }
+
+    .fi-panel-user .fi-fo-date-time-picker-panel {
+        z-index: 50 !important;
+    }
+
+    .fi-panel-user .fi-select-input-ctn .fi-dropdown-panel {
+        z-index: 60;
+    }
+
+    .fi-panel-user .fi-sc-grid > *,
+    .fi-panel-user .fi-fo-field-wrp,
+    .fi-panel-user .fi-fo-field-content-col {
+        overflow: visible;
+    }
+
     .fi-panel-user .fi-main-ctn {
         max-width: 72rem;
     }
@@ -87,7 +128,7 @@
     .mp-stack {
         display: flex;
         flex-direction: column;
-        gap: 1.5rem;
+        gap: 1.25rem;
     }
 
     .mp-hero {
@@ -652,6 +693,132 @@
         padding-top: 0.875rem;
     }
 
+    .mp-loans-widget {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .mp-loans-widget .mp-table {
+        display: table !important;
+        width: 100%;
+        table-layout: fixed;
+        min-width: 0;
+    }
+
+    .mp-loans-widget .mp-table thead {
+        display: table-header-group;
+    }
+
+    .mp-loans-widget .mp-table tbody {
+        display: table-row-group;
+    }
+
+    .mp-loans-widget .mp-table tr {
+        display: table-row;
+    }
+
+    .mp-loans-widget .mp-table th,
+    .mp-loans-widget .mp-table td {
+        display: table-cell;
+        vertical-align: middle;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .mp-loans-widget .mp-table td.mp-loans-actions {
+        text-align: right;
+        white-space: nowrap;
+        width: 8.75rem;
+    }
+
+    .mp-loans-widget .mp-loans-actions .mp-btn {
+        padding: 0.35rem 0.7rem;
+        font-size: 0.75rem;
+        border-radius: 0.5rem;
+    }
+
+    .mp-status {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.2rem 0.65rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 650;
+        letter-spacing: 0.01em;
+        line-height: 1.2;
+    }
+
+    .mp-status--pending {
+        color: #b45309;
+        background: rgba(245, 158, 11, 0.16);
+    }
+
+    html.dark .mp-status--pending {
+        color: #fbbf24;
+        background: rgba(245, 158, 11, 0.18);
+    }
+
+    .mp-status--approved {
+        color: #047857;
+        background: rgba(16, 185, 129, 0.16);
+    }
+
+    html.dark .mp-status--approved {
+        color: #6ee7b7;
+        background: rgba(16, 185, 129, 0.16);
+    }
+
+    .mp-status--rejected {
+        color: #b91c1c;
+        background: rgba(239, 68, 68, 0.16);
+    }
+
+    html.dark .mp-status--rejected {
+        color: #fca5a5;
+        background: rgba(239, 68, 68, 0.16);
+    }
+
+    .mp-btn-disabled {
+        opacity: 0.45;
+        pointer-events: none;
+        cursor: not-allowed;
+    }
+
+    .mp-collateral-modal h3 {
+        margin: 0 0 0.5rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #0c4a6e;
+    }
+
+    html.dark .mp-collateral-modal h3 {
+        color: #7dd3fc;
+    }
+
+    .mp-collateral-modal p,
+    .mp-collateral-modal li {
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: #334155;
+    }
+
+    html.dark .mp-collateral-modal p,
+    html.dark .mp-collateral-modal li {
+        color: #cbd5e1;
+    }
+
+    .mp-collateral-modal ol {
+        margin: 0 0 1.25rem;
+        padding-left: 1.25rem;
+    }
+
+    .mp-collateral-modal ol li + li {
+        margin-top: 0.35rem;
+    }
+
     .mp-empty {
         padding: 1.5rem;
         text-align: center;
@@ -781,7 +948,12 @@
     }
 
     .fi-panel-user .mp-table {
-        min-width: 36rem;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .fi-panel-user .mp-loans-widget .mp-table-wrap {
+        width: 100%;
     }
 
     .fi-panel-user .fi-ta-table {

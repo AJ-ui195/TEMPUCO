@@ -3,9 +3,8 @@
 namespace App\Filament\User\Pages;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
 use App\Models\Member;
-use App\Support\LoanTypes;
+use App\Models\RegularLoan;
 use App\Support\RegularLoanSchedule;
 use BackedEnum;
 use Filament\Infolists\Components\TextEntry;
@@ -56,11 +55,10 @@ class RegularLoanLedger extends Page
             ]);
     }
 
-    protected function latestRegularLoan(Member $user): ?Loan
+    protected function latestRegularLoan(Member $user): ?RegularLoan
     {
-        return Loan::query()
+        return RegularLoan::query()
             ->forUser($user)
-            ->whereNotIn('loan_type', LoanTypes::nonRegular())
             ->where('status', LoanStatus::Approved)
             ->orderedByLoanDate()
             ->orderByDesc('id')

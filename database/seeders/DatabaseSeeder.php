@@ -7,7 +7,7 @@ use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
 use App\Enums\UserRole;
-use App\Models\Loan;
+use App\Models\RegularLoan;
 use App\Models\User;
 use App\Support\MemberAccount;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -49,6 +49,12 @@ class DatabaseSeeder extends Seeder
         ]);
 
         User::factory()->create([
+            'name' => 'Cashier',
+            'email' => 'collection@example.com',
+            'role' => UserRole::CollectionCashier,
+        ]);
+
+        User::factory()->create([
             'name' => 'Canteen Cashier',
             'email' => 'canteen@example.com',
             'role' => UserRole::CanteenCashier,
@@ -60,8 +66,8 @@ class DatabaseSeeder extends Seeder
             'role' => UserRole::Inventory,
         ]);
 
-        Loan::query()->create([
-            'user_id' => $member->id,
+        RegularLoan::query()->create([
+            'member_id' => $member->id,
             'status' => LoanStatus::Approved,
             'loan_category' => LoanCategory::AdditionalNew,
             'loan_type' => 'Personal loan',
@@ -76,8 +82,8 @@ class DatabaseSeeder extends Seeder
             'approved_at' => now()->subMonths(2),
         ]);
 
-        Loan::query()->create([
-            'user_id' => $member->id,
+        RegularLoan::query()->create([
+            'member_id' => $member->id,
             'status' => LoanStatus::Pending,
             'loan_category' => LoanCategory::AdditionalNew,
             'loan_type' => 'Emergency fund',

@@ -62,6 +62,7 @@ class UserResource extends Resource
                     ->label(__('Role'))
                     ->options([
                         UserRole::Admin->value => UserRole::Admin->getLabel(),
+                        UserRole::CollectionCashier->value => UserRole::CollectionCashier->getLabel(),
                         UserRole::Cashier->value => UserRole::Cashier->getLabel(),
                         UserRole::CanteenCashier->value => UserRole::CanteenCashier->getLabel(),
                         UserRole::Inventory->value => UserRole::Inventory->getLabel(),
@@ -113,6 +114,7 @@ class UserResource extends Resource
 
                         return match ($role) {
                             UserRole::Admin => 'danger',
+                            UserRole::CollectionCashier => 'primary',
                             UserRole::Cashier => 'info',
                             UserRole::CanteenCashier => 'warning',
                             UserRole::Inventory => 'success',
@@ -131,6 +133,7 @@ class UserResource extends Resource
                     ->label(__('Role'))
                     ->options([
                         UserRole::Admin->value => UserRole::Admin->getLabel(),
+                        UserRole::CollectionCashier->value => UserRole::CollectionCashier->getLabel(),
                         UserRole::Cashier->value => UserRole::Cashier->getLabel(),
                         UserRole::CanteenCashier->value => UserRole::CanteenCashier->getLabel(),
                         UserRole::Inventory->value => UserRole::Inventory->getLabel(),

@@ -3,11 +3,15 @@
 namespace App\Filament\Resources\Loans\Schemas;
 
 use App\Enums\LoanStatus;
+use App\Support\PesoInput;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -16,24 +20,64 @@ class LoanForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
+            ->columns([
+                'default' => 1,
+                'lg' => 2,
+            ])
             ->components([
-                Section::make(__('Status'))
-                    ->schema([
-                        Select::make('status')
-                            ->label(__('Status'))
-                            ->options([
-                                LoanStatus::Pending->value => LoanStatus::Pending->getLabel(),
-                                LoanStatus::Approved->value => LoanStatus::Approved->getLabel(),
-                                LoanStatus::Rejected->value => LoanStatus::Rejected->getLabel(),
-                            ])
-                            ->required()
-                            ->native(false),
-                        DateTimePicker::make('approved_at')
-                            ->label(__('Approved at'))
-                            ->seconds(false)
-                            ->visible(fn (callable $get): bool => $get('status') === LoanStatus::Approved->value),
-                    ])
-                    ->columns(2),
+                Group::make([
+                    Section::make(__('Status'))
+                        ->schema([
+                            Select::make('status')
+                                ->label(__('Status'))
+                                ->options([
+                                    LoanStatus::Pending->value => LoanStatus::Pending->getLabel(),
+                                    LoanStatus::Approved->value => LoanStatus::Approved->getLabel(),
+                                    LoanStatus::Rejected->value => LoanStatus::Rejected->getLabel(),
+                                ])
+                                ->required()
+                                ->native(false),
+                            DateTimePicker::make('approved_at')
+                                ->label(__('Approved at'))
+                                ->seconds(false)
+                                ->visible(fn (callable $get): bool => $get('status') === LoanStatus::Approved->value),
+                        ])
+                        ->columns(2),
+
+                    Section::make(__('Committee approval'))
+                        ->relationship('committeeDecision')
+                        ->schema([
+                            DatePicker::make('meeting_date')
+                                ->label(__('Meeting date'))
+                                ->native(false),
+                            Textarea::make('conditions_notes')
+                                ->label(__('Conditions / changes'))
+                                ->rows(3)
+                                ->columnSpanFull(),
+                            PesoInput::decorate(
+                                TextInput::make('approved_amount')
+                                    ->label(__('Amount approved'))
+                                    ->minValue(0)
+                            ),
+                            DatePicker::make('minutes_date')
+                                ->label(__('Recorded in minutes'))
+                                ->native(false),
+                        ])
+                        ->columns(2)
+                        ->collapsed(),
+
+                    Actions::make([
+                        Action::make('save')
+                            ->label(__('filament-panels::resources/pages/edit-record.form.actions.save.label'))
+                            ->submit('save')
+                            ->keyBindings(['mod+s']),
+                        Action::make('cancel')
+                            ->label(__('filament-panels::resources/pages/edit-record.form.actions.cancel.label'))
+                            ->color('gray')
+                            ->alpineClickHandler('window.history.back()'),
+                    ]),
+                ])
+                    ->columns(1),
 
                 Section::make(__('Cooperative certification'))
                     ->relationship('certification')
@@ -60,28 +104,6 @@ class LoanForm
                             ->columnSpanFull(),
                         DatePicker::make('treasurer_signed_at')
                             ->label(__('Treasurer date'))
-                            ->native(false),
-                    ])
-                    ->columns(2)
-                    ->collapsed(),
-
-                Section::make(__('Committee approval'))
-                    ->relationship('committeeDecision')
-                    ->schema([
-                        DatePicker::make('meeting_date')
-                            ->label(__('Meeting date'))
-                            ->native(false),
-                        Textarea::make('conditions_notes')
-                            ->label(__('Conditions / changes'))
-                            ->rows(3)
-                            ->columnSpanFull(),
-                        TextInput::make('approved_amount')
-                            ->label(__('Amount approved'))
-                            ->numeric()
-                            ->minValue(0)
-                            ->step(0.01),
-                        DatePicker::make('minutes_date')
-                            ->label(__('Recorded in minutes'))
                             ->native(false),
                     ])
                     ->columns(2)

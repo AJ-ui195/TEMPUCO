@@ -41,6 +41,7 @@ class LoansTable
                 TextColumn::make('loan_category')
                     ->label(__('Category'))
                     ->formatStateUsing(fn (mixed $state): string => $state?->getLabel() ?? '—')
+                    ->placeholder('—')
                     ->toggleable(),
                 TextColumn::make('loan_amount')
                     ->label(__('Loan amount'))

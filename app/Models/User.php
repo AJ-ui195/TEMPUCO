@@ -52,6 +52,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->role === UserRole::Cashier;
     }
 
+    public function isCollectionCashier(): bool
+    {
+        return $this->role === UserRole::CollectionCashier;
+    }
+
     public function isCanteenCashier(): bool
     {
         return $this->role === UserRole::CanteenCashier;
@@ -68,6 +73,7 @@ class User extends Authenticatable implements FilamentUser
             'admin' => $this->role === UserRole::Admin,
             'pos' => $this->role === UserRole::Cashier,
             'pos-canteen' => $this->role === UserRole::CanteenCashier,
+            'cashier' => $this->role === UserRole::CollectionCashier,
             default => false,
         };
     }
