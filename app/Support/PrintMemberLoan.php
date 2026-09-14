@@ -159,7 +159,7 @@ final class PrintMemberLoan
             'address' => self::parseNoteLine($notes, 'Address')
                 ?: (string) ($member?->address ?? ''),
             'contactNumber' => self::parseNoteLine($notes, 'Contact number')
-                ?: (string) ($member?->cellphone ?? ''),
+                ?: (string) ($member?->contact_number ?? ''),
             'email' => self::parseNoteLine($notes, 'Email')
                 ?: (string) ($member?->email ?? ''),
             'occupation' => self::parseNoteLine($notes, 'Occupation / Position')

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\PosSaleChannel;
+use App\Models\Member;
 use App\Models\PosCreditPayment;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ final class SettleMemberCredit
      *
      * @return array{applied: float, remaining_balance: float, payment: ?PosCreditPayment}
      */
-    public static function apply(User $member, PosSaleChannel $channel, float $amount, ?User $cashier = null): array
+    public static function apply(Member $member, PosSaleChannel $channel, float $amount, ?User $cashier = null): array
     {
         return DB::transaction(function () use ($member, $channel, $amount, $cashier): array {
             $credit = new MemberPosCredit($member);

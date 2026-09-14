@@ -3,8 +3,8 @@
 namespace App\Filament\Cashier\Pages;
 
 use App\Enums\PosSaleChannel;
+use App\Models\Member;
 use App\Models\PosCreditPayment;
-use App\Models\User;
 use App\Support\MemberCreditsLedger;
 use App\Support\MemberPosCredit;
 use App\Support\PrintCreditPaymentReceipt;
@@ -74,7 +74,7 @@ class PosMemberCreditsPage extends Page
 
             return str_contains(strtolower($member->name), $lower)
                 || str_contains(strtolower($member->email), $lower)
-                || ($member->cellphone && str_contains($member->cellphone, $term));
+                || ($member->contact_number && str_contains($member->contact_number, $term));
         })->values();
     }
 
@@ -88,7 +88,7 @@ class PosMemberCreditsPage extends Page
         $member = $this->findMember($memberId);
         $saleChannel = PosSaleChannel::tryFrom($channel);
 
-        if (! $member instanceof User || ! $saleChannel instanceof PosSaleChannel) {
+        if (! $member instanceof Member || ! $saleChannel instanceof PosSaleChannel) {
             return;
         }
 
@@ -131,7 +131,7 @@ class PosMemberCreditsPage extends Page
         }
     }
 
-    public function getPaymentMember(): ?User
+    public function getPaymentMember(): ?Member
     {
         return $this->paymentMemberId === null
             ? null
@@ -148,7 +148,7 @@ class PosMemberCreditsPage extends Page
         $member = $this->getPaymentMember();
         $channel = $this->getPaymentSaleChannel();
 
-        if (! $member instanceof User || ! $channel instanceof PosSaleChannel) {
+        if (! $member instanceof Member || ! $channel instanceof PosSaleChannel) {
             return 0;
         }
 
@@ -207,7 +207,7 @@ class PosMemberCreditsPage extends Page
         $member = $this->getPaymentMember();
         $channel = $this->getPaymentSaleChannel();
 
-        if (! $member instanceof User || ! $channel instanceof PosSaleChannel) {
+        if (! $member instanceof Member || ! $channel instanceof PosSaleChannel) {
             $this->closePaymentModal();
 
             return;
@@ -259,8 +259,8 @@ class PosMemberCreditsPage extends Page
         }
     }
 
-    protected function findMember(int $memberId): ?User
+    protected function findMember(int $memberId): ?Member
     {
-        return User::query()->members()->find($memberId);
+        return Member::query()->find($memberId);
     }
 }

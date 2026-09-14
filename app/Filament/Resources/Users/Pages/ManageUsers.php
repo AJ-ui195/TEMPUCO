@@ -10,7 +10,7 @@ class ManageUsers extends ManageRecords
 {
     protected static string $resource = UserResource::class;
 
-    protected static ?string $title = 'Members';
+    protected static ?string $title = 'Users';
 
     protected function getHeaderActions(): array
     {

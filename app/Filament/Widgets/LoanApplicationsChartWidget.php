@@ -40,7 +40,6 @@ class LoanApplicationsChartWidget extends ChartWidget
             $day = now()->subDays($i)->startOfDay();
             $labels[] = $day->format('M j');
             $counts[] = Loan::query()
-                ->whereHas('user', fn ($query) => $query->members())
                 ->whereLoanDate($day)
                 ->count();
         }

@@ -30,14 +30,6 @@ class FilamentLoginResponse implements Responsable
 
     protected function resolveHomeUrl(FilamentUser $user): string
     {
-        if ($user->canAccessPanel(Filament::getPanel('admin'))) {
-            return Filament::getPanel('admin')->getUrl();
-        }
-
-        if ($user->canAccessPanel(Filament::getPanel('user'))) {
-            return Filament::getPanel('user')->getUrl();
-        }
-
         return Filament::getUrl();
     }
 

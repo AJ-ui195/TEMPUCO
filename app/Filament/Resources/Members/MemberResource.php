@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Pos\Resources\Members;
+namespace App\Filament\Resources\Members;
 
-use App\Filament\Pos\Resources\Members\Pages\ManageMembers;
+use App\Filament\Resources\Members\Pages\ManageMembers;
 use App\Filament\Resources\Members\Schemas\MemberForm;
 use App\Models\Member;
 use App\Support\MemberAccount;
@@ -10,14 +10,19 @@ use App\Support\MemberQrCode;
 use App\Support\PrintMemberQrCode;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 class MemberResource extends Resource
@@ -34,9 +39,9 @@ class MemberResource extends Resource
 
     protected static ?string $navigationLabel = 'Members';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 10;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserPlus;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
     public static function form(Schema $schema): Schema
     {
@@ -50,7 +55,7 @@ class MemberResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->label(__('Member'))
+                    ->label(__('Full name'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('createdBy.name')
@@ -65,34 +70,24 @@ class MemberResource extends Resource
                 TextColumn::make('contact_number')
                     ->label(__('Contact number'))
                     ->searchable()
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->toggleable(),
+                IconColumn::make('is_retiree')
+                    ->label(__('Retiree'))
+                    ->boolean()
+                    ->sortable(),
+                ImageColumn::make('qr_code')
+                    ->label(__('QR code'))
+                    ->getStateUsing(fn (Member $record): string => MemberQrCode::dataUriFor($record))
+                    ->imageHeight(64)
+                    ->imageWidth(64)
+                    ->extraImgAttributes(fn (Member $record): array => [
+                        'alt' => "QR code for {$record->name}",
+                    ]),
             ])
             ->defaultSort('name')
             ->deferLoading()
             ->recordActions([
-                Action::make('viewQrCode')
-                    ->label(__('View QR'))
-                    ->icon(Heroicon::OutlinedQrCode)
-                    ->modalHeading(fn (Member $record): string => __('Member QR code — :name', [
-                        'name' => $record->name,
-                    ]))
-                    ->modalContent(fn (Member $record): View => view(
-                        'filament.pos.member-qr-modal',
-                        [
-                            'user' => $record,
-                            'qrCodeDataUri' => MemberQrCode::dataUriFor($record, scale: 4),
-                        ],
-                    ))
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel(__('Close'))
-                    ->extraModalFooterActions(fn (Member $record): array => [
-                        Action::make('printQrFromView')
-                            ->label(__('Print QR code'))
-                            ->icon(Heroicon::OutlinedPrinter)
-                            ->url(PrintMemberQrCode::printUrl($record))
-                            ->openUrlInNewTab()
-                            ->color('primary'),
-                    ]),
                 Action::make('printQrCode')
                     ->label(__('Print QR code'))
                     ->icon(Heroicon::OutlinedPrinter)
@@ -104,6 +99,19 @@ class MemberResource extends Resource
                         /** @var Member $record */
                         return MemberAccount::update($record, $data);
                     }),
+                DeleteAction::make()
+                    ->using(function (Model $record): void {
+                        /** @var Member $record */
+                        MemberAccount::delete($record);
+                    }),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->action(function (Collection $records): void {
+                            $records->each(fn (Member $record) => MemberAccount::delete($record));
+                        }),
+                ]),
             ]);
     }
 
