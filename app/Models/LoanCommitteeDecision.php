@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTypedLoan;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LoanCommitteeDecision extends Model
 {
+    use BelongsToTypedLoan;
+
     protected $fillable = [
-        'loan_id',
+        'character_loan_id',
+        'quick_loan_id',
+        'regular_loan_id',
         'meeting_date',
         'conditions_notes',
         'approved_amount',
@@ -25,10 +29,5 @@ class LoanCommitteeDecision extends Model
             'meeting_date' => 'date',
             'minutes_date' => 'date',
         ];
-    }
-
-    public function loan(): BelongsTo
-    {
-        return $this->belongsTo(Loan::class);
     }
 }

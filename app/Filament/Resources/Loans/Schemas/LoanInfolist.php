@@ -6,8 +6,9 @@ use App\Enums\LoanCategory;
 use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
-use App\Models\Loan;
+use App\Models\Contracts\MemberLoan;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -16,6 +17,10 @@ class LoanInfolist
     public static function configure(Schema $schema): Schema
     {
         return $schema
+            ->columns([
+                'default' => 1,
+                'lg' => 2,
+            ])
             ->components([
                 Section::make(__('Application'))
                     ->schema([
@@ -43,7 +48,7 @@ class LoanInfolist
                             ->formatStateUsing(fn (mixed $state): string => number_format((float) $state, 2)),
                         TextEntry::make('amount_in_words')
                             ->label(__('Amount in words'))
-                            ->state(fn (Loan $record): string => $record->amountInWords())
+                            ->state(fn (MemberLoan $record): string => $record->amountInWords())
                             ->placeholder('—'),
                         TextEntry::make('loan_period_months')
                             ->label(__('Loan period'))
@@ -61,7 +66,7 @@ class LoanInfolist
                             ->placeholder('—'),
                         TextEntry::make('purpose_of_loan_other')
                             ->label(__('Purpose (others)'))
-                            ->visible(fn (Loan $record): bool => $record->purpose_of_loan === LoanPurpose::Others)
+                            ->visible(fn (MemberLoan $record): bool => $record->purpose_of_loan === LoanPurpose::Others)
                             ->placeholder('—')
                             ->columnSpanFull(),
                         TextEntry::make('mode_of_payment')
@@ -71,7 +76,7 @@ class LoanInfolist
                         TextEntry::make('application_notes')
                             ->label(__('Application notes'))
                             ->columnSpanFull()
-                            ->visible(fn (Loan $record): bool => filled($record->application_notes))
+                            ->visible(fn (MemberLoan $record): bool => filled($record->application_notes))
                             ->placeholder('—'),
                         TextEntry::make('applicant_signed_at')
                             ->label(__('Applicant signed on'))
@@ -85,7 +90,32 @@ class LoanInfolist
                             ->dateTime()
                             ->placeholder('—'),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(),
+
+                Group::make([
+                    Section::make(__('Committee approval'))
+                        ->schema([
+                            TextEntry::make('committeeDecision.meeting_date')
+                                ->label(__('Meeting date'))
+                                ->date()
+                                ->placeholder('—'),
+                            TextEntry::make('committeeDecision.conditions_notes')
+                                ->label(__('Conditions / changes'))
+                                ->placeholder('—')
+                                ->columnSpanFull(),
+                            TextEntry::make('committeeDecision.approved_amount')
+                                ->label(__('Amount approved'))
+                                ->formatStateUsing(fn (mixed $state): string => filled($state) ? number_format((float) $state, 2) : '—'),
+                            TextEntry::make('committeeDecision.minutes_date')
+                                ->label(__('Recorded in minutes'))
+                                ->date()
+                                ->placeholder('—'),
+                        ])
+                        ->columns(2)
+                        ->collapsed(),
+                ])
+                    ->columns(1),
 
                 Section::make(__('Cooperative certification'))
                     ->schema([
@@ -114,33 +144,13 @@ class LoanInfolist
                     ->columns(2)
                     ->collapsed(),
 
-                Section::make(__('Committee approval'))
-                    ->schema([
-                        TextEntry::make('committeeDecision.meeting_date')
-                            ->label(__('Meeting date'))
-                            ->date()
-                            ->placeholder('—'),
-                        TextEntry::make('committeeDecision.conditions_notes')
-                            ->label(__('Conditions / changes'))
-                            ->placeholder('—')
-                            ->columnSpanFull(),
-                        TextEntry::make('committeeDecision.approved_amount')
-                            ->label(__('Amount approved'))
-                            ->formatStateUsing(fn (mixed $state): string => filled($state) ? number_format((float) $state, 2) : '—'),
-                        TextEntry::make('committeeDecision.minutes_date')
-                            ->label(__('Recorded in minutes'))
-                            ->date()
-                            ->placeholder('—'),
-                    ])
-                    ->columns(2)
-                    ->collapsed(),
-
                 Section::make(__('Payments'))
                     ->schema([
                         TextEntry::make('payments_total')
                             ->label(__('Total received'))
-                            ->state(fn (Loan $record): string => number_format((float) $record->payments()->sum('amount'), 2)),
-                    ]),
+                            ->state(fn (MemberLoan $record): string => number_format((float) $record->payments()->sum('amount'), 2)),
+                    ])
+                    ->columnSpanFull(),
             ]);
     }
 }

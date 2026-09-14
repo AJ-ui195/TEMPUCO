@@ -3,18 +3,15 @@
 namespace App\Filament\User\Widgets;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
+use App\Models\Contracts\MemberLoan;
 use App\Models\Member;
+use App\Support\MemberLoans;
 use App\Support\PrintMemberLoan;
-use Filament\Actions\Action;
 use Filament\Facades\Filament;
-use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Table;
-use Filament\Widgets\TableWidget;
-use Illuminate\Database\Eloquent\Builder;
+use Filament\Widgets\Widget;
+use Illuminate\Support\Collection;
 
-class UserLoansTableWidget extends TableWidget
+class UserLoansTableWidget extends Widget
 {
     protected static bool $isDiscovered = false;
 
@@ -22,68 +19,34 @@ class UserLoansTableWidget extends TableWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    public function table(Table $table): Table
-    {
-        return $table
-            ->heading(__('My loans'))
-            ->description(__('Track the status and details of your loan applications.'))
-            ->striped()
-            ->paginated([5, 10, 25])
-            ->query(fn (): Builder => $this->memberLoansQuery())
-            ->columns([
-                TextColumn::make('status')
-                    ->label(__('Status'))
-                    ->badge()
-                    ->formatStateUsing(fn (mixed $state): string => $state instanceof LoanStatus ? $state->getLabel() : (string) $state)
-                    ->color(fn (mixed $state): string => match ($state instanceof LoanStatus ? $state : LoanStatus::tryFrom((string) $state)) {
-                        LoanStatus::Approved => 'success',
-                        LoanStatus::Rejected => 'danger',
-                        default => 'warning',
-                    })
-                    ->sortable(),
-                TextColumn::make('loan_type')
-                    ->label(__('Loan type'))
-                    ->searchable()
-                    ->formatStateUsing(fn (mixed $state): string => (string) $state),
-                TextColumn::make('loan_category')
-                    ->label(__('Category'))
-                    ->formatStateUsing(fn (mixed $state): string => $state?->getLabel() ?? '—')
-                    ->hiddenFrom('md'),
-                TextColumn::make('loan_amount')
-                    ->label(__('Loan amount'))
-                    ->formatStateUsing(fn (mixed $state): string => number_format((float) $state, 2)),
-                TextColumn::make('loan_period_months')
-                    ->label(__('Loan period'))
-                    ->formatStateUsing(fn (mixed $state): string => ((int) $state).' '.__('months'))
-                    ->hiddenFrom('md'),
-                TextColumn::make('installment_amount')
-                    ->label(__('Installment amount'))
-                    ->formatStateUsing(fn (mixed $state): string => number_format((float) $state, 2))
-                    ->hiddenFrom('md'),
-                TextColumn::make('loan_date')
-                    ->label(__('Date'))
-                    ->date(),
-            ])
-            ->recordActions([
-                Action::make('printLoanDetails')
-                    ->label(__('Print details'))
-                    ->icon(Heroicon::OutlinedPrinter)
-                    ->url(fn (Loan $record): string => PrintMemberLoan::printUrl($record))
-                    ->openUrlInNewTab()
-                    ->disabled(fn (Loan $record): bool => $record->status !== LoanStatus::Approved)
-                    ->tooltip(fn (Loan $record): ?string => $record->status !== LoanStatus::Approved
-                        ? __('Available only for approved loans.')
-                        : __('Open printable loan details form')),
-            ])
-            ->emptyStateHeading(__('No loans yet'))
-            ->emptyStateDescription(__('When you have active or past loans, they will appear here.'));
-    }
+    protected static bool $isLazy = false;
 
-    protected function memberLoansQuery(): Builder
+    /**
+     * @var view-string
+     */
+    protected string $view = 'filament.user.widgets.user-loans-table';
+
+    /**
+     * @return Collection<int, MemberLoan>
+     */
+    public function loans(): Collection
     {
-        /** @var Member $user */
         $user = Filament::auth()->user();
 
-        return Loan::query()->forUser($user)->orderedByLoanDate();
+        if (! $user instanceof Member) {
+            return collect();
+        }
+
+        return MemberLoans::forMember($user);
+    }
+
+    public function printUrl(MemberLoan $loan): string
+    {
+        return PrintMemberLoan::printUrl($loan);
+    }
+
+    public function isApproved(MemberLoan $loan): bool
+    {
+        return $loan->status === LoanStatus::Approved;
     }
 }

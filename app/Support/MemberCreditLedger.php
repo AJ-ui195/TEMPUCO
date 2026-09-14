@@ -68,6 +68,7 @@ final class MemberCreditLedger
             ->get()
             ->map(fn (PosSale $sale): array => [
                 'type' => 'charge',
+                'id' => (int) $sale->id,
                 'date' => $sale->created_at,
                 'reference' => $sale->reference,
                 'channel' => $sale->sale_channel,
@@ -78,7 +79,6 @@ final class MemberCreditLedger
                 ),
                 'charge' => $sale->outstandingAmount(),
                 'payment' => 0.0,
-                'sort_key' => 0,
             ]);
 
         $payments = $this->paymentsQuery($channel)
@@ -90,6 +90,7 @@ final class MemberCreditLedger
             ->get()
             ->map(fn (PosCreditPayment $payment): array => [
                 'type' => 'payment',
+                'id' => (int) $payment->id,
                 'date' => $payment->created_at,
                 'reference' => $payment->reference,
                 'channel' => $payment->sale_channel,
@@ -98,22 +99,16 @@ final class MemberCreditLedger
                     : __('Payment received'),
                 'charge' => 0.0,
                 'payment' => (float) $payment->amount,
-                'sort_key' => 1,
             ]);
 
         $balance = $this->openingBalance($channel, $from);
 
-        return $charges
-            ->concat($payments)
-            ->sortBy([
-                fn (array $a, array $b): int => $a['date'] <=> $b['date'],
-                fn (array $a, array $b): int => $a['sort_key'] <=> $b['sort_key'],
-            ])
-            ->values()
-            ->map(function (array $entry) use (&$balance): array {
+        return LedgerChronology::sortByStoredTime(
+            $charges->concat($payments),
+            fn (array $entry) => $entry['date'],
+            fn (array $entry): int => (int) $entry['id'],
+        )->map(function (array $entry) use (&$balance): array {
                 $balance = round($balance + $entry['charge'] - $entry['payment'], 2);
-
-                unset($entry['sort_key']);
 
                 return [...$entry, 'balance' => $balance];
             });

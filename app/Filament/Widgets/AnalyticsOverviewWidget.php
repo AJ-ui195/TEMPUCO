@@ -3,8 +3,8 @@
 namespace App\Filament\Widgets;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
 use App\Models\LoanPayment;
+use App\Support\MemberLoans;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -19,16 +19,9 @@ class AnalyticsOverviewWidget extends StatsOverviewWidget
         $monthStart = now()->startOfMonth();
         $monthEnd = now()->endOfMonth();
 
-        $memberLoansQuery = Loan::query()
-            ->whereBetween('created_at', [$monthStart, $monthEnd]);
-
-        $totalMemberLoanAmount = (float) (clone $memberLoansQuery)->sum('loan_amount');
-        $memberLoanCount = (clone $memberLoansQuery)->count();
-
-        $approvedLoansCount = Loan::query()
-            ->where('status', LoanStatus::Approved)
-            ->whereBetween('approved_at', [$monthStart, $monthEnd])
-            ->count();
+        $totalMemberLoanAmount = MemberLoans::sumAmountCreatedBetween($monthStart, $monthEnd);
+        $memberLoanCount = MemberLoans::countCreatedBetween($monthStart, $monthEnd);
+        $approvedLoansCount = MemberLoans::countApprovedBetween($monthStart, $monthEnd, LoanStatus::Approved);
 
         $totalReceived = (float) LoanPayment::query()
             ->whereBetween('received_at', [$monthStart, $monthEnd])

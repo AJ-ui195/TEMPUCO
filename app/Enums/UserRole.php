@@ -7,6 +7,7 @@ enum UserRole: string
     case Admin = 'admin';
     case User = 'user';
     case Cashier = 'cashier';
+    case CollectionCashier = 'collection_cashier';
     case CanteenCashier = 'canteen_cashier';
     case Inventory = 'inventory';
 
@@ -16,6 +17,7 @@ enum UserRole: string
             self::Admin => 'Admin',
             self::User => 'Member',
             self::Cashier => __('Grocery cashier'),
+            self::CollectionCashier => __('Cashier'),
             self::CanteenCashier => __('Canteen cashier'),
             self::Inventory => __('Inventory'),
         };

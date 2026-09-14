@@ -3,7 +3,6 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Pages\Login;
-use App\Filament\User\Widgets\UserLoansTableWidget;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -43,9 +42,7 @@ class UserPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->userMenu(false)
             ->discoverPages(in: app_path('Filament/User/Pages'), for: 'App\Filament\User\Pages')
-            ->widgets([
-                UserLoansTableWidget::class,
-            ])
+            ->widgets([])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

@@ -3,7 +3,6 @@
 namespace App\Filament\User\Pages;
 
 use App\Models\Member;
-use Filament\Facades\Filament;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Schemas\Schema;
@@ -21,7 +20,7 @@ class UserDashboard extends BaseDashboard
     #[\Override]
     public function getWidgets(): array
     {
-        return Filament::getWidgets();
+        return [];
     }
 
     #[\Override]
@@ -32,7 +31,6 @@ class UserDashboard extends BaseDashboard
 
         return $schema
             ->components([
-                ...(method_exists($this, 'getFiltersForm') ? [$this->getFiltersFormContentComponent()] : []),
                 TextEntry::make('dashboard_welcome')
                     ->hiddenLabel()
                     ->state(fn (): HtmlString => new HtmlString(
@@ -41,7 +39,6 @@ class UserDashboard extends BaseDashboard
                         ])->render()
                     ))
                     ->columnSpanFull(),
-                $this->getWidgetsContentComponent(),
             ]);
     }
 }

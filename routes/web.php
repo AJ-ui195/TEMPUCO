@@ -21,7 +21,7 @@ Route::middleware(['auth:web,member'])->group(function (): void {
     Route::get('/members/{member}/print-qr', [PrintMemberQrCodeController::class, 'member'])
         ->name('members.print-qr');
 
-    Route::get('/members/loans/{loan}/print', PrintMemberLoanController::class)
+    Route::get('/members/loans/{type}/{loan}/print', PrintMemberLoanController::class)
         ->name('members.loans.print');
 
     Route::get('/admin/members/{member}/print-qr', [PrintMemberQrCodeController::class, 'member'])

@@ -3,9 +3,8 @@
 namespace App\Filament\User\Pages;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
 use App\Models\Member;
-use App\Support\LoanTypes;
+use App\Models\QuickLoan;
 use App\Support\QuickLoanLedgerEntries;
 use BackedEnum;
 use Filament\Infolists\Components\TextEntry;
@@ -57,13 +56,12 @@ class QuickLoanLedger extends Page
     }
 
     /**
-     * @return Collection<int, Loan>
+     * @return Collection<int, QuickLoan>
      */
     protected function quickLoans(Member $user): Collection
     {
-        return Loan::query()
+        return QuickLoan::query()
             ->forUser($user)
-            ->where('loan_type', LoanTypes::QUICK)
             ->where('status', LoanStatus::Approved)
             ->with('payments')
             ->orderedByLoanDate()

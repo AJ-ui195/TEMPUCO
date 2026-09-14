@@ -99,7 +99,7 @@ final class MemberForm
                 ->maxLength(255),
             Toggle::make('is_retiree')
                 ->label(__('Retiree'))
-                ->helperText(__('Retirees can access the Emergency loan ledger.'))
+                ->helperText(__('Marks this member as a retiree.'))
                 ->default(false),
             TextInput::make('password')
                 ->label(__('Password'))
