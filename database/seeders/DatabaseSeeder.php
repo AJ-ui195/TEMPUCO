@@ -22,6 +22,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(AdminUserSeeder::class);
+
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -102,3 +104,4 @@ class DatabaseSeeder extends Seeder
         ])->save();
     }
 }
+
