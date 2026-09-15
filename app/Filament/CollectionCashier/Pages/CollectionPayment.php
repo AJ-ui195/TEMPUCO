@@ -10,8 +10,9 @@ use App\Models\Member;
 use App\Models\PosCreditPayment;
 use App\Models\QuickLoan;
 use App\Models\RegularLoan;
-use App\Support\ChargeCanteenCredit;
+use App\Models\User;
 use App\Support\CharacterLoanLedgerEntries;
+use App\Support\ChargeCanteenCredit;
 use App\Support\MemberCollectionAccounts;
 use App\Support\MemberCreditLedger;
 use App\Support\MemberCreditLimit;
@@ -19,6 +20,7 @@ use App\Support\PesoInput;
 use App\Support\PrintCreditPaymentReceipt;
 use App\Support\QuickLoanLedgerEntries;
 use App\Support\RecordMemberLoanPayment;
+use App\Support\RegularLoanPaymentAllocation;
 use App\Support\RegularLoanSchedule;
 use App\Support\SettleMemberCredit;
 use BackedEnum;
@@ -57,7 +59,7 @@ class CollectionPayment extends Page
 
     public ?int $regularViewLoanId = null;
 
-    public string $paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+    public string $paymentKind = CharacterLoanLedgerEntries::KIND_INTEREST;
 
     public string $paymentAmount = '';
 
@@ -189,13 +191,14 @@ class CollectionPayment extends Page
         return RegularLoan::query()
             ->forUser($member)
             ->where('status', LoanStatus::Approved)
+            ->with('payments')
             ->orderedByLoanDate()
             ->orderByDesc('id')
             ->get();
     }
 
     /**
-     * @return array{schedule: RegularLoanSchedule, blankAmounts: bool, loans: Collection<int, RegularLoan>}
+     * @return array{schedule: RegularLoanSchedule, blankAmounts: bool, loans: Collection<int, RegularLoan>, loan: ?RegularLoan, paidCash: float}
      */
     public function getRegularScheduleView(): array
     {
@@ -208,6 +211,10 @@ class CollectionPayment extends Page
                 : RegularLoanSchedule::blank(),
             'blankAmounts' => ! $loan instanceof RegularLoan,
             'loans' => $loans,
+            'loan' => $loan instanceof RegularLoan ? $loan : null,
+            'paidCash' => $loan instanceof RegularLoan
+                ? RegularLoanPaymentAllocation::cashPaid($loan)
+                : 0.0,
         ];
     }
 
@@ -314,7 +321,7 @@ class CollectionPayment extends Page
         $this->paymentAmount = '';
         $this->officialReceiptNo = '';
         $this->paymentError = null;
-        $this->paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+        $this->paymentKind = CharacterLoanLedgerEntries::KIND_INTEREST;
     }
 
     public function updatedCollectLoanId(): void
@@ -445,7 +452,7 @@ class CollectionPayment extends Page
     }
 
     /**
-     * @return array{payment: PosCreditPayment, cashier: ?\App\Models\User, balanceBefore: float, balanceAfter: float, autoPrint: bool}|null
+     * @return array{payment: PosCreditPayment, cashier: ?User, balanceBefore: float, balanceAfter: float, autoPrint: bool}|null
      */
     public function getReceiptData(): ?array
     {

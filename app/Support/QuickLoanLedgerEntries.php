@@ -54,8 +54,9 @@ final class QuickLoanLedgerEntries
         );
 
         $due = self::totalPayable($principal);
-        $totalPaid = round((float) $payments->sum(fn (LoanPayment $payment) => (float) $payment->amount), 2);
-        $isPaid = $totalPaid + 0.005 >= $due;
+        $firstDue = $loan->first_payment_due_date
+            ? Carbon::parse($loan->first_payment_due_date)->format('n-j-Y')
+            : $releaseDate->copy()->addMonthNoOverflow()->format('n-j-Y');
 
         $entries = collect();
 
@@ -66,30 +67,15 @@ final class QuickLoanLedgerEntries
             'or' => '',
             'voucher' => '',
             'released' => $principal,
-            'interest' => 0.0,
+            'interest' => $interest,
             'payment' => 0.0,
-            'balance' => $principal,
+            'balance' => $due,
             'surcharge_payment' => 0.0,
             'surcharge_balance' => 0.0,
-            'remarks' => $isPaid ? '' : __('unpaid'),
+            'remarks' => $firstDue,
         ]);
 
         $balance = $due;
-
-        $entries->push([
-            'date' => $releaseDate,
-            'stored_at' => $loan->created_at ?? $releaseDate,
-            'stored_id' => 0,
-            'or' => '',
-            'voucher' => '',
-            'released' => 0.0,
-            'interest' => $interest,
-            'payment' => 0.0,
-            'balance' => $balance,
-            'surcharge_payment' => 0.0,
-            'surcharge_balance' => 0.0,
-            'remarks' => '',
-        ]);
 
         foreach ($payments as $payment) {
             $amount = round((float) $payment->amount, 2);

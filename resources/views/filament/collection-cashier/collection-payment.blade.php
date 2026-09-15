@@ -139,6 +139,8 @@
                                 'schedule' => $regularView['schedule'],
                                 'borrowerName' => $member->name,
                                 'blankAmounts' => $regularView['blankAmounts'],
+                                'loan' => $regularView['loan'],
+                                'paidCash' => $regularView['paidCash'],
                             ])
                         @elseif ($expandedLedger['type'] === \App\Support\MemberCollectionAccounts::TYPE_CHARACTER)
                             @php($characterView = $this->getCharacterLedgerView())
@@ -187,7 +189,7 @@
                         <label style="display: block; font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.375rem;">{{ __('Payment type') }}</label>
                         <select wire:model.live="paymentKind" class="pos-input" style="margin-bottom: 0.75rem;">
                             <option value="{{ \App\Support\CharacterLoanLedgerEntries::KIND_INTEREST }}">{{ __('Interest') }}</option>
-                            <option value="{{ \App\Support\CharacterLoanLedgerEntries::KIND_PRINCIPAL }}">{{ __('Principal') }}</option>
+                            <option value="{{ \App\Support\CharacterLoanLedgerEntries::KIND_PRINCIPAL }}">{{ __('Released amount') }}</option>
                         </select>
                     @endif
 

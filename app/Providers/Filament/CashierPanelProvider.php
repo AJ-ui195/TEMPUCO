@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Auth\Pages\Login;
 use App\Filament\CollectionCashier\Pages\CollectionPayment;
 use App\Filament\CollectionCashier\Pages\Dashboard;
+use App\Filament\CollectionCashier\Pages\RegularLoanRemittance;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -44,6 +45,7 @@ class CashierPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
                 CollectionPayment::class,
+                RegularLoanRemittance::class,
             ])
             ->widgets([])
             ->middleware([

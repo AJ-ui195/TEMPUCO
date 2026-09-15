@@ -31,7 +31,7 @@ trait RecordsMemberLoanPayment
                         ->label(__('Payment type'))
                         ->options([
                             CharacterLoanLedgerEntries::KIND_INTEREST => __('Interest'),
-                            CharacterLoanLedgerEntries::KIND_PRINCIPAL => __('Principal'),
+                            CharacterLoanLedgerEntries::KIND_PRINCIPAL => __('Released amount'),
                         ])
                         ->required()
                         ->native(false)

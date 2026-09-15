@@ -30,9 +30,11 @@ final class MemberLoans
     {
         return collect(self::models())
             ->flatMap(fn (string $model) => $model::query()->forUser($member)->get())
-            ->sortByDesc(fn (MemberLoan $loan) => $loan->loan_date?->timestamp
-                ?? $loan->created_at?->timestamp
-                ?? 0)
+            ->sortByDesc(fn (MemberLoan $loan): string => sprintf(
+                '%s-%020d',
+                ($loan->created_at ?? $loan->loan_date)?->format('Y-m-d H:i:s.u') ?? '0',
+                (int) $loan->getKey(),
+            ))
             ->values();
     }
 

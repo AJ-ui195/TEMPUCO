@@ -68,7 +68,6 @@ final class CharacterLoanLedgerEntries
 
         $principal = round((float) $loan->loan_amount, 2);
         $periodInterest = self::periodInterest($loan);
-        $intervalMonths = self::repaymentIntervalMonths($loan);
         $releaseDate = Carbon::parse($loan->loan_date ?? $loan->approved_at ?? $loan->created_at);
 
         $payments = LoanPayment::inRecordedOrder(
@@ -77,14 +76,10 @@ final class CharacterLoanLedgerEntries
                 : $loan->payments()->get()
         );
 
-        $principalPaid = round((float) $payments
-            ->filter(fn (LoanPayment $payment): bool => self::isPrincipalPayment($payment))
-            ->sum(fn (LoanPayment $payment) => (float) $payment->amount), 2);
-
-        $isPaid = $principalPaid + 0.005 >= $principal;
-        $nextDue = $loan->first_payment_due_date
+        $remarksIntervalMonths = 3;
+        $dueCursor = $loan->first_payment_due_date
             ? Carbon::parse($loan->first_payment_due_date)
-            : $releaseDate->copy()->addMonthsNoOverflow($intervalMonths);
+            : $releaseDate->copy()->addMonthsNoOverflow($remarksIntervalMonths);
 
         $entries = collect();
 
@@ -101,11 +96,10 @@ final class CharacterLoanLedgerEntries
             'balance' => $principal,
             'balance_blank' => false,
             'surcharge' => 0.0,
-            'remarks' => $isPaid ? '' : $nextDue->format('n-j-Y'),
+            'remarks' => $dueCursor->format('n-j-Y'),
         ]);
 
         $balance = $principal;
-        $dueCursor = $nextDue->copy();
 
         foreach ($payments as $payment) {
             $amount = round((float) $payment->amount, 2);
@@ -113,7 +107,7 @@ final class CharacterLoanLedgerEntries
             $or = (string) ($payment->official_receipt_no ?? '');
 
             if (self::isInterestPayment($payment)) {
-                $dueCursor = $date->copy()->addMonthsNoOverflow($intervalMonths);
+                $dueCursor = $dueCursor->copy()->addMonthsNoOverflow($remarksIntervalMonths);
 
                 $entries->push([
                     'date' => $date,
@@ -128,7 +122,7 @@ final class CharacterLoanLedgerEntries
                     'balance' => $balance,
                     'balance_blank' => false,
                     'surcharge' => 0.0,
-                    'remarks' => $isPaid ? '' : $dueCursor->format('n-j-Y'),
+                    'remarks' => $dueCursor->format('n-j-Y'),
                 ]);
 
                 continue;

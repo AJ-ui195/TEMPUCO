@@ -17,6 +17,8 @@ class LoanPayment extends Model
         'regular_loan_id',
         'amount',
         'kind',
+        'interest_applied',
+        'principal_applied',
         'official_receipt_no',
         'received_at',
     ];
@@ -28,6 +30,8 @@ class LoanPayment extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'interest_applied' => 'decimal:2',
+            'principal_applied' => 'decimal:2',
             'received_at' => 'datetime',
         ];
     }

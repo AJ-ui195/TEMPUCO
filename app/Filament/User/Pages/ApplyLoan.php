@@ -625,12 +625,17 @@ class ApplyLoan extends Page
                         ),
                         DatePicker::make('first_payment_due_date')
                             ->label(__('First payment due on'))
+                            ->helperText(__('Three months after the loan date (e.g. 9-15-2026 → 12-15-2026).'))
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
                             ->native(false),
                         DatePicker::make('applicant_signed_at')
                             ->label(__('Date'))
                             ->required()
-                            ->native(false),
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function (?string $state, callable $set, callable $get): void {
+                                $this->syncCharacterDueDate($set, $get);
+                            }),
                     ])
                     ->columns(2)
                     ->visible(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
@@ -875,6 +880,9 @@ class ApplyLoan extends Page
                 (int) ($data['loan_period_months'] ?? 0),
                 $member->isRetiree(),
             );
+            $signedAt = $data['applicant_signed_at'] ?? now()->toDateString();
+            $firstPaymentDueDate = Carbon::parse($signedAt)->addMonthsNoOverflow(3)->toDateString();
+            $data['applicant_signed_at'] = $signedAt;
         }
 
         $payload = [
@@ -892,7 +900,9 @@ class ApplyLoan extends Page
             ),
             'mode_of_payment' => $data['mode_of_payment'],
             'applicant_signed_at' => $data['applicant_signed_at'] ?? now()->toDateString(),
-            'loan_date' => now()->toDateString(),
+            'loan_date' => $isCharacterLoan
+                ? ($data['applicant_signed_at'] ?? now()->toDateString())
+                : now()->toDateString(),
         ];
 
         if ($isQuickLoan) {
@@ -982,6 +992,8 @@ class ApplyLoan extends Page
             }
         }
 
+        $this->syncCharacterDueDate($set, $get);
+
         $amount = PesoInput::parse($get('loan_amount'));
         $months = (int) ($get('loan_period_months') ?? CharacterLoanRules::defaultTermMonths($type));
         $member = auth()->user();
@@ -1038,6 +1050,28 @@ class ApplyLoan extends Page
         $set(
             'first_payment_due_date',
             Carbon::parse((string) $signedAt)->addMonthNoOverflow()->toDateString(),
+        );
+    }
+
+    /**
+     * @param  callable(string, mixed): void  $set
+     * @param  callable(string): mixed  $get
+     */
+    private function syncCharacterDueDate(callable $set, callable $get): void
+    {
+        if ($get('loan_application_type') !== self::APPLICATION_TYPE_CHARACTER) {
+            return;
+        }
+
+        $signedAt = $get('applicant_signed_at');
+
+        if (blank($signedAt)) {
+            return;
+        }
+
+        $set(
+            'first_payment_due_date',
+            Carbon::parse((string) $signedAt)->addMonthsNoOverflow(3)->toDateString(),
         );
     }
 
