@@ -8,27 +8,30 @@ use App\Filament\Resources\Loans\Pages\ViewLoan;
 use App\Filament\Resources\Loans\Schemas\LoanForm;
 use App\Filament\Resources\Loans\Schemas\LoanInfolist;
 use App\Filament\Resources\Loans\Tables\LoansTable;
-use App\Models\Loan;
+use App\Models\RegularLoan;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use UnitEnum;
 
 class LoanResource extends Resource
 {
-    protected static ?string $model = Loan::class;
+    protected static ?string $model = RegularLoan::class;
 
-    protected static ?string $slug = 'loan-applications';
+    protected static ?string $slug = 'regular-loans';
 
     protected static ?string $recordTitleAttribute = 'loan_type';
 
-    protected static ?string $modelLabel = 'loan application';
+    protected static ?string $modelLabel = 'regular loan';
 
-    protected static ?string $pluralModelLabel = 'loan applications';
+    protected static ?string $pluralModelLabel = 'regular loans';
 
-    protected static ?string $navigationLabel = 'Loan applications';
+    protected static ?string $navigationLabel = 'Regular loans';
+
+    protected static string|UnitEnum|null $navigationGroup = 'Loans';
 
     protected static ?int $navigationSort = 20;
 
@@ -52,12 +55,7 @@ class LoanResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user', 'certification', 'committeeDecision', 'decidedBy']);
-    }
-
-    public static function canCreate(): bool
-    {
-        return false;
+            ->with(['user', 'certification', 'committeeDecision']);
     }
 
     public static function getRelations(): array

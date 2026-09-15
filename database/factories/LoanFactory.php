@@ -6,16 +6,16 @@ use App\Enums\LoanCategory;
 use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
-use App\Models\Loan;
 use App\Models\Member;
+use App\Models\RegularLoan;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<Loan>
+ * @extends Factory<RegularLoan>
  */
 class LoanFactory extends Factory
 {
-    protected $model = Loan::class;
+    protected $model = RegularLoan::class;
 
     /**
      * @return array<string, mixed>
@@ -38,9 +38,9 @@ class LoanFactory extends Factory
 
     public function configure(): static
     {
-        return $this->afterMaking(function (Loan $loan): void {
-            if ($loan->user_id === null) {
-                $loan->user_id = Member::factory()->create()->id;
+        return $this->afterMaking(function (RegularLoan $loan): void {
+            if ($loan->member_id === null) {
+                $loan->member_id = Member::factory()->create()->id;
             }
 
             if ($loan->status === null) {
@@ -51,7 +51,7 @@ class LoanFactory extends Factory
 
     public function awaitingVerification(): static
     {
-        return $this->afterMaking(function (Loan $loan): void {
+        return $this->afterMaking(function (RegularLoan $loan): void {
             $loan->status = LoanStatus::AwaitingVerification;
             $loan->email_verification_token = hash('sha256', 'test-token');
             $loan->email_verified_at = null;
@@ -62,7 +62,7 @@ class LoanFactory extends Factory
 
     public function pending(): static
     {
-        return $this->afterMaking(function (Loan $loan): void {
+        return $this->afterMaking(function (RegularLoan $loan): void {
             $loan->status = LoanStatus::Pending;
             $loan->email_verified_at = now();
             $loan->approved_at = null;
@@ -72,7 +72,7 @@ class LoanFactory extends Factory
 
     public function approved(): static
     {
-        return $this->afterMaking(function (Loan $loan): void {
+        return $this->afterMaking(function (RegularLoan $loan): void {
             $loan->status = LoanStatus::Approved;
             $loan->approved_at = now();
         });
@@ -80,7 +80,7 @@ class LoanFactory extends Factory
 
     public function rejected(): static
     {
-        return $this->afterMaking(function (Loan $loan): void {
+        return $this->afterMaking(function (RegularLoan $loan): void {
             $loan->status = LoanStatus::Rejected;
             $loan->rejected_at = now();
             $loan->approved_at = null;

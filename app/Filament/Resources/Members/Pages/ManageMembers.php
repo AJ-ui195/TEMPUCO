@@ -90,6 +90,7 @@ class ManageMembers extends ManageRecords
                     ->label(__('Role'))
                     ->options([
                         UserRole::Admin->value => UserRole::Admin->getLabel(),
+                        UserRole::CollectionCashier->value => UserRole::CollectionCashier->getLabel(),
                         UserRole::Cashier->value => UserRole::Cashier->getLabel(),
                         UserRole::CanteenCashier->value => UserRole::CanteenCashier->getLabel(),
                         UserRole::Inventory->value => UserRole::Inventory->getLabel(),

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Concerns\HasAccountStatus;
+use App\Models\Contracts\MemberLoan;
+use App\Support\MemberLoans;
 use Database\Factories\MemberFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 
 class Member extends Authenticatable implements FilamentUser
 {
@@ -84,9 +87,29 @@ class Member extends Authenticatable implements FilamentUser
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function loans(): HasMany
+    public function regularLoans(): HasMany
     {
-        return $this->hasMany(Loan::class, 'user_id');
+        return $this->hasMany(RegularLoan::class);
+    }
+
+    public function quickLoans(): HasMany
+    {
+        return $this->hasMany(QuickLoan::class);
+    }
+
+    public function characterLoans(): HasMany
+    {
+        return $this->hasMany(CharacterLoan::class);
+    }
+
+    /**
+     * All loan applications across regular, quick, and character tables.
+     *
+     * @return Collection<int, MemberLoan>
+     */
+    public function loans(): Collection
+    {
+        return MemberLoans::forMember($this);
     }
 
     public function posSales(): HasMany

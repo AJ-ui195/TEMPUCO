@@ -3,16 +3,15 @@
 namespace App\Filament\User\Pages;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
 use App\Models\Member;
-use App\Support\LoanTypes;
+use App\Models\RegularLoan;
+use App\Support\RegularLoanPaymentAllocation;
 use App\Support\RegularLoanSchedule;
 use BackedEnum;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 
 class RegularLoanLedger extends Page
@@ -40,6 +39,7 @@ class RegularLoanLedger extends Page
         $user = auth()->user();
         $loan = $this->latestRegularLoan($user);
         $schedule = $loan ? RegularLoanSchedule::fromLoan($loan) : null;
+        $paidCash = $loan ? RegularLoanPaymentAllocation::cashPaid($loan) : 0.0;
 
         return $schema
             ->components([
@@ -50,18 +50,20 @@ class RegularLoanLedger extends Page
                             'schedule' => $schedule ?? RegularLoanSchedule::blank(),
                             'blankAmounts' => $schedule === null,
                             'borrowerName' => $user->name,
+                            'loan' => $loan,
+                            'paidCash' => $paidCash,
                         ])->render()
                     ))
                     ->columnSpanFull(),
             ]);
     }
 
-    protected function latestRegularLoan(Member $user): ?Loan
+    protected function latestRegularLoan(Member $user): ?RegularLoan
     {
-        return Loan::query()
+        return RegularLoan::query()
             ->forUser($user)
-            ->whereNotIn('loan_type', LoanTypes::nonRegular())
             ->where('status', LoanStatus::Approved)
+            ->with('payments')
             ->orderedByLoanDate()
             ->orderByDesc('id')
             ->first();

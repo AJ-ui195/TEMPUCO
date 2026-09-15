@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTypedLoan;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LoanCertification extends Model
 {
+    use BelongsToTypedLoan;
+
     protected $fillable = [
-        'loan_id',
+        'character_loan_id',
+        'quick_loan_id',
+        'regular_loan_id',
         'borrower_name',
         'fixed_savings_deposits',
         'standing_loan',
@@ -28,10 +32,5 @@ class LoanCertification extends Model
             'date_of_birth' => 'date',
             'treasurer_signed_at' => 'date',
         ];
-    }
-
-    public function loan(): BelongsTo
-    {
-        return $this->belongsTo(Loan::class);
     }
 }

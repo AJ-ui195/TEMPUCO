@@ -4,7 +4,6 @@ namespace App\Providers\Filament;
 
 use App\Filament\Auth\Pages\ChangePassword;
 use App\Filament\Auth\Pages\Login;
-use App\Filament\User\Widgets\UserLoansTableWidget;
 use App\Http\Middleware\EnsurePasswordChanged;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
@@ -48,9 +47,7 @@ class UserPanelProvider extends PanelProvider
             ->pages([
                 ChangePassword::class,
             ])
-            ->widgets([
-                UserLoansTableWidget::class,
-            ])
+            ->widgets([])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

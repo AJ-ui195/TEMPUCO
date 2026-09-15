@@ -2,7 +2,7 @@
 
 namespace App\Notifications;
 
-use App\Models\Loan;
+use App\Models\Contracts\MemberLoan;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -12,7 +12,7 @@ class VerifyLoanApplication extends Notification
     use Queueable;
 
     public function __construct(
-        public Loan $loan,
+        public MemberLoan $loan,
         public string $verificationUrl,
     ) {}
 

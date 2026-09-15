@@ -3,20 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
 use App\Support\LoanApplicationService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class VerifyLoanApplicationController extends Controller
 {
-    public function __invoke(Request $request, Loan $loan, LoanApplicationService $applications)
+    public function __invoke(Request $request, string $type, int $loan, LoanApplicationService $applications)
     {
+        $record = $applications->resolve($type, $loan);
+
         try {
-            $already = $loan->status === LoanStatus::Pending && $loan->email_verified_at !== null;
+            $already = $record->status === LoanStatus::Pending && $record->email_verified_at !== null;
 
             $verified = $applications->confirmFromEmail(
-                $loan,
+                $record,
                 (string) $request->query('token', ''),
             );
         } catch (ValidationException $exception) {
@@ -26,7 +27,7 @@ class VerifyLoanApplicationController extends Controller
                 'title' => __('Confirmation failed'),
                 'message' => collect($exception->errors())->flatten()->first()
                     ?? __('This confirmation link is invalid or has expired.'),
-                'loan' => $loan,
+                'loan' => $record,
             ], 403);
         }
 

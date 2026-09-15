@@ -3,7 +3,7 @@
 namespace App\Policies;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
+use App\Models\Contracts\MemberLoan;
 use App\Models\Member;
 use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -15,13 +15,13 @@ class LoanPolicy
         return $actor instanceof User && $actor->isAdmin();
     }
 
-    public function view(Authenticatable $actor, Loan $loan): bool
+    public function view(Authenticatable $actor, MemberLoan $loan): bool
     {
         if ($actor instanceof User && $actor->isAdmin()) {
             return true;
         }
 
-        return $actor instanceof Member && (int) $actor->id === (int) $loan->user_id;
+        return $actor instanceof Member && (int) $actor->id === (int) $loan->member_id;
     }
 
     public function create(Authenticatable $actor): bool
@@ -29,12 +29,12 @@ class LoanPolicy
         return $actor instanceof Member && $actor->isActive();
     }
 
-    public function update(Authenticatable $actor, Loan $loan): bool
+    public function update(Authenticatable $actor, MemberLoan $loan): bool
     {
         return $actor instanceof User && $actor->isAdmin();
     }
 
-    public function delete(Authenticatable $actor, Loan $loan): bool
+    public function delete(Authenticatable $actor, MemberLoan $loan): bool
     {
         return $actor instanceof User
             && $actor->isAdmin()
@@ -49,19 +49,19 @@ class LoanPolicy
         return false;
     }
 
-    public function approve(Authenticatable $actor, Loan $loan): bool
+    public function approve(Authenticatable $actor, MemberLoan $loan): bool
     {
         return $actor instanceof User
             && $actor->isAdmin()
             && $loan->status === LoanStatus::Pending;
     }
 
-    public function reject(Authenticatable $actor, Loan $loan): bool
+    public function reject(Authenticatable $actor, MemberLoan $loan): bool
     {
         return $this->approve($actor, $loan);
     }
 
-    public function recordPayment(Authenticatable $actor, Loan $loan): bool
+    public function recordPayment(Authenticatable $actor, MemberLoan $loan): bool
     {
         return $actor instanceof User
             && $actor->isAdmin()

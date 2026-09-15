@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Member;
 use App\Models\PosCreditPayment;
 use App\Models\User;
 
@@ -28,7 +29,7 @@ final class PrintCreditPaymentReceipt
     {
         $payment->loadMissing(['member', 'cashier']);
 
-        $balanceAfter = $payment->member instanceof User
+        $balanceAfter = $payment->member instanceof Member
             ? (new MemberPosCredit($payment->member))->outstandingAfter($payment)
             : 0.0;
 

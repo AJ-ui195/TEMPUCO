@@ -4,12 +4,14 @@ namespace App\Providers;
 
 use App\Auth\Http\Responses\FilamentLoginResponse;
 use App\Models\AuditLog;
-use App\Models\Loan;
+use App\Models\CharacterLoan;
 use App\Models\LoanPayment;
 use App\Models\Member;
 use App\Models\PosBranchInventory;
 use App\Models\PosCanteenInventoryItem;
 use App\Models\PosInventoryItem;
+use App\Models\QuickLoan;
+use App\Models\RegularLoan;
 use App\Models\User;
 use App\Observers\PosBranchInventoryObserver;
 use App\Observers\PosCanteenInventoryItemObserver;
@@ -38,7 +40,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::policy(Loan::class, LoanPolicy::class);
+        Gate::policy(RegularLoan::class, LoanPolicy::class);
+        Gate::policy(QuickLoan::class, LoanPolicy::class);
+        Gate::policy(CharacterLoan::class, LoanPolicy::class);
         Gate::policy(Member::class, MemberPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(LoanPayment::class, LoanPaymentPolicy::class);

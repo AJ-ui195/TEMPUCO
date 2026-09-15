@@ -2,7 +2,8 @@
 
 namespace App\Support;
 
-use App\Models\Loan;
+use App\Enums\LoanStatus;
+use App\Models\RegularLoan;
 
 /**
  * Declining-balance APDS schedule for a regular loan. All figures are derived
@@ -46,7 +47,7 @@ final class RegularLoanSchedule
         public float $totalInterest,
     ) {}
 
-    public static function fromLoan(Loan $loan): self
+    public static function fromLoan(RegularLoan $loan): self
     {
         $principal = round((float) $loan->loan_amount, 2);
         $termMonths = max(1, (int) $loan->loan_period_months);
@@ -54,10 +55,10 @@ final class RegularLoanSchedule
         $isSecond = false;
 
         if ($user) {
-            $orderedIds = Loan::query()
+            $orderedIds = RegularLoan::query()
                 ->forUser($user)
-                ->where('status', \App\Enums\LoanStatus::Approved)
-                ->whereNotIn('loan_type', LoanTypes::nonRegular())
+                ->where('status', LoanStatus::Approved)
+                ->whereNotIn('loan_type', LoanTypes::excludedFromApdsAccounts())
                 ->orderBy('loan_date')
                 ->orderBy('id')
                 ->pluck('id');
@@ -73,6 +74,14 @@ final class RegularLoanSchedule
             }
         }
 
+        if (LoanTypes::isCollateralized((string) $loan->loan_type)) {
+            return self::calculateCollateralized(
+                $principal,
+                $termMonths,
+                (bool) $user?->isRetiree(),
+            );
+        }
+
         return self::calculate($principal, $termMonths, $isSecond);
     }
 
@@ -80,7 +89,7 @@ final class RegularLoanSchedule
     public static function blank(): self
     {
         $annualRate = self::annualInterestRateForTerm(12);
-        $monthlyRate = $annualRate / 12;
+        $monthlyRate = round($annualRate / 12, 8);
         $chargeRate = ApdsRules::SERVICE_CHARGE_FIRST_1_TO_5_YEARS;
 
         return new self(
@@ -131,17 +140,46 @@ final class RegularLoanSchedule
         };
     }
 
-    public static function calculate(float $principal, int $termMonths, bool $isSecondApdsAccount = false): self
+    public static function calculateCollateralized(float $principal, int $termMonths, bool $isRetiree): self
     {
+        $monthlyRate = $isRetiree
+            ? CollateralizedLoanRules::MONTHLY_RATE_RETIREE
+            : CollateralizedLoanRules::MONTHLY_RATE_REGULAR_MEMBER;
+
+        return self::calculate(
+            $principal,
+            $termMonths,
+            isSecondApdsAccount: false,
+            monthlyInterestRate: $monthlyRate,
+            applyApdsFees: false,
+        );
+    }
+
+    public static function calculate(
+        float $principal,
+        int $termMonths,
+        bool $isSecondApdsAccount = false,
+        ?float $monthlyInterestRate = null,
+        bool $applyApdsFees = true,
+    ): self {
         $principal = round($principal, 2);
         $termMonths = max(1, $termMonths);
-        $annualRate = self::annualInterestRateForTerm($termMonths);
-        $monthlyRate = $annualRate / 12;
+        $annualRate = $monthlyInterestRate !== null
+            ? $monthlyInterestRate * 12
+            : self::annualInterestRateForTerm($termMonths);
+        $monthlyRate = round($monthlyInterestRate ?? ($annualRate / 12), 8);
 
-        $otherChargesRate = ApdsRules::serviceChargeRate($isSecondApdsAccount, $termMonths);
-        $otherChargeLines = ApdsRules::otherChargeLines($otherChargesRate);
-        $otherCharges = round($principal * $otherChargesRate, 2);
-        $capitalRetention = ApdsRules::capitalBuildUpRetention($isSecondApdsAccount);
+        $otherChargesRate = $applyApdsFees
+            ? ApdsRules::serviceChargeRate($isSecondApdsAccount, $termMonths)
+            : 0.0;
+        $otherChargeLines = $applyApdsFees
+            ? ApdsRules::otherChargeLines($otherChargesRate)
+            : [];
+        $otherCharges = $applyApdsFees ? round($principal * $otherChargesRate, 2) : 0.0;
+        $capitalRetention = $applyApdsFees
+            ? ApdsRules::capitalBuildUpRetention($isSecondApdsAccount)
+            : 0.0;
+        $capitalRetention = round(min($capitalRetention, max(0.0, $principal - $otherCharges)), 2);
         $netProceeds = round($principal - $otherCharges - $capitalRetention, 2);
         $installment = self::monthlyInstallment($principal, $monthlyRate, $termMonths);
 
@@ -243,8 +281,11 @@ final class RegularLoanSchedule
         }
 
         $factor = pow(1 + $monthlyRate, $periods);
+        $raw = $principal * $monthlyRate * $factor / ($factor - 1);
 
-        return round($principal * $monthlyRate * $factor / ($factor - 1), 2);
+        // APDS worksheets round the installment to thousandths, then to centavos
+        // (₱300,000 × 7.50% × 60 mo → ₱6,011.39).
+        return round(round($raw, 3), 2);
     }
 
     /**

@@ -8,8 +8,9 @@ use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
 use App\Enums\UserRole;
 use App\Filament\User\Pages\ApplyLoan;
-use App\Models\Loan;
+use App\Models\CharacterLoan;
 use App\Models\Member;
+use App\Models\RegularLoan;
 use App\Models\User;
 use App\Notifications\VerifyLoanApplication;
 use App\Support\LoanApplicationService;
@@ -30,21 +31,21 @@ class LoanSecurityTest extends TestCase
         $this->get('/portal/apply-loan')->assertRedirect();
     }
 
-    public function test_cashier_cannot_open_admin_loan_applications(): void
+    public function test_cashier_cannot_open_admin_regular_loans(): void
     {
         $cashier = User::factory()->create(['role' => UserRole::Cashier]);
 
         $this->actingAs($cashier)
-            ->get('/admin/loan-applications')
+            ->get('/admin/regular-loans')
             ->assertForbidden();
     }
 
-    public function test_member_cannot_open_admin_loan_applications(): void
+    public function test_member_cannot_open_admin_regular_loans(): void
     {
         $member = Member::factory()->create();
 
         $this->actingAs($member, 'member')
-            ->get('/admin/loan-applications')
+            ->get('/admin/regular-loans')
             ->assertRedirect();
     }
 
@@ -57,7 +58,8 @@ class LoanSecurityTest extends TestCase
         $this->actingAs($member, 'member');
 
         $this->assertFalse(ApplyLoan::canAccess());
-        $this->assertFalse($member->can('create', Loan::class));
+        $this->assertFalse($member->can('create', RegularLoan::class));
+        $this->assertFalse($member->can('create', CharacterLoan::class));
     }
 
     public function test_member_cannot_spoof_owner_or_approved_status(): void
@@ -68,12 +70,13 @@ class LoanSecurityTest extends TestCase
         $other = Member::factory()->create();
 
         $loan = app(LoanApplicationService::class)->submit($member, $this->characterLoanPayload([
-            'user_id' => $other->id,
+            'member_id' => $other->id,
             'status' => LoanStatus::Approved->value,
             'approved_at' => now()->toDateTimeString(),
         ]));
 
-        $this->assertSame($member->id, $loan->user_id);
+        $this->assertInstanceOf(CharacterLoan::class, $loan);
+        $this->assertSame($member->id, $loan->member_id);
         $this->assertSame(LoanStatus::AwaitingVerification, $loan->status);
         $this->assertNull($loan->approved_at);
         $this->assertNull($loan->email_verified_at);
@@ -85,9 +88,9 @@ class LoanSecurityTest extends TestCase
 
     public function test_mass_assignment_cannot_set_status_or_owner(): void
     {
-        $loan = new Loan;
+        $loan = new RegularLoan;
         $loan->fill([
-            'user_id' => 999,
+            'member_id' => 999,
             'status' => LoanStatus::Approved->value,
             'approved_at' => now(),
             'loan_type' => 'Personal loan',
@@ -97,7 +100,7 @@ class LoanSecurityTest extends TestCase
             'loan_date' => now()->toDateString(),
         ]);
 
-        $this->assertNull($loan->user_id);
+        $this->assertNull($loan->member_id);
         $this->assertNull($loan->status);
         $this->assertNull($loan->approved_at);
     }
@@ -138,7 +141,7 @@ class LoanSecurityTest extends TestCase
     public function test_cashier_cannot_approve_a_loan(): void
     {
         $cashier = User::factory()->create(['role' => UserRole::Cashier]);
-        $loan = Loan::factory()->pending()->create();
+        $loan = RegularLoan::factory()->pending()->create();
 
         $this->expectException(AuthorizationException::class);
 
@@ -179,6 +182,7 @@ class LoanSecurityTest extends TestCase
         );
 
         $this->assertIsString($url);
+        $this->assertStringContainsString('/loans/character/', $url);
         $this->get($url)->assertOk()->assertSee('Application confirmed', false);
 
         $loan->refresh();
@@ -192,16 +196,19 @@ class LoanSecurityTest extends TestCase
 
     public function test_unsigned_confirmation_link_is_rejected(): void
     {
-        $loan = Loan::factory()->awaitingVerification()->create();
+        $loan = RegularLoan::factory()->awaitingVerification()->create();
 
-        $this->get(route('loans.verify-email', ['loan' => $loan, 'token' => 'test-token']))
-            ->assertForbidden();
+        $this->get(route('loans.verify-email', [
+            'type' => 'regular',
+            'loan' => $loan,
+            'token' => 'test-token',
+        ]))->assertForbidden();
     }
 
     public function test_admin_can_approve_pending_loan_and_writes_audit(): void
     {
         $admin = User::factory()->create(['role' => UserRole::Admin]);
-        $loan = Loan::factory()->pending()->create();
+        $loan = RegularLoan::factory()->pending()->create();
 
         $result = app(LoanDecisionService::class)->approve($admin, $loan, 'password', 'Committee approved');
 
@@ -218,7 +225,7 @@ class LoanSecurityTest extends TestCase
     public function test_admin_cannot_approve_an_already_decided_loan(): void
     {
         $admin = User::factory()->create(['role' => UserRole::Admin]);
-        $loan = Loan::factory()->approved()->create();
+        $loan = RegularLoan::factory()->approved()->create();
 
         $this->expectException(AuthorizationException::class);
 
@@ -228,7 +235,7 @@ class LoanSecurityTest extends TestCase
     public function test_admin_reject_requires_notes_and_locks_status(): void
     {
         $admin = User::factory()->create(['role' => UserRole::Admin]);
-        $loan = Loan::factory()->pending()->create();
+        $loan = RegularLoan::factory()->pending()->create();
 
         $result = app(LoanDecisionService::class)->reject($admin, $loan, 'password', 'Incomplete documents');
 
@@ -259,6 +266,8 @@ class LoanSecurityTest extends TestCase
             'purpose_of_loan' => LoanPurpose::Personal->value,
             'mode_of_payment' => ModeOfPayment::CashPayment->value,
             'loan_category' => LoanCategory::AdditionalNew->value,
+            'character_loan_type' => LoanTypes::CHARACTER,
+            'character_variant' => 'character_emergency',
             'loan_type' => LoanTypes::CHARACTER,
         ], $overrides);
     }

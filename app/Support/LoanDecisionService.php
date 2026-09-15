@@ -3,7 +3,7 @@
 namespace App\Support;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
+use App\Models\Contracts\MemberLoan;
 use App\Models\LoanPayment;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 final class LoanDecisionService
 {
-    public function approve(User $admin, Loan $loan, string $password, ?string $notes = null): Loan
+    public function approve(User $admin, MemberLoan $loan, string $password, ?string $notes = null): MemberLoan
     {
         Gate::forUser($admin)->authorize('approve', $loan);
         $this->assertCurrentPassword($admin, $password);
@@ -33,7 +33,7 @@ final class LoanDecisionService
         return $loan->refresh();
     }
 
-    public function reject(User $admin, Loan $loan, string $password, string $notes): Loan
+    public function reject(User $admin, MemberLoan $loan, string $password, string $notes): MemberLoan
     {
         Gate::forUser($admin)->authorize('reject', $loan);
         $this->assertCurrentPassword($admin, $password);
@@ -63,7 +63,7 @@ final class LoanDecisionService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function recordPayment(User $admin, Loan $loan, array $data): LoanPayment
+    public function recordPayment(User $admin, MemberLoan $loan, array $data): LoanPayment
     {
         Gate::forUser($admin)->authorize('recordPayment', $loan);
 
@@ -92,7 +92,7 @@ final class LoanDecisionService
         }
     }
 
-    private function assertPending(Loan $loan): void
+    private function assertPending(MemberLoan $loan): void
     {
         if ($loan->status !== LoanStatus::Pending) {
             throw ValidationException::withMessages([
