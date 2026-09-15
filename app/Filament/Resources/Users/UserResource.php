@@ -31,20 +31,15 @@ class UserResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?string $modelLabel = 'user';
+    protected static ?string $modelLabel = 'staff';
 
-    protected static ?string $pluralModelLabel = 'users';
+    protected static ?string $pluralModelLabel = 'staff';
 
-    protected static ?string $navigationLabel = 'Users';
+    protected static ?string $navigationLabel = 'Staff';
 
     protected static ?int $navigationSort = 11;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
 
     public static function form(Schema $schema): Schema
     {
@@ -134,6 +129,11 @@ class UserResource extends Resource
                     ->label(__('Active'))
                     ->boolean()
                     ->sortable(),
+                TextColumn::make('created_at')
+                    ->label(__('Created'))
+                    ->dateTime('M j, Y g:i A')
+                    ->sortable()
+                    ->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('role')
@@ -147,7 +147,7 @@ class UserResource extends Resource
                     ])
                     ->native(false),
             ])
-            ->defaultSort('name')
+            ->defaultSort('created_at', 'desc')
             ->deferLoading()
             ->recordActions([
                 EditAction::make()

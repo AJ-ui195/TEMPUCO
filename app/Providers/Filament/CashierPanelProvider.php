@@ -2,10 +2,12 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Pages\ChangePassword;
 use App\Filament\Auth\Pages\Login;
 use App\Filament\CollectionCashier\Pages\CollectionPayment;
 use App\Filament\CollectionCashier\Pages\Dashboard;
 use App\Filament\CollectionCashier\Pages\RegularLoanRemittance;
+use App\Http\Middleware\EnsurePasswordChanged;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -14,7 +16,6 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -46,6 +47,7 @@ class CashierPanelProvider extends PanelProvider
                 Dashboard::class,
                 CollectionPayment::class,
                 RegularLoanRemittance::class,
+                ChangePassword::class,
             ])
             ->widgets([])
             ->middleware([
@@ -61,15 +63,9 @@ class CashierPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsurePasswordChanged::class,
             ]);
 
-        return $this->registerPortalUi($panel)
-            ->renderHook(
-                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
-                fn (): string => view('filament.hooks.login-panel-switch', [
-                    'url' => url('/admin/login'),
-                    'message' => __('Click here to login to Admin'),
-                ])->render(),
-            );
+        return $this->registerPortalUi($panel);
     }
 }

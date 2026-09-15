@@ -17,8 +17,8 @@ return [
         'description' => 'DICNHS TEMPUCO — sign in to view loans, credits, and account details.',
         // start_url carries a `source=pwa` flag so analytics can split
         // installs vs regular web hits without affecting routing.
-        'start_url' => '/portal/login?source=pwa',
-        'scope' => '/portal/',
+        'start_url' => '/login?source=pwa',
+        'scope' => '/',
         'id' => '/portal/',
         'display' => 'standalone',
         'orientation' => 'portrait-primary',

@@ -41,8 +41,8 @@ class AccountSecurity extends Page
     {
         return $schema
             ->components([
-                Section::make(__('Authenticator app'))
-                    ->description(__('Required for admin sign-in. Scan the QR code with an authenticator app and store your recovery codes.'))
+                Section::make(__('Email sign-in code'))
+                    ->description(__('A 6-digit code is sent to your email when you sign in. After you enter it, this device will not ask again for 1 day.'))
                     ->schema(
                         collect(Filament::getMultiFactorAuthenticationProviders())
                             ->map(fn (MultiFactorAuthenticationProvider $provider): Group => Group::make($provider->getManagementSchemaComponents())

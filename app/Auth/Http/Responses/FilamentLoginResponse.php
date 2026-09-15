@@ -2,9 +2,8 @@
 
 namespace App\Auth\Http\Responses;
 
-use App\Filament\Auth\Pages\ChangePassword;
+use App\Support\RoleDashboard;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as Responsable;
-use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Illuminate\Http\RedirectResponse;
 use Livewire\Features\SupportRedirects\Redirector;
@@ -13,29 +12,29 @@ class FilamentLoginResponse implements Responsable
 {
     public function toResponse($request): RedirectResponse|Redirector
     {
-        $user = Filament::auth()->user();
+        $user = RoleDashboard::currentUser();
 
         if (is_object($user) && ($user->must_change_password ?? false)) {
-            return redirect()->to(ChangePassword::getUrl());
+            $changePasswordUrl = RoleDashboard::changePasswordUrl($user);
+
+            if (filled($changePasswordUrl)) {
+                return redirect()->to($changePasswordUrl);
+            }
         }
 
-        if (! $user instanceof FilamentUser) {
-            return redirect()->intended(Filament::getUrl());
+        $homeUrl = RoleDashboard::url($user);
+
+        if (! $user instanceof FilamentUser || blank($homeUrl)) {
+            return redirect()->to(RoleDashboard::loginUrl());
         }
 
         $intended = session()->pull('url.intended');
-        $homeUrl = $this->resolveHomeUrl($user);
 
         if (is_string($intended) && $this->intendedBelongsToPanel($intended, $homeUrl)) {
             return redirect()->to($intended);
         }
 
         return redirect()->to($homeUrl);
-    }
-
-    protected function resolveHomeUrl(FilamentUser $user): string
-    {
-        return Filament::getUrl();
     }
 
     protected function intendedBelongsToPanel(string $intended, string $homeUrl): bool

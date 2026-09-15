@@ -10,7 +10,7 @@ use App\Http\Controllers\VerifyLoanApplicationController;
 use App\Http\Controllers\VerifyMemberAccountController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/portal/login');
+Route::redirect('/', '/login');
 
 Route::get('/loans/{type}/{loan}/verify-email', VerifyLoanApplicationController::class)
     ->middleware('signed')

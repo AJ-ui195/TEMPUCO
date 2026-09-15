@@ -5,10 +5,8 @@ namespace App\Models;
 use App\Concerns\HasAccountStatus;
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
-use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
-use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
-use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
-use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
+use Filament\Auth\MultiFactor\Email\Concerns\InteractsWithEmailAuthentication;
+use Filament\Auth\MultiFactor\Email\Contracts\HasEmailAuthentication;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,14 +15,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
+class User extends Authenticatable implements FilamentUser, HasEmailAuthentication
 {
     /** @use HasFactory<UserFactory> */
     use HasAccountStatus;
 
     use HasFactory;
-    use InteractsWithAppAuthentication;
-    use InteractsWithAppAuthenticationRecovery;
+    use InteractsWithEmailAuthentication;
     use Notifiable;
 
     protected $fillable = [
@@ -53,7 +50,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'role' => UserRole::class,
             'is_active' => 'boolean',
             'must_change_password' => 'boolean',
+            'has_email_authentication' => 'boolean',
+            'email_mfa_verified_until' => 'datetime',
         ];
+    }
+
+    public function hasEmailAuthentication(): bool
+    {
+        return $this->isAdmin() || (bool) $this->has_email_authentication;
     }
 
     public function isAdmin(): bool
@@ -88,8 +92,9 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         }
 
         return match ($panel->getId()) {
+            'auth' => $this->role !== UserRole::User,
             'admin' => $this->role === UserRole::Admin,
-            'pos' => $this->role === UserRole::Cashier,
+            'pos' => in_array($this->role, [UserRole::Cashier, UserRole::Inventory], true),
             'pos-canteen' => $this->role === UserRole::CanteenCashier,
             'cashier' => $this->role === UserRole::CollectionCashier,
             default => false,

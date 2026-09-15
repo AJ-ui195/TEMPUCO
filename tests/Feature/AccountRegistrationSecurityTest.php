@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Auth\Http\Responses\FilamentLoginResponse;
 use App\Enums\UserRole;
+use App\Filament\Resources\Users\UserResource;
 use App\Models\Member;
 use App\Models\User;
 use App\Notifications\VerifyMemberAccount;
@@ -10,6 +12,7 @@ use App\Support\MemberAccount;
 use App\Support\StaffAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -154,6 +157,11 @@ class AccountRegistrationSecurityTest extends TestCase
             'action' => 'staff.created',
             'subject_id' => $staff->id,
         ]);
+        $this->assertFalse(Member::query()->where('email', $staff->email)->exists());
+        $this->assertTrue(UserResource::shouldRegisterNavigation());
+        $this->assertTrue(
+            UserResource::getEloquentQuery()->whereKey($staff->id)->exists()
+        );
     }
 
     public function test_inactive_member_cannot_access_portal(): void
@@ -170,6 +178,26 @@ class AccountRegistrationSecurityTest extends TestCase
         $panel = filament()->getPanel('admin');
 
         $this->assertFalse($cashier->canAccessPanel($panel));
+    }
+
+    public function test_collection_cashier_login_redirects_to_change_password(): void
+    {
+        $this->assertTrue(Route::has('filament.cashier.pages.change-password'));
+
+        $cashier = User::factory()->create([
+            'role' => UserRole::CollectionCashier,
+            'must_change_password' => true,
+        ]);
+
+        $this->actingAs($cashier);
+        filament()->setCurrentPanel(filament()->getPanel('cashier'));
+
+        $response = app(FilamentLoginResponse::class)->toResponse(request());
+
+        $this->assertTrue($response->isRedirect());
+        $this->assertStringContainsString('/cashier/change-password', $response->getTargetUrl());
+
+        $this->get('/cashier/change-password')->assertOk();
     }
 
     /**

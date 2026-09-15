@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Members\Pages;
 use App\Enums\UserRole;
 use App\Filament\Resources\Members\MemberResource;
 use App\Filament\Resources\Members\Schemas\MemberForm;
+use App\Filament\Resources\Users\UserResource;
 use App\Models\Member;
 use App\Models\User;
 use App\Support\MemberAccount;
@@ -74,7 +75,8 @@ class ManageMembers extends ManageRecords
             ->model(User::class)
             ->modelLabel(__('admin'))
             ->createAnother(false)
-            ->successNotificationTitle(__('Admin user created'))
+            ->successNotificationTitle(__('Staff account created'))
+            ->successRedirectUrl(fn (): string => UserResource::getUrl())
             ->schema([
                 TextInput::make('name')
                     ->label(__('Full name'))

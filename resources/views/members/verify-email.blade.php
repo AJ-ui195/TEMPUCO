@@ -21,7 +21,7 @@
             <h1 class="{{ $ok ? 'ok' : 'err' }}">{{ $title }}</h1>
             <p>{{ $message }}</p>
             @if ($ok)
-                <p><a href="{{ url('/portal/login') }}">{{ __('Open the Members Portal') }}</a></p>
+                <p><a href="{{ url('/login') }}">{{ __('Open the Members Portal') }}</a></p>
             @endif
         </div>
     </div>

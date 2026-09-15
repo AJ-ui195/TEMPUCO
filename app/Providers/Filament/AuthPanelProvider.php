@@ -2,11 +2,10 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Auth\Pages\ChangePassword;
 use App\Filament\Auth\Pages\Login;
-use App\Filament\Pages\Dashboard;
-use App\Http\Middleware\EnsurePasswordChanged;
+use App\Filament\Auth\Pages\RedirectHome;
 use App\Support\AdminEmailMfa;
+use App\Support\RoleDashboard;
 use Filament\Auth\MultiFactor\Pages\SetUpRequiredMultiFactorAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -23,16 +22,16 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
-class AdminPanelProvider extends PanelProvider
+class AuthPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->default()
-            ->id('admin')
-            ->path('admin')
+            ->id('auth')
+            ->path('')
             ->spa()
             ->login(Login::class)
+            ->homeUrl(fn (): string => RoleDashboard::url() ?? url('/login'))
             ->brandName('DICNHS TEMPUCO')
             ->brandLogo(asset('images/DICNHSLOGO1.png'))
             ->brandLogoHeight('6.5rem')
@@ -40,19 +39,14 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::Amber,
             ])
             ->globalSearch(false)
-            ->databaseNotifications()
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
-            ->pages([
-                Dashboard::class,
-                ChangePassword::class,
-            ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->userMenu(false)
+            ->pages([
+                RedirectHome::class,
+            ])
             ->multiFactorAuthentication(
                 [AdminEmailMfa::provider()],
                 SetUpRequiredMultiFactorAuthentication::class,
-                true,
+                false,
             )
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
@@ -99,7 +93,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-                EnsurePasswordChanged::class,
             ]);
     }
 }

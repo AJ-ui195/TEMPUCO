@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Auth\Http\Responses\FilamentLoginResponse;
+use App\Auth\Http\Responses\FilamentLogoutResponse;
 use App\Models\AuditLog;
 use App\Models\CharacterLoan;
 use App\Models\LoanPayment;
@@ -22,6 +23,7 @@ use App\Policies\LoanPolicy;
 use App\Policies\MemberPolicy;
 use App\Policies\UserPolicy;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
+use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -33,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(LoginResponse::class, FilamentLoginResponse::class);
+        $this->app->singleton(LogoutResponse::class, FilamentLogoutResponse::class);
     }
 
     /**
