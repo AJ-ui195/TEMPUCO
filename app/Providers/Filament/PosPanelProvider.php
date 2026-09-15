@@ -2,9 +2,11 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Pages\ChangePassword;
 use App\Filament\Auth\Pages\Login;
-use App\Filament\Pos\Pages\BranchInventoryPage;
 use App\Filament\Pos\Pages\BranchesPage;
+use App\Filament\Pos\Pages\BranchInventoryPage;
+use App\Http\Middleware\EnsurePasswordChanged;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -46,6 +48,7 @@ class PosPanelProvider extends PanelProvider
             ->pages([
                 BranchesPage::class,
                 BranchInventoryPage::class,
+                ChangePassword::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -60,6 +63,7 @@ class PosPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsurePasswordChanged::class,
             ]);
 
         return $this->registerPortalUi($panel);

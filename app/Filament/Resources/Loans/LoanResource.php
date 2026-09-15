@@ -11,10 +11,10 @@ use App\Filament\Resources\Loans\Tables\LoansTable;
 use App\Models\Loan;
 use BackedEnum;
 use Filament\Resources\Resource;
-use Illuminate\Database\Eloquent\Builder;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class LoanResource extends Resource
 {
@@ -52,7 +52,12 @@ class LoanResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user', 'certification', 'committeeDecision']);
+            ->with(['user', 'certification', 'committeeDecision', 'decidedBy']);
+    }
+
+    public static function canCreate(): bool
+    {
+        return false;
     }
 
     public static function getRelations(): array

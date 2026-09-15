@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\HasAccountStatus;
 use Database\Factories\MemberFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -15,7 +16,10 @@ use Illuminate\Notifications\Notifiable;
 class Member extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<MemberFactory> */
-    use HasFactory, Notifiable;
+    use HasAccountStatus;
+
+    use HasFactory;
+    use Notifiable;
 
     protected $fillable = [
         'created_by',
@@ -32,11 +36,14 @@ class Member extends Authenticatable implements FilamentUser
         'employer_department',
         'is_retiree',
         'points',
+        'is_active',
+        'must_change_password',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'email_verification_token',
     ];
 
     /**
@@ -50,12 +57,21 @@ class Member extends Authenticatable implements FilamentUser
             'is_retiree' => 'boolean',
             'password' => 'hashed',
             'points' => 'integer',
+            'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
         ];
     }
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $panel->getId() === 'user';
+        return $panel->getId() === 'user'
+            && $this->isActive()
+            && $this->hasVerifiedEmail();
+    }
+
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->email_verified_at !== null;
     }
 
     public function isRetiree(): bool

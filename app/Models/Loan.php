@@ -3,23 +3,27 @@
 namespace App\Models;
 
 use App\Enums\LoanCategory;
-use App\Support\AmountInWords;
 use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
+use App\Support\AmountInWords;
+use Database\Factories\LoanFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Loan extends Model
 {
+    /** @use HasFactory<LoanFactory> */
+    use HasFactory;
+
     private const LOAN_DATE_COLUMN = 'loan_date';
 
     protected $fillable = [
-        'user_id',
-        'status',
         'loan_category',
         'loan_type',
         'loan_amount',
@@ -32,7 +36,11 @@ class Loan extends Model
         'mode_of_payment',
         'applicant_signed_at',
         'loan_date',
-        'approved_at',
+        'decision_notes',
+    ];
+
+    protected $hidden = [
+        'email_verification_token',
     ];
 
     /**
@@ -51,6 +59,8 @@ class Loan extends Model
             'applicant_signed_at' => 'date',
             'loan_date' => 'date',
             'approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
+            'email_verified_at' => 'datetime',
         ];
     }
 
@@ -62,6 +72,11 @@ class Loan extends Model
     public function member(): BelongsTo
     {
         return $this->belongsTo(Member::class, 'user_id');
+    }
+
+    public function decidedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'decided_by');
     }
 
     public function payments(): HasMany
@@ -79,9 +94,19 @@ class Loan extends Model
         return $this->hasOne(LoanCommitteeDecision::class);
     }
 
+    public function auditLogs(): MorphMany
+    {
+        return $this->morphMany(AuditLog::class, 'subject');
+    }
+
     public function amountInWords(): string
     {
         return AmountInWords::format($this->loan_amount);
+    }
+
+    public function isAwaitingEmailConfirmation(): bool
+    {
+        return $this->status === LoanStatus::AwaitingVerification;
     }
 
     public function scopeForUser(Builder $query, Member $user): Builder

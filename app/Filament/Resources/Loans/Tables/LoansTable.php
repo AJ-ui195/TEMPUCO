@@ -3,8 +3,6 @@
 namespace App\Filament\Resources\Loans\Tables;
 
 use App\Enums\LoanStatus;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
@@ -30,6 +28,7 @@ class LoansTable
                     ->color(fn (mixed $state): string => match ($state instanceof LoanStatus ? $state : LoanStatus::tryFrom((string) $state)) {
                         LoanStatus::Approved => 'success',
                         LoanStatus::Rejected => 'danger',
+                        LoanStatus::AwaitingVerification => 'gray',
                         default => 'warning',
                     })
                     ->sortable(),
@@ -68,11 +67,6 @@ class LoansTable
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
             ]);
     }
 }

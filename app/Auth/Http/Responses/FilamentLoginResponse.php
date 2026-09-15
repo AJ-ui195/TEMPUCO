@@ -2,6 +2,7 @@
 
 namespace App\Auth\Http\Responses;
 
+use App\Filament\Auth\Pages\ChangePassword;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as Responsable;
 use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
@@ -13,6 +14,10 @@ class FilamentLoginResponse implements Responsable
     public function toResponse($request): RedirectResponse|Redirector
     {
         $user = Filament::auth()->user();
+
+        if (is_object($user) && ($user->must_change_password ?? false)) {
+            return redirect()->to(ChangePassword::getUrl());
+        }
 
         if (! $user instanceof FilamentUser) {
             return redirect()->intended(Filament::getUrl());

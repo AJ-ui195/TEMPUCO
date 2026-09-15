@@ -9,6 +9,7 @@
     $totalOutstanding = $credit->totalOutstanding();
     $loansCount = $user->loans()->count();
     $pendingLoans = $user->loans()->where('status', LoanStatus::Pending)->count();
+    $awaitingConfirmation = $user->loans()->where('status', LoanStatus::AwaitingVerification)->count();
     $hour = (int) now()->format('G');
     $greeting = match (true) {
         $hour < 12 => __('Good morning'),
@@ -64,7 +65,9 @@
                 </div>
                 <div class="mp-stat-value">{{ $loansCount }}</div>
                 <p class="mp-stat-hint">
-                    @if ($pendingLoans > 0)
+                    @if ($awaitingConfirmation > 0)
+                        {{ trans_choice(':count waiting for email confirmation|:count waiting for email confirmation', $awaitingConfirmation, ['count' => $awaitingConfirmation]) }}
+                    @elseif ($pendingLoans > 0)
                         {{ trans_choice(':count pending review|:count pending reviews', $pendingLoans, ['count' => $pendingLoans]) }}
                     @else
                         {{ __('Total loan records') }}

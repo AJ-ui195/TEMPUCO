@@ -2,15 +2,18 @@
 
 namespace App\Filament\Auth\Pages;
 
+use App\Models\Member;
+use App\Models\User;
+use App\Support\AuditLog;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\MultiFactor\Contracts\HasBeforeChallengeHook;
-use Filament\Auth\MultiFactor\Contracts\MultiFactorAuthenticationProvider;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
@@ -23,7 +26,7 @@ class Login extends BaseLogin
 {
     protected const MAX_ATTEMPTS = 5;
 
-    protected const LOCKOUT_SECONDS = 50;
+    protected const LOCKOUT_SECONDS = 900;
 
     public int $throttleSecondsRemaining = 0;
 
@@ -81,6 +84,22 @@ class Login extends BaseLogin
 
             $this->fireFailedEvent($authGuard, $user, $credentials);
             $this->throwFailureValidationException();
+        }
+
+        if (($user instanceof User || $user instanceof Member) && ! $user->isActive()) {
+            $this->userUndertakingMultiFactorAuthentication = null;
+
+            throw ValidationException::withMessages([
+                'data.email' => __('This account has been disabled.'),
+            ]);
+        }
+
+        if ($user instanceof Member && ! $user->hasVerifiedEmail()) {
+            $this->userUndertakingMultiFactorAuthentication = null;
+
+            throw ValidationException::withMessages([
+                'data.email' => __('Confirm this email address before signing in. Check the inbox for the confirmation link.'),
+            ]);
         }
 
         if (
@@ -149,7 +168,7 @@ class Login extends BaseLogin
         $component = parent::getFormContentComponent();
 
         $component->footer([
-            \Filament\Schemas\Components\Actions::make($this->getFormActions())
+            Actions::make($this->getFormActions())
                 ->alignment($this->getFormActionsAlignment())
                 ->fullWidth($this->hasFullWidthFormActions())
                 ->key('login-form-actions'),
@@ -257,6 +276,11 @@ class Login extends BaseLogin
 
         if (RateLimiter::tooManyAttempts($key, self::MAX_ATTEMPTS)) {
             $this->throttleSecondsRemaining = RateLimiter::availableIn($key);
+
+            AuditLog::record('login.lockout', null, [
+                'panel' => Filament::getCurrentPanel()?->getId(),
+                'email' => strtolower((string) ($this->data['email'] ?? '')),
+            ]);
 
             $this->getRateLimitedNotification(new TooManyRequestsException(
                 static::class,

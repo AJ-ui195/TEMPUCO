@@ -5,7 +5,7 @@ namespace App\Support;
 use App\Enums\LoanStatus;
 use App\Models\Loan;
 use App\Models\Member;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 
 /**
  * APDS policy rules (Sections 2–5) for regular / salary loans.
@@ -71,7 +71,7 @@ final class ApdsRules
         };
     }
 
-    public static function ageAt(?Carbon $dateOfBirth): ?int
+    public static function ageAt(?CarbonInterface $dateOfBirth): ?int
     {
         return $dateOfBirth?->age;
     }
@@ -79,7 +79,7 @@ final class ApdsRules
     /**
      * @return string|null Validation error message, or null if OK / skipped.
      */
-    public static function ageRequirementError(?Carbon $dateOfBirth, int $termMonths): ?string
+    public static function ageRequirementError(?CarbonInterface $dateOfBirth, int $termMonths): ?string
     {
         if ($dateOfBirth === null) {
             return null; // DOB optional — skip Section 3 when blank

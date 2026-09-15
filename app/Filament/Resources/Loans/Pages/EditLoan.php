@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Loans\Pages;
 
-use App\Enums\LoanStatus;
 use App\Filament\Resources\Loans\LoanResource;
 use Filament\Resources\Pages\EditRecord;
 
@@ -24,13 +23,7 @@ class EditLoan extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        if (($data['status'] ?? null) === LoanStatus::Approved->value && blank($data['approved_at'] ?? null)) {
-            $data['approved_at'] = now();
-        }
-
-        if (($data['status'] ?? null) !== LoanStatus::Approved->value) {
-            $data['approved_at'] = null;
-        }
+        unset($data['status'], $data['approved_at'], $data['rejected_at'], $data['user_id'], $data['decided_by']);
 
         return $data;
     }

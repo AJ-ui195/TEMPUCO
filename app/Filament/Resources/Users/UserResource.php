@@ -5,21 +5,23 @@ namespace App\Filament\Resources\Users;
 use App\Enums\UserRole;
 use App\Filament\Resources\Users\Pages\ManageUsers;
 use App\Models\User;
+use App\Support\PasswordRules;
+use App\Support\StaffAccount;
 use BackedEnum;
-use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class UserResource extends Resource
 {
@@ -69,16 +71,22 @@ class UserResource extends Resource
                     ->required()
                     ->default(UserRole::Admin->value)
                     ->native(false),
-                DateTimePicker::make('email_verified_at')
-                    ->label(__('Email verified at'))
-                    ->seconds(false),
+                Toggle::make('is_active')
+                    ->label(__('Active'))
+                    ->default(true),
                 TextInput::make('password')
                     ->password()
                     ->revealable()
                     ->required(fn (string $operation): bool => $operation === 'create')
-                    ->minLength(8)
+                    ->rule(PasswordRules::rule())
+                    ->confirmed()
                     ->dehydrated(fn (?string $state): bool => filled($state))
-                    ->helperText(__('Leave blank when editing to keep the current password.')),
+                    ->helperText(PasswordRules::helperText().' '.__('Leave blank when editing to keep the current password.')),
+                TextInput::make('password_confirmation')
+                    ->password()
+                    ->revealable()
+                    ->required(fn (string $operation): bool => $operation === 'create')
+                    ->dehydrated(false),
             ]);
     }
 
@@ -120,10 +128,9 @@ class UserResource extends Resource
                         };
                     })
                     ->sortable(),
-                TextColumn::make('email_verified_at')
-                    ->label(__('Verified'))
-                    ->dateTime()
-                    ->placeholder('—')
+                IconColumn::make('is_active')
+                    ->label(__('Active'))
+                    ->boolean()
                     ->sortable(),
             ])
             ->filters([
@@ -140,13 +147,12 @@ class UserResource extends Resource
             ->defaultSort('name')
             ->deferLoading()
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->using(function (Model $record, array $data): Model {
+                        /** @var User $record */
+                        return StaffAccount::update($record, $data);
+                    }),
                 DeleteAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
             ]);
     }
 

@@ -13,6 +13,7 @@ class LoanPayment extends Model
         'kind',
         'official_receipt_no',
         'received_at',
+        'received_by',
     ];
 
     /**
@@ -29,5 +30,10 @@ class LoanPayment extends Model
     public function loan(): BelongsTo
     {
         return $this->belongsTo(Loan::class);
+    }
+
+    public function receivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by');
     }
 }

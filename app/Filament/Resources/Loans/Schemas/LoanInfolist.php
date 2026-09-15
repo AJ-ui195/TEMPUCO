@@ -32,6 +32,10 @@ class LoanInfolist
                             ->label(__('Status'))
                             ->badge()
                             ->formatStateUsing(fn (mixed $state): string => $state instanceof LoanStatus ? $state->getLabel() : (string) $state),
+                        TextEntry::make('email_verified_at')
+                            ->label(__('Email confirmed at'))
+                            ->dateTime()
+                            ->placeholder(__('Not confirmed')),
                         TextEntry::make('loan_category')
                             ->label(__('Loan category'))
                             ->formatStateUsing(fn (mixed $state): string => $state instanceof LoanCategory ? $state->getLabel() : '—')
@@ -84,6 +88,17 @@ class LoanInfolist
                             ->label(__('Approved at'))
                             ->dateTime()
                             ->placeholder('—'),
+                        TextEntry::make('rejected_at')
+                            ->label(__('Rejected at'))
+                            ->dateTime()
+                            ->placeholder('—'),
+                        TextEntry::make('decidedBy.name')
+                            ->label(__('Decided by'))
+                            ->placeholder('—'),
+                        TextEntry::make('decision_notes')
+                            ->label(__('Decision notes'))
+                            ->placeholder('—')
+                            ->columnSpanFull(),
                     ])
                     ->columns(2),
 
@@ -141,6 +156,30 @@ class LoanInfolist
                             ->label(__('Total received'))
                             ->state(fn (Loan $record): string => number_format((float) $record->payments()->sum('amount'), 2)),
                     ]),
+
+                Section::make(__('Security activity'))
+                    ->schema([
+                        TextEntry::make('audit_activity')
+                            ->hiddenLabel()
+                            ->state(function (Loan $record): string {
+                                $lines = $record->auditLogs()
+                                    ->latest('created_at')
+                                    ->limit(20)
+                                    ->get()
+                                    ->map(function ($log): string {
+                                        $when = $log->created_at?->format('Y-m-d H:i') ?? '—';
+                                        $actor = $log->actor?->name ?? __('System');
+
+                                        return $when.' — '.$log->action.' — '.$actor;
+                                    });
+
+                                return $lines->isEmpty()
+                                    ? __('No recorded activity yet.')
+                                    : $lines->implode("\n");
+                            })
+                            ->columnSpanFull(),
+                    ])
+                    ->collapsed(),
             ]);
     }
 }

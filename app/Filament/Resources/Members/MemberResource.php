@@ -14,6 +14,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -67,6 +68,18 @@ class MemberResource extends Resource
                     ->label(__('Email'))
                     ->searchable()
                     ->copyable(),
+                TextColumn::make('email_status')
+                    ->label(__('Email status'))
+                    ->badge()
+                    ->getStateUsing(fn (Member $record): string => $record->hasVerifiedEmail()
+                        ? __('Confirmed')
+                        : __('Awaiting confirmation'))
+                    ->color(fn (Member $record): string => $record->hasVerifiedEmail() ? 'success' : 'warning'),
+                TextColumn::make('created_at')
+                    ->label(__('Created'))
+                    ->dateTime('M j, Y g:i A')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('contact_number')
                     ->label(__('Contact number'))
                     ->searchable()
@@ -74,6 +87,10 @@ class MemberResource extends Resource
                     ->toggleable(),
                 IconColumn::make('is_retiree')
                     ->label(__('Retiree'))
+                    ->boolean()
+                    ->sortable(),
+                IconColumn::make('is_active')
+                    ->label(__('Active'))
                     ->boolean()
                     ->sortable(),
                 ImageColumn::make('qr_code')
@@ -85,14 +102,35 @@ class MemberResource extends Resource
                         'alt' => "QR code for {$record->name}",
                     ]),
             ])
-            ->defaultSort('name')
+            ->defaultSort('created_at', 'desc')
             ->deferLoading()
             ->recordActions([
+                Action::make('resendConfirmation')
+                    ->label(__('Resend confirmation'))
+                    ->icon(Heroicon::OutlinedEnvelope)
+                    ->visible(fn (Member $record): bool => ! $record->hasVerifiedEmail())
+                    ->requiresConfirmation()
+                    ->modalHeading(__('Resend confirmation email'))
+                    ->modalDescription(fn (Member $record): string => __('Send a new confirmation link to :email?', [
+                        'email' => $record->email,
+                    ]))
+                    ->action(function (Member $record): void {
+                        MemberAccount::resendConfirmation($record);
+
+                        Notification::make()
+                            ->title(__('Confirmation email sent'))
+                            ->success()
+                            ->send();
+                    }),
                 Action::make('printQrCode')
                     ->label(__('Print QR code'))
                     ->icon(Heroicon::OutlinedPrinter)
                     ->url(fn (Member $record): string => PrintMemberQrCode::printUrl($record))
-                    ->openUrlInNewTab(),
+                    ->openUrlInNewTab()
+                    ->disabled(fn (Member $record): bool => ! $record->hasVerifiedEmail())
+                    ->tooltip(fn (Member $record): ?string => $record->hasVerifiedEmail()
+                        ? null
+                        : __('Available after the member confirms their email.')),
                 EditAction::make()
                     ->mutateRecordDataUsing(fn (array $data): array => MemberForm::withComputedAge($data))
                     ->using(function (Model $record, array $data): Model {

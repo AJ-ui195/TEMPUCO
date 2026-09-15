@@ -4,11 +4,11 @@ namespace App\Filament\User\Pages;
 
 use App\Enums\LoanCategory;
 use App\Enums\LoanPurpose;
-use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
-use App\Models\Loan;
 use App\Models\Member;
 use App\Support\ApdsRules;
+use App\Support\LoanApplicationException;
+use App\Support\LoanApplicationService;
 use App\Support\LoanTypes;
 use App\Support\RegularLoanSchedule;
 use BackedEnum;
@@ -29,7 +29,9 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 
 class ApplyLoan extends Page
 {
@@ -51,6 +53,13 @@ class ApplyLoan extends Page
      * @var array<string, mixed>|null
      */
     public ?array $data = [];
+
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof Member && $user->isActive();
+    }
 
     public function mount(): void
     {
@@ -397,120 +406,40 @@ class ApplyLoan extends Page
 
     public function submit(): void
     {
-        $data = $this->form->getState();
-        $applicationType = $data['loan_application_type'] ?? self::APPLICATION_TYPE_REGULAR;
-        $isQuickLoan = $applicationType === self::APPLICATION_TYPE_QUICK;
-        $isCharacterLoan = $applicationType === self::APPLICATION_TYPE_CHARACTER;
-        $isRegularLoan = $applicationType === self::APPLICATION_TYPE_REGULAR;
-
-        /** @var Member $member */
         $member = auth()->user();
 
-        if ($isRegularLoan) {
-            $dob = filled($data['date_of_birth'] ?? null)
-                ? Carbon::parse($data['date_of_birth'])
-                : $member->date_of_birth;
-
-            $ageError = ApdsRules::ageRequirementError(
-                $dob,
-                (int) ($data['loan_period_months'] ?? 0),
-            );
-
-            if ($ageError !== null) {
-                Notification::make()
-                    ->title(__('APDS age requirement'))
-                    ->body($ageError)
-                    ->danger()
-                    ->send();
-
-                return;
-            }
-
-            $restructureError = ApdsRules::restructureAggregateError(
-                $member,
-                (float) ($data['loan_amount'] ?? 0),
-                ($data['loan_category'] ?? null) === LoanCategory::Restructure->value,
-            );
-
-            if ($restructureError !== null) {
-                Notification::make()
-                    ->title(__('Maximum loanable amount'))
-                    ->body($restructureError)
-                    ->danger()
-                    ->send();
-
-                return;
-            }
+        if (! $member instanceof Member) {
+            abort(403);
         }
 
-        $memberUpdates = array_filter([
-            'name' => $data['applicant_name'] ?? null,
-            'address' => $data['applicant_address'] ?? null,
-        ], fn (mixed $value): bool => filled($value));
+        try {
+            app(LoanApplicationService::class)->submit($member, $this->form->getState());
+        } catch (LoanApplicationException $exception) {
+            Notification::make()
+                ->title($exception->title)
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
 
-        if ($isRegularLoan && filled($data['date_of_birth'] ?? null)) {
-            $memberUpdates['date_of_birth'] = $data['date_of_birth'];
+            return;
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first()
+                ?? $exception->getMessage();
+
+            Notification::make()
+                ->title(__('Application not submitted'))
+                ->body($message)
+                ->danger()
+                ->send();
+
+            throw $exception;
         }
-
-        if ($isQuickLoan) {
-            $memberUpdates = array_merge($memberUpdates, array_filter([
-                'email' => $data['quick_email'] ?? null,
-                'date_of_birth' => $data['quick_date_of_birth'] ?? null,
-                'sex' => $data['quick_sex'] ?? null,
-                'civil_status' => $data['quick_civil_status'] ?? null,
-                'contact_number' => $data['quick_contact_number'] ?? null,
-                'occupation' => $data['quick_occupation'] ?? null,
-                'employer_department' => $data['quick_employer_department'] ?? null,
-            ], fn (mixed $value): bool => filled($value)));
-        }
-
-        if ($memberUpdates !== []) {
-            $member->update($memberUpdates);
-        }
-
-        $loanType = match ($applicationType) {
-            self::APPLICATION_TYPE_QUICK => LoanTypes::QUICK,
-            self::APPLICATION_TYPE_CHARACTER => LoanTypes::CHARACTER,
-            default => (string) ($data['loan_type'] ?? ''),
-        };
-
-        $isSecondApds = $isRegularLoan && ApdsRules::isSecondApdsAccount($member);
-        $installmentAmount = $data['installment_amount'];
-
-        if ($isRegularLoan) {
-            $schedule = RegularLoanSchedule::calculate(
-                (float) $data['loan_amount'],
-                (int) $data['loan_period_months'],
-                $isSecondApds,
-            );
-            $installmentAmount = $schedule->monthlyInstallment;
-        }
-
-        Loan::query()->create([
-            'user_id' => auth()->id(),
-            'status' => LoanStatus::Pending,
-            'loan_category' => ($isQuickLoan || $isCharacterLoan)
-                ? LoanCategory::AdditionalNew
-                : $data['loan_category'],
-            'loan_type' => $loanType,
-            'loan_amount' => $data['loan_amount'],
-            'loan_period_months' => $data['loan_period_months'],
-            'installment_amount' => $installmentAmount,
-            'first_payment_due_date' => $data['first_payment_due_date'] ?? null,
-            'purpose_of_loan' => $isQuickLoan ? null : $data['purpose_of_loan'],
-            'purpose_of_loan_other' => $isQuickLoan ? null : (
-                ($data['purpose_of_loan'] ?? null) === LoanPurpose::Others->value
-                    ? ($data['purpose_of_loan_other'] ?? null)
-                    : null
-            ),
-            'application_notes' => $isQuickLoan ? $this->buildQuickLoanPurpose($data) : null,
-            'mode_of_payment' => $data['mode_of_payment'],
-            'applicant_signed_at' => $data['applicant_signed_at'] ?? now()->toDateString(),
-            'loan_date' => now()->toDateString(),
-        ]);
 
         Notification::make()
-            ->title(__('Loan application submitted'))
+            ->title(__('Confirm the application from your email'))
+            ->body(__('We sent a confirmation link to :email. TEMPUCO can review and approve the loan only after you confirm it.', [
+                'email' => $member->email,
+            ]))
             ->success()
             ->send();
 
@@ -578,47 +507,5 @@ class ApplyLoan extends Page
                 ->maxLength(1000)
                 ->columnSpanFull(),
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function formatLoanPurposeSummary(array $data): string
-    {
-        $purposeLabel = LoanPurpose::tryFrom((string) ($data['purpose_of_loan'] ?? ''))?->getLabel()
-            ?? (string) ($data['purpose_of_loan'] ?? '');
-
-        if (($data['purpose_of_loan'] ?? null) === LoanPurpose::Others->value && filled($data['purpose_of_loan_other'] ?? null)) {
-            return $purposeLabel.': '.($data['purpose_of_loan_other']);
-        }
-
-        return $purposeLabel;
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function buildQuickLoanPurpose(array $data): string
-    {
-        $paymentLabel = ModeOfPayment::tryFrom((string) ($data['mode_of_payment'] ?? ''))?->getLabel()
-            ?? (string) ($data['mode_of_payment'] ?? 'N/A');
-
-        $details = [
-            'Purpose of loan: '.$this->formatLoanPurposeSummary($data),
-            'Mode of payment: '.$paymentLabel,
-            '',
-            'Quick Loan Applicant Details:',
-            'Address: '.($data['applicant_address'] ?? 'N/A'),
-            'Date of birth: '.($data['quick_date_of_birth'] ?? 'N/A'),
-            'Age: '.($data['quick_age'] ?? 'N/A'),
-            'Sex: '.ucfirst((string) ($data['quick_sex'] ?? 'N/A')),
-            'Civil status: '.ucfirst((string) ($data['quick_civil_status'] ?? 'N/A')),
-            'Contact number: '.($data['quick_contact_number'] ?? 'N/A'),
-            'Email: '.($data['quick_email'] ?? 'N/A'),
-            'Occupation / Position: '.($data['quick_occupation'] ?? 'N/A'),
-            'Employer / Department: '.($data['quick_employer_department'] ?? 'N/A'),
-        ];
-
-        return implode(PHP_EOL, $details);
     }
 }

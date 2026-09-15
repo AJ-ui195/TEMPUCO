@@ -9,12 +9,15 @@ use App\Models\Member;
 use App\Models\User;
 use App\Support\MemberAccount;
 use App\Support\MemberQrCode;
+use App\Support\PasswordRules;
 use App\Support\PrintMemberQrCode;
+use App\Support\StaffAccount;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
@@ -47,7 +50,17 @@ class ManageMembers extends ManageRecords
             ->createAnother(false)
             ->schema(MemberForm::components())
             ->using(fn (array $data): Member => MemberAccount::create($data))
+            ->successNotification(
+                Notification::make()
+                    ->success()
+                    ->title(__('Confirmation email sent'))
+                    ->body(__('The member account can be used only after they confirm the address in the Email field.')),
+            )
             ->after(function (Member $record): void {
+                if (! $record->hasVerifiedEmail()) {
+                    return;
+                }
+
                 $this->replaceMountedAction('showAccountQr', [
                     'member' => $record->getKey(),
                 ]);
@@ -84,26 +97,23 @@ class ManageMembers extends ManageRecords
                     ->required()
                     ->default(UserRole::Admin->value)
                     ->native(false),
-                DateTimePicker::make('email_verified_at')
-                    ->label(__('Email verified at'))
-                    ->seconds(false)
-                    ->default(now()),
+                Toggle::make('is_active')
+                    ->label(__('Active'))
+                    ->default(true),
                 TextInput::make('password')
                     ->password()
                     ->revealable()
                     ->required()
-                    ->minLength(8),
+                    ->rule(PasswordRules::rule())
+                    ->confirmed()
+                    ->helperText(PasswordRules::helperText()),
+                TextInput::make('password_confirmation')
+                    ->password()
+                    ->revealable()
+                    ->required()
+                    ->dehydrated(false),
             ])
-            ->using(function (array $data): User {
-                return User::query()->create([
-                    'name' => $data['name'],
-                    'email' => $data['email'],
-                    'role' => $data['role'],
-                    'email_verified_at' => $data['email_verified_at'] ?? now(),
-                    'password' => $data['password'],
-                    'created_by' => MemberAccount::creatorName(),
-                ]);
-            });
+            ->using(fn (array $data): User => StaffAccount::create($data));
     }
 
     public function showAccountQrAction(): Action

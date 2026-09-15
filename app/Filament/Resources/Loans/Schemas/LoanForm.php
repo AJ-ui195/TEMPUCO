@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\Loans\Schemas;
 
 use App\Enums\LoanStatus;
+use App\Models\Loan;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
@@ -19,19 +19,19 @@ class LoanForm
             ->components([
                 Section::make(__('Status'))
                     ->schema([
-                        Select::make('status')
+                        Placeholder::make('status_display')
                             ->label(__('Status'))
-                            ->options([
-                                LoanStatus::Pending->value => LoanStatus::Pending->getLabel(),
-                                LoanStatus::Approved->value => LoanStatus::Approved->getLabel(),
-                                LoanStatus::Rejected->value => LoanStatus::Rejected->getLabel(),
-                            ])
-                            ->required()
-                            ->native(false),
-                        DateTimePicker::make('approved_at')
+                            ->content(fn (?Loan $record): string => $record?->status?->getLabel()
+                                ?? LoanStatus::Pending->getLabel()),
+                        Placeholder::make('approved_at_display')
                             ->label(__('Approved at'))
-                            ->seconds(false)
-                            ->visible(fn (callable $get): bool => $get('status') === LoanStatus::Approved->value),
+                            ->content(fn (?Loan $record): string => $record?->approved_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') ?: '—'),
+                        Placeholder::make('rejected_at_display')
+                            ->label(__('Rejected at'))
+                            ->content(fn (?Loan $record): string => $record?->rejected_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') ?: '—'),
+                        Placeholder::make('decided_by_display')
+                            ->label(__('Decided by'))
+                            ->content(fn (?Loan $record): string => $record?->decidedBy?->name ?: '—'),
                     ])
                     ->columns(2),
 

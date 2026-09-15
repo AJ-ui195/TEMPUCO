@@ -5,9 +5,19 @@ use App\Http\Controllers\PrintCreditPaymentReceiptController;
 use App\Http\Controllers\PrintMemberLedgerController;
 use App\Http\Controllers\PrintMemberLoanController;
 use App\Http\Controllers\PrintPosSaleReceiptController;
+use App\Http\Controllers\VerifyLoanApplicationController;
+use App\Http\Controllers\VerifyMemberAccountController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/portal/login');
+
+Route::get('/loans/{loan}/verify-email', VerifyLoanApplicationController::class)
+    ->middleware('signed')
+    ->name('loans.verify-email');
+
+Route::get('/members/{member}/verify-email', VerifyMemberAccountController::class)
+    ->middleware('signed')
+    ->name('members.verify-email');
 
 Route::get('/portal/service-worker.js', function () {
     return response(
