@@ -4,15 +4,13 @@ namespace App\Filament\User\Pages;
 
 use App\Enums\LoanCategory;
 use App\Enums\LoanPurpose;
-use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
-use App\Models\CharacterLoan;
 use App\Models\Member;
-use App\Models\QuickLoan;
-use App\Models\RegularLoan;
 use App\Support\ApdsRules;
 use App\Support\CharacterLoanRules;
 use App\Support\CollateralizedLoanRules;
+use App\Support\LoanApplicationException;
+use App\Support\LoanApplicationService;
 use App\Support\LoanTypes;
 use App\Support\PesoInput;
 use App\Support\QuickLoanLedgerEntries;
@@ -36,6 +34,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 
 class ApplyLoan extends Page
 {
@@ -57,6 +56,13 @@ class ApplyLoan extends Page
      * @var array<string, mixed>|null
      */
     public ?array $data = [];
+
+    public static function canAccess(): bool
+    {
+        $member = auth()->user();
+
+        return $member instanceof Member && $member->isActive();
+    }
 
     public function mount(): void
     {
@@ -885,43 +891,47 @@ class ApplyLoan extends Page
             $data['applicant_signed_at'] = $signedAt;
         }
 
-        $payload = [
-            'member_id' => $member->id,
-            'status' => LoanStatus::Pending,
-            'loan_amount' => PesoInput::parse($data['loan_amount'] ?? 0),
-            'loan_period_months' => $data['loan_period_months'],
-            'installment_amount' => PesoInput::parse($installmentAmount),
-            'first_payment_due_date' => $firstPaymentDueDate,
-            'purpose_of_loan' => $isQuickLoan ? ($data['purpose_of_loan'] ?? null) : $data['purpose_of_loan'],
-            'purpose_of_loan_other' => (
-                ($data['purpose_of_loan'] ?? null) === LoanPurpose::Others->value
-                    ? ($data['purpose_of_loan_other'] ?? null)
-                    : null
-            ),
-            'mode_of_payment' => $data['mode_of_payment'],
-            'applicant_signed_at' => $data['applicant_signed_at'] ?? now()->toDateString(),
-            'loan_date' => $isCharacterLoan
-                ? ($data['applicant_signed_at'] ?? now()->toDateString())
-                : now()->toDateString(),
-        ];
+        $data['loan_type'] = $loanType;
+        $data['loan_period_months'] = $isQuickLoan ? 1 : ($data['loan_period_months'] ?? null);
+        $data['installment_amount'] = $installmentAmount;
+        $data['first_payment_due_date'] = $firstPaymentDueDate;
+        $data['applicant_signed_at'] = $data['applicant_signed_at'] ?? now()->toDateString();
+        $data['loan_date'] = $isCharacterLoan
+            ? ($data['applicant_signed_at'] ?? now()->toDateString())
+            : now()->toDateString();
 
-        if ($isQuickLoan) {
-            QuickLoan::query()->create($payload);
-        } elseif ($isCharacterLoan) {
-            CharacterLoan::query()->create([
-                ...$payload,
-                'loan_type' => $loanType,
-            ]);
-        } else {
-            RegularLoan::query()->create([
-                ...$payload,
-                'loan_category' => $data['loan_category'],
-                'loan_type' => $loanType,
-            ]);
+        if ($isCharacterLoan) {
+            $data['character_loan_type'] = $data['character_loan_type'] ?? $loanType;
+        }
+
+        try {
+            app(LoanApplicationService::class)->submit($member, $data);
+        } catch (LoanApplicationException $exception) {
+            Notification::make()
+                ->title($exception->title)
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first()
+                ?? $exception->getMessage();
+
+            Notification::make()
+                ->title(__('Application not submitted'))
+                ->body($message)
+                ->danger()
+                ->send();
+
+            throw $exception;
         }
 
         Notification::make()
-            ->title(__('Loan application submitted'))
+            ->title(__('Confirm the application from your email'))
+            ->body(__('We sent a confirmation link to :email. TEMPUCO can review and approve the loan only after you confirm it.', [
+                'email' => $member->email,
+            ]))
             ->success()
             ->send();
 

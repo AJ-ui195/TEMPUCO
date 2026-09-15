@@ -8,15 +8,18 @@ use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
 use App\Models\Concerns\IsMemberLoan;
 use App\Models\Contracts\MemberLoan;
+use Database\Factories\LoanFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class RegularLoan extends Model implements MemberLoan
 {
+    /** @use HasFactory<LoanFactory> */
+    use HasFactory;
+
     use IsMemberLoan;
 
     protected $fillable = [
-        'member_id',
-        'status',
         'loan_category',
         'loan_type',
         'loan_amount',
@@ -29,7 +32,7 @@ class RegularLoan extends Model implements MemberLoan
         'mode_of_payment',
         'applicant_signed_at',
         'loan_date',
-        'approved_at',
+        'decision_notes',
     ];
 
     /**
@@ -54,5 +57,10 @@ class RegularLoan extends Model implements MemberLoan
     public function printType(): string
     {
         return 'regular';
+    }
+
+    protected static function newFactory(): LoanFactory
+    {
+        return LoanFactory::new();
     }
 }

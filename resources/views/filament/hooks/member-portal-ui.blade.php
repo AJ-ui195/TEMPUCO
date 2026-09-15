@@ -751,6 +751,16 @@
         line-height: 1.2;
     }
 
+    .mp-status--awaiting_verification {
+        background: color-mix(in oklab, var(--gray-500) 18%, transparent);
+        color: var(--gray-700);
+    }
+
+    html.dark .mp-status--awaiting_verification {
+        background: color-mix(in oklab, var(--gray-400) 22%, transparent);
+        color: var(--gray-200);
+    }
+
     .mp-status--pending {
         color: #b45309;
         background: rgba(245, 158, 11, 0.16);

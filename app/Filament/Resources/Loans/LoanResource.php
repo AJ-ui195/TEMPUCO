@@ -11,10 +11,10 @@ use App\Filament\Resources\Loans\Tables\LoansTable;
 use App\Models\RegularLoan;
 use BackedEnum;
 use Filament\Resources\Resource;
-use Illuminate\Database\Eloquent\Builder;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 class LoanResource extends Resource

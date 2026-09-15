@@ -13,6 +13,9 @@
     $pendingLoans = $loans
         ->filter(fn ($loan): bool => $loan->status === LoanStatus::Pending)
         ->count();
+    $awaitingConfirmation = $loans
+        ->filter(fn ($loan): bool => $loan->status === LoanStatus::AwaitingVerification)
+        ->count();
     $hour = (int) now()->format('G');
     $greeting = match (true) {
         $hour < 12 => __('Good morning'),
@@ -68,7 +71,9 @@
                 </div>
                 <div class="mp-stat-value">{{ $loansCount }}</div>
                 <p class="mp-stat-hint">
-                    @if ($pendingLoans > 0)
+                    @if ($awaitingConfirmation > 0)
+                        {{ trans_choice(':count waiting for email confirmation|:count waiting for email confirmation', $awaitingConfirmation, ['count' => $awaitingConfirmation]) }}
+                    @elseif ($pendingLoans > 0)
                         {{ trans_choice(':count pending review|:count pending reviews', $pendingLoans, ['count' => $pendingLoans]) }}
                     @else
                         {{ __('Total loan records') }}
@@ -158,7 +163,14 @@
                                 <td>{{ (int) $loan->loan_period_months }} {{ __('months') }}</td>
                                 <td>{{ $loan->loan_date?->format('M j, Y') ?? '—' }}</td>
                                 <td class="mp-loans-actions">
-                                    @if ($approved)
+                                    @if ($status === LoanStatus::AwaitingVerification)
+                                        <form method="post" action="{{ route('portal.loans.resend-confirmation', ['type' => $loan->printType(), 'loan' => $loan->getKey()]) }}" class="inline">
+                                            @csrf
+                                            <button type="submit" class="mp-btn mp-btn-secondary">
+                                                {{ __('Resend confirmation') }}
+                                            </button>
+                                        </form>
+                                    @elseif ($approved)
                                         <a href="{{ PrintMemberLoan::printUrl($loan) }}" target="_blank" rel="noopener noreferrer" class="mp-btn mp-btn-secondary">
                                             {{ __('Print details') }}
                                         </a>

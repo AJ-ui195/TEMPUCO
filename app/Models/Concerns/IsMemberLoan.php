@@ -2,6 +2,7 @@
 
 namespace App\Models\Concerns;
 
+use App\Enums\LoanStatus;
 use App\Models\CharacterLoan;
 use App\Models\LoanCertification;
 use App\Models\LoanCommitteeDecision;
@@ -87,5 +88,24 @@ trait IsMemberLoan
     public function scopeWhereLoanDate(Builder $query, \DateTimeInterface|string $date): Builder
     {
         return $query->whereDate($query->qualifyColumn(self::LOAN_DATE_COLUMN), $date);
+    }
+
+    public function initializeIsMemberLoan(): void
+    {
+        $this->mergeCasts([
+            'email_verified_at' => 'datetime',
+            'rejected_at' => 'datetime',
+        ]);
+        $this->makeHidden(['email_verification_token']);
+    }
+
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->email_verified_at !== null;
+    }
+
+    public function isAwaitingEmailConfirmation(): bool
+    {
+        return $this->status === LoanStatus::AwaitingVerification;
     }
 }

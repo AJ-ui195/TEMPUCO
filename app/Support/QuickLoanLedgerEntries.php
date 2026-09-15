@@ -3,8 +3,8 @@
 namespace App\Support;
 
 use App\Enums\LoanStatus;
-use App\Models\QuickLoan;
 use App\Models\LoanPayment;
+use App\Models\QuickLoan;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 

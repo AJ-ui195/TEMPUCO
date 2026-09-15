@@ -41,8 +41,8 @@
     x-show="! isInstalled"
     class="mp-pwa-install"
 >
-    <p class="mp-pwa-install__title" x-text="isMacSafari ? @js(__('Install Members Portal on your Mac')) : @js(__('Install Members Portal on your phone'))">
-        {{ __('Install Members Portal on your phone') }}
+    <p class="mp-pwa-install__title" x-text="isMacSafari ? @js(__('Install TEMPUCO on your Mac')) : @js(__('Install TEMPUCO on your phone'))">
+        {{ __('Install TEMPUCO on your phone') }}
     </p>
 
     <button

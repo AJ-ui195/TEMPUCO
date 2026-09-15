@@ -9,7 +9,7 @@ class LoanApplicationsChartWidget extends ChartWidget
 {
     protected static ?int $sort = -1;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected ?string $maxHeight = '15rem';
 

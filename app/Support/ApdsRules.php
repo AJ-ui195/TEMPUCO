@@ -3,9 +3,9 @@
 namespace App\Support;
 
 use App\Enums\LoanStatus;
-use App\Models\RegularLoan;
 use App\Models\Member;
-use Illuminate\Support\Carbon;
+use App\Models\RegularLoan;
+use Carbon\Carbon;
 
 /**
  * APDS policy rules (Sections 2–5) for regular / salary loans.

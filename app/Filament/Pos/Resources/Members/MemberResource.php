@@ -67,7 +67,7 @@ class MemberResource extends Resource
                     ->searchable()
                     ->placeholder('—'),
             ])
-            ->defaultSort('name')
+            ->defaultSort('created_at', 'desc')
             ->deferLoading()
             ->recordActions([
                 Action::make('viewQrCode')

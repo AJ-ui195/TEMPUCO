@@ -2,11 +2,16 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement('
             ALTER TABLE loan_payments
                 MODIFY principal_applied DECIMAL(15, 2) NULL AFTER character_loan_id,
@@ -18,6 +23,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement('
             ALTER TABLE loan_payments
                 MODIFY amount DECIMAL(15, 2) NOT NULL AFTER character_loan_id,

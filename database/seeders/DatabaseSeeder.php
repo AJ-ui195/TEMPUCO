@@ -39,7 +39,9 @@ class DatabaseSeeder extends Seeder
             'occupation' => 'Teacher',
             'employer_department' => 'DepEd',
             'is_retiree' => false,
-            'password' => 'password',
+            'password' => 'Password12',
+            'must_change_password' => false,
+            'email_verified' => true,
         ]);
 
         User::factory()->create([
@@ -66,7 +68,7 @@ class DatabaseSeeder extends Seeder
             'role' => UserRole::Inventory,
         ]);
 
-        RegularLoan::query()->create([
+        (new RegularLoan)->forceFill([
             'member_id' => $member->id,
             'status' => LoanStatus::Approved,
             'loan_category' => LoanCategory::AdditionalNew,
@@ -80,9 +82,10 @@ class DatabaseSeeder extends Seeder
             'applicant_signed_at' => now()->subMonths(2)->toDateString(),
             'loan_date' => now()->subMonths(2)->toDateString(),
             'approved_at' => now()->subMonths(2),
-        ]);
+            'email_verified_at' => now()->subMonths(2),
+        ])->save();
 
-        RegularLoan::query()->create([
+        (new RegularLoan)->forceFill([
             'member_id' => $member->id,
             'status' => LoanStatus::Pending,
             'loan_category' => LoanCategory::AdditionalNew,
@@ -95,6 +98,7 @@ class DatabaseSeeder extends Seeder
             'mode_of_payment' => ModeOfPayment::OverTheCounter,
             'applicant_signed_at' => now()->subWeeks(3)->toDateString(),
             'loan_date' => now()->subWeeks(3)->toDateString(),
-        ]);
+            'email_verified_at' => now()->subWeeks(3),
+        ])->save();
     }
 }

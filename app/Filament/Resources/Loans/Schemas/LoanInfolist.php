@@ -89,6 +89,14 @@ class LoanInfolist
                             ->label(__('Approved at'))
                             ->dateTime()
                             ->placeholder('—'),
+                        TextEntry::make('email_verified_at')
+                            ->label(__('Email confirmed at'))
+                            ->dateTime()
+                            ->placeholder('—'),
+                        TextEntry::make('decision_notes')
+                            ->label(__('Decision notes'))
+                            ->placeholder('—')
+                            ->columnSpanFull(),
                     ])
                     ->columns(2)
                     ->columnSpanFull(),

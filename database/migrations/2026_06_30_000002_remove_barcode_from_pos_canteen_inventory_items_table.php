@@ -20,6 +20,10 @@ return new class extends Migration
             });
 
         Schema::table('pos_canteen_inventory_items', function (Blueprint $table) {
+            if (Schema::getConnection()->getDriverName() === 'sqlite') {
+                $table->dropUnique(['barcode']);
+            }
+
             $table->dropColumn('barcode');
         });
     }

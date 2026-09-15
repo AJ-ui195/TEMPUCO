@@ -108,10 +108,10 @@ final class MemberCreditLedger
             fn (array $entry) => $entry['date'],
             fn (array $entry): int => (int) $entry['id'],
         )->map(function (array $entry) use (&$balance): array {
-                $balance = round($balance + $entry['charge'] - $entry['payment'], 2);
+            $balance = round($balance + $entry['charge'] - $entry['payment'], 2);
 
-                return [...$entry, 'balance' => $balance];
-            });
+            return [...$entry, 'balance' => $balance];
+        });
     }
 
     /**

@@ -25,6 +25,7 @@ trait RecordsMemberLoanPayment
                 ->label(__('Record payment'))
                 ->icon('heroicon-o-banknotes')
                 ->visible(fn (): bool => $this->getRecord()->status === LoanStatus::Approved)
+                ->authorize(fn (): bool => auth()->user()?->can('recordPayment', $this->getRecord()) ?? false)
                 ->fillForm(fn (): array => RecordMemberLoanPayment::defaults($this->getRecord()))
                 ->form([
                     Select::make('kind')

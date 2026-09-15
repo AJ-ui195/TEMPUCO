@@ -15,8 +15,6 @@ class QuickLoan extends Model implements MemberLoan
     use IsMemberLoan;
 
     protected $fillable = [
-        'member_id',
-        'status',
         'loan_type',
         'loan_amount',
         'loan_period_months',
@@ -28,7 +26,7 @@ class QuickLoan extends Model implements MemberLoan
         'mode_of_payment',
         'applicant_signed_at',
         'loan_date',
-        'approved_at',
+        'decision_notes',
     ];
 
     /**

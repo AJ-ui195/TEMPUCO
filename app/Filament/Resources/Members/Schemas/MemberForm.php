@@ -4,7 +4,9 @@ namespace App\Filament\Resources\Members\Schemas;
 
 use App\Models\Member;
 use App\Models\User;
+use App\Support\PasswordRules;
 use Carbon\Carbon;
+use Filament\Forms\Components\Component;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
@@ -13,7 +15,7 @@ use Filament\Forms\Components\Toggle;
 final class MemberForm
 {
     /**
-     * @return array<int, \Filament\Forms\Components\Component>
+     * @return array<int, Component>
      */
     public static function components(): array
     {
@@ -74,6 +76,7 @@ final class MemberForm
                 ->email()
                 ->required()
                 ->maxLength(255)
+                ->helperText(__('A confirmation link is sent to this address. The member can sign in only after they confirm it.'))
                 ->rule(function (?Member $record): \Closure {
                     return function (string $attribute, mixed $value, \Closure $fail) use ($record): void {
                         $query = Member::query()->where('email', $value);
@@ -101,14 +104,26 @@ final class MemberForm
                 ->label(__('Retiree'))
                 ->helperText(__('Marks this member as a retiree.'))
                 ->default(false),
+            Toggle::make('is_active')
+                ->label(__('Active'))
+                ->helperText(__('Inactive members cannot sign in or apply for loans.'))
+                ->default(true),
             TextInput::make('password')
                 ->label(__('Password'))
                 ->password()
                 ->revealable()
                 ->required(fn (string $operation): bool => $operation === 'create')
-                ->minLength(8)
+                ->rule(PasswordRules::rule())
+                ->confirmed()
                 ->dehydrated(fn (?string $state): bool => filled($state))
-                ->helperText(__('Used by the member to sign in to the Members Portal. Leave blank when editing to keep the current password.'))
+                ->helperText(PasswordRules::helperText().' '.__('Leave blank when editing to keep the current password.'))
+                ->columnSpanFull(),
+            TextInput::make('password_confirmation')
+                ->label(__('Confirm password'))
+                ->password()
+                ->revealable()
+                ->required(fn (string $operation): bool => $operation === 'create')
+                ->dehydrated(false)
                 ->columnSpanFull(),
         ];
     }

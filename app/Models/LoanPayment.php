@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToTypedLoan;
 use App\Support\LedgerChronology;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection;
 
 class LoanPayment extends Model
@@ -21,6 +22,7 @@ class LoanPayment extends Model
         'principal_applied',
         'official_receipt_no',
         'received_at',
+        'received_by',
     ];
 
     /**
@@ -49,5 +51,10 @@ class LoanPayment extends Model
             fn (self $payment) => $payment->created_at ?? $payment->received_at,
             fn (self $payment): int => (int) $payment->id,
         );
+    }
+
+    public function receivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by');
     }
 }

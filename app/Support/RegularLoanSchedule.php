@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\LoanStatus;
 use App\Models\RegularLoan;
 
 /**
@@ -56,7 +57,7 @@ final class RegularLoanSchedule
         if ($user) {
             $orderedIds = RegularLoan::query()
                 ->forUser($user)
-                ->where('status', \App\Enums\LoanStatus::Approved)
+                ->where('status', LoanStatus::Approved)
                 ->whereNotIn('loan_type', LoanTypes::excludedFromApdsAccounts())
                 ->orderBy('loan_date')
                 ->orderBy('id')
@@ -160,8 +161,7 @@ final class RegularLoanSchedule
         bool $isSecondApdsAccount = false,
         ?float $monthlyInterestRate = null,
         bool $applyApdsFees = true,
-    ): self
-    {
+    ): self {
         $principal = round($principal, 2);
         $termMonths = max(1, $termMonths);
         $annualRate = $monthlyInterestRate !== null

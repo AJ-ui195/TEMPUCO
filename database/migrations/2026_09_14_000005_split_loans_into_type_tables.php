@@ -30,6 +30,11 @@ return new class extends Migration
             $table->date('applicant_signed_at')->nullable();
             $table->date('loan_date')->nullable();
             $table->timestamp('approved_at')->nullable();
+            $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('decision_notes')->nullable();
+            $table->timestamp('rejected_at')->nullable();
+            $table->string('email_verification_token', 64)->nullable();
+            $table->timestamp('email_verified_at')->nullable();
             $table->timestamps();
         });
 
@@ -49,6 +54,11 @@ return new class extends Migration
             $table->date('applicant_signed_at')->nullable();
             $table->date('loan_date')->nullable();
             $table->timestamp('approved_at')->nullable();
+            $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('decision_notes')->nullable();
+            $table->timestamp('rejected_at')->nullable();
+            $table->string('email_verification_token', 64)->nullable();
+            $table->timestamp('email_verified_at')->nullable();
             $table->timestamps();
         });
 
@@ -68,6 +78,11 @@ return new class extends Migration
             $table->date('applicant_signed_at')->nullable();
             $table->date('loan_date')->nullable();
             $table->timestamp('approved_at')->nullable();
+            $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('decision_notes')->nullable();
+            $table->timestamp('rejected_at')->nullable();
+            $table->string('email_verification_token', 64)->nullable();
+            $table->timestamp('email_verified_at')->nullable();
             $table->timestamps();
         });
 
@@ -79,23 +94,17 @@ return new class extends Migration
             $this->copyExistingLoans();
         }
 
-        Schema::table('loan_payments', function (Blueprint $table) {
-            if (Schema::hasColumn('loan_payments', 'loan_id')) {
-                $table->dropConstrainedForeignId('loan_id');
-            }
-        });
+        if (Schema::hasColumn('loan_payments', 'loan_id')) {
+            $this->dropLoanId('loan_payments');
+        }
 
-        Schema::table('loan_certifications', function (Blueprint $table) {
-            if (Schema::hasColumn('loan_certifications', 'loan_id')) {
-                $table->dropConstrainedForeignId('loan_id');
-            }
-        });
+        if (Schema::hasColumn('loan_certifications', 'loan_id')) {
+            $this->dropLoanId('loan_certifications');
+        }
 
-        Schema::table('loan_committee_decisions', function (Blueprint $table) {
-            if (Schema::hasColumn('loan_committee_decisions', 'loan_id')) {
-                $table->dropConstrainedForeignId('loan_id');
-            }
-        });
+        if (Schema::hasColumn('loan_committee_decisions', 'loan_id')) {
+            $this->dropLoanId('loan_committee_decisions');
+        }
 
         Schema::dropIfExists('loans');
     }
@@ -125,6 +134,46 @@ return new class extends Migration
         Schema::dropIfExists('character_loans');
         Schema::dropIfExists('quick_loans');
         Schema::dropIfExists('regular_loans');
+    }
+
+    private function dropLoanId(string $table): void
+    {
+        if (! Schema::hasColumn($table, 'loan_id')) {
+            return;
+        }
+
+        Schema::disableForeignKeyConstraints();
+
+        try {
+            Schema::table($table, function (Blueprint $blueprint) use ($table): void {
+                foreach (Schema::getIndexes($table) as $index) {
+                    $columns = $index['columns'] ?? [];
+                    $name = $index['name'] ?? null;
+
+                    if ($name === null || ($index['primary'] ?? false)) {
+                        continue;
+                    }
+
+                    if ($columns === ['loan_id'] && ($index['unique'] ?? false)) {
+                        $blueprint->dropUnique($name);
+                    } elseif ($columns === ['loan_id']) {
+                        $blueprint->dropIndex($name);
+                    }
+                }
+
+                try {
+                    $blueprint->dropForeign(['loan_id']);
+                } catch (Throwable) {
+                    // SQLite may not expose the foreign key name the same way.
+                }
+            });
+
+            Schema::table($table, function (Blueprint $blueprint): void {
+                $blueprint->dropColumn('loan_id');
+            });
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
     }
 
     private function addMorphColumns(string $table): void
@@ -160,6 +209,12 @@ return new class extends Migration
                 'created_at' => $loan->created_at,
                 'updated_at' => $loan->updated_at,
             ];
+
+            foreach (['decided_by', 'decision_notes', 'rejected_at', 'email_verification_token', 'email_verified_at'] as $column) {
+                if (property_exists($loan, $column) || isset($loan->{$column})) {
+                    $payload[$column] = $loan->{$column} ?? null;
+                }
+            }
 
             if ($type === LoanTypes::QUICK) {
                 $newId = DB::table('quick_loans')->insertGetId($payload);

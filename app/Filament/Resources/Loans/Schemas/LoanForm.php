@@ -2,12 +2,9 @@
 
 namespace App\Filament\Resources\Loans\Schemas;
 
-use App\Enums\LoanStatus;
 use App\Support\PesoInput;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
@@ -26,24 +23,6 @@ class LoanForm
             ])
             ->components([
                 Group::make([
-                    Section::make(__('Status'))
-                        ->schema([
-                            Select::make('status')
-                                ->label(__('Status'))
-                                ->options([
-                                    LoanStatus::Pending->value => LoanStatus::Pending->getLabel(),
-                                    LoanStatus::Approved->value => LoanStatus::Approved->getLabel(),
-                                    LoanStatus::Rejected->value => LoanStatus::Rejected->getLabel(),
-                                ])
-                                ->required()
-                                ->native(false),
-                            DateTimePicker::make('approved_at')
-                                ->label(__('Approved at'))
-                                ->seconds(false)
-                                ->visible(fn (callable $get): bool => $get('status') === LoanStatus::Approved->value),
-                        ])
-                        ->columns(2),
-
                     Section::make(__('Committee approval'))
                         ->relationship('committeeDecision')
                         ->schema([
