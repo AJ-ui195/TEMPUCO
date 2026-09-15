@@ -13,96 +13,110 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('regular_loans', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('member_id')->constrained('members')->cascadeOnDelete();
-            $table->string('status');
-            $table->string('loan_category')->nullable();
-            $table->string('loan_type');
-            $table->decimal('loan_amount', 15, 2);
-            $table->unsignedSmallInteger('loan_period_months');
-            $table->decimal('installment_amount', 15, 2);
-            $table->date('first_payment_due_date')->nullable();
-            $table->string('purpose_of_loan')->nullable();
-            $table->text('purpose_of_loan_other')->nullable();
-            $table->text('application_notes')->nullable();
-            $table->string('mode_of_payment')->nullable();
-            $table->date('applicant_signed_at')->nullable();
-            $table->date('loan_date')->nullable();
-            $table->timestamp('approved_at')->nullable();
-            $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->text('decision_notes')->nullable();
-            $table->timestamp('rejected_at')->nullable();
-            $table->string('email_verification_token', 64)->nullable();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('regular_loans')) {
+            Schema::create('regular_loans', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('member_id')->constrained('members')->cascadeOnDelete();
+                $table->string('status');
+                $table->string('loan_category')->nullable();
+                $table->string('loan_type');
+                $table->decimal('loan_amount', 15, 2);
+                $table->unsignedSmallInteger('loan_period_months');
+                $table->decimal('installment_amount', 15, 2);
+                $table->date('first_payment_due_date')->nullable();
+                $table->string('purpose_of_loan')->nullable();
+                $table->text('purpose_of_loan_other')->nullable();
+                $table->text('application_notes')->nullable();
+                $table->string('mode_of_payment')->nullable();
+                $table->date('applicant_signed_at')->nullable();
+                $table->date('loan_date')->nullable();
+                $table->timestamp('approved_at')->nullable();
+                $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->text('decision_notes')->nullable();
+                $table->timestamp('rejected_at')->nullable();
+                $table->string('email_verification_token', 64)->nullable();
+                $table->timestamp('email_verified_at')->nullable();
+                $table->timestamps();
+            });
+        }
 
-        Schema::create('quick_loans', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('member_id')->constrained('members')->cascadeOnDelete();
-            $table->string('status');
-            $table->string('loan_type')->default(LoanTypes::QUICK);
-            $table->decimal('loan_amount', 15, 2);
-            $table->unsignedSmallInteger('loan_period_months')->default(1);
-            $table->decimal('installment_amount', 15, 2);
-            $table->date('first_payment_due_date')->nullable();
-            $table->string('purpose_of_loan')->nullable();
-            $table->text('purpose_of_loan_other')->nullable();
-            $table->text('application_notes')->nullable();
-            $table->string('mode_of_payment')->nullable();
-            $table->date('applicant_signed_at')->nullable();
-            $table->date('loan_date')->nullable();
-            $table->timestamp('approved_at')->nullable();
-            $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->text('decision_notes')->nullable();
-            $table->timestamp('rejected_at')->nullable();
-            $table->string('email_verification_token', 64)->nullable();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('quick_loans')) {
+            Schema::create('quick_loans', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('member_id')->constrained('members')->cascadeOnDelete();
+                $table->string('status');
+                $table->string('loan_type')->default(LoanTypes::QUICK);
+                $table->decimal('loan_amount', 15, 2);
+                $table->unsignedSmallInteger('loan_period_months')->default(1);
+                $table->decimal('installment_amount', 15, 2);
+                $table->date('first_payment_due_date')->nullable();
+                $table->string('purpose_of_loan')->nullable();
+                $table->text('purpose_of_loan_other')->nullable();
+                $table->text('application_notes')->nullable();
+                $table->string('mode_of_payment')->nullable();
+                $table->date('applicant_signed_at')->nullable();
+                $table->date('loan_date')->nullable();
+                $table->timestamp('approved_at')->nullable();
+                $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->text('decision_notes')->nullable();
+                $table->timestamp('rejected_at')->nullable();
+                $table->string('email_verification_token', 64)->nullable();
+                $table->timestamp('email_verified_at')->nullable();
+                $table->timestamps();
+            });
+        }
 
-        Schema::create('character_loans', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('member_id')->constrained('members')->cascadeOnDelete();
-            $table->string('status');
-            $table->string('loan_type')->default(LoanTypes::CHARACTER);
-            $table->decimal('loan_amount', 15, 2);
-            $table->unsignedSmallInteger('loan_period_months');
-            $table->decimal('installment_amount', 15, 2);
-            $table->date('first_payment_due_date')->nullable();
-            $table->string('purpose_of_loan')->nullable();
-            $table->text('purpose_of_loan_other')->nullable();
-            $table->text('application_notes')->nullable();
-            $table->string('mode_of_payment')->nullable();
-            $table->date('applicant_signed_at')->nullable();
-            $table->date('loan_date')->nullable();
-            $table->timestamp('approved_at')->nullable();
-            $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->text('decision_notes')->nullable();
-            $table->timestamp('rejected_at')->nullable();
-            $table->string('email_verification_token', 64)->nullable();
-            $table->timestamp('email_verified_at')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('character_loans')) {
+            Schema::create('character_loans', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('member_id')->constrained('members')->cascadeOnDelete();
+                $table->string('status');
+                $table->string('loan_type')->default(LoanTypes::CHARACTER);
+                $table->decimal('loan_amount', 15, 2);
+                $table->unsignedSmallInteger('loan_period_months');
+                $table->decimal('installment_amount', 15, 2);
+                $table->date('first_payment_due_date')->nullable();
+                $table->string('purpose_of_loan')->nullable();
+                $table->text('purpose_of_loan_other')->nullable();
+                $table->text('application_notes')->nullable();
+                $table->string('mode_of_payment')->nullable();
+                $table->date('applicant_signed_at')->nullable();
+                $table->date('loan_date')->nullable();
+                $table->timestamp('approved_at')->nullable();
+                $table->foreignId('decided_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->text('decision_notes')->nullable();
+                $table->timestamp('rejected_at')->nullable();
+                $table->string('email_verification_token', 64)->nullable();
+                $table->timestamp('email_verified_at')->nullable();
+                $table->timestamps();
+            });
+        }
 
-        $this->addMorphColumns('loan_payments');
-        $this->addMorphColumns('loan_certifications');
-        $this->addMorphColumns('loan_committee_decisions');
+        if (Schema::hasTable('loan_payments')) {
+            $this->addMorphColumns('loan_payments');
+        }
+
+        if (Schema::hasTable('loan_certifications')) {
+            $this->addMorphColumns('loan_certifications');
+        }
+
+        if (Schema::hasTable('loan_committee_decisions')) {
+            $this->addMorphColumns('loan_committee_decisions');
+        }
 
         if (Schema::hasTable('loans')) {
             $this->copyExistingLoans();
         }
 
-        if (Schema::hasColumn('loan_payments', 'loan_id')) {
+        if (Schema::hasTable('loan_payments') && Schema::hasColumn('loan_payments', 'loan_id')) {
             $this->dropLoanId('loan_payments');
         }
 
-        if (Schema::hasColumn('loan_certifications', 'loan_id')) {
+        if (Schema::hasTable('loan_certifications') && Schema::hasColumn('loan_certifications', 'loan_id')) {
             $this->dropLoanId('loan_certifications');
         }
 
-        if (Schema::hasColumn('loan_committee_decisions', 'loan_id')) {
+        if (Schema::hasTable('loan_committee_decisions') && Schema::hasColumn('loan_committee_decisions', 'loan_id')) {
             $this->dropLoanId('loan_committee_decisions');
         }
 
@@ -178,6 +192,10 @@ return new class extends Migration
 
     private function addMorphColumns(string $table): void
     {
+        if (! Schema::hasTable($table)) {
+            return;
+        }
+
         Schema::table($table, function (Blueprint $blueprint) use ($table): void {
             if (! Schema::hasColumn($table, 'loanable_type')) {
                 $blueprint->nullableMorphs('loanable');

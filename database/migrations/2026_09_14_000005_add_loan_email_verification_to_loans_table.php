@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('loans')) {
+            return;
+        }
+
         Schema::table('loans', function (Blueprint $table) {
             if (! Schema::hasColumn('loans', 'email_verification_token')) {
                 $table->string('email_verification_token', 64)->nullable()->after('decision_notes');
@@ -21,6 +25,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('loans')) {
+            return;
+        }
+
         Schema::table('loans', function (Blueprint $table) {
             $drop = array_values(array_filter(
                 ['email_verification_token', 'email_verified_at'],
