@@ -66,7 +66,7 @@ final class RegularLoanLedgerEntries
             $date = $payment->received_at
                 ? Carbon::parse($payment->received_at)
                 : ($payment->created_at ?? $releaseDate);
-            $or = (string) ($payment->official_receipt_no ?? '');
+            $or = CollectionReceiptNumbers::displayOfficialReceipt((string) ($payment->official_receipt_no ?? ''));
 
             if ($principalApplied < 0.005 && $interest < 0.005) {
                 $principalApplied = $amount;

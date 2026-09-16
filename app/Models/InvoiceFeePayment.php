@@ -11,6 +11,7 @@ class InvoiceFeePayment extends Model
         'member_id',
         'invoice_no',
         'interest',
+        'settles_loan_interest',
         'surcharge',
         'membership_fee',
         'others',
@@ -27,6 +28,7 @@ class InvoiceFeePayment extends Model
     {
         return [
             'interest' => 'decimal:2',
+            'settles_loan_interest' => 'boolean',
             'surcharge' => 'decimal:2',
             'membership_fee' => 'decimal:2',
             'others' => 'decimal:2',

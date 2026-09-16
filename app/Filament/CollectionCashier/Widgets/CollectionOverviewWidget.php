@@ -3,6 +3,7 @@
 namespace App\Filament\CollectionCashier\Widgets;
 
 use App\Enums\PosSaleChannel;
+use App\Models\InvoiceFeePayment;
 use App\Models\LoanPayment;
 use App\Models\Member;
 use App\Models\PosCreditPayment;
@@ -30,18 +31,18 @@ class CollectionOverviewWidget extends StatsOverviewWidget
             ->whereDate('created_at', $today)
             ->sum('amount');
 
-        $loanToday = (float) LoanPayment::query()
-            ->whereDate('received_at', $today)
-            ->sum('amount');
+        $loanToday = round($this->loanOfficialReceiptTotalForDate($today) + $this->invoiceCollectionTotalForDate($today), 2);
 
         $canteenMonth = (float) PosCreditPayment::query()
             ->where('sale_channel', PosSaleChannel::Canteen)
             ->whereBetween('created_at', [$monthStart, $monthEnd])
             ->sum('amount');
 
-        $loanMonth = (float) LoanPayment::query()
-            ->whereBetween('received_at', [$monthStart, $monthEnd])
-            ->sum('amount');
+        $loanMonth = round(
+            $this->loanOfficialReceiptTotalBetween($monthStart, $monthEnd)
+            + $this->invoiceCollectionTotalBetween($monthStart, $monthEnd),
+            2,
+        );
 
         return [
             Stat::make(__('Members'), number_format(Member::query()->count()))
@@ -61,13 +62,41 @@ class CollectionOverviewWidget extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-m-building-storefront')
                 ->color('info'),
             Stat::make(__('Collected today'), '₱'.number_format($canteenToday + $loanToday, 2))
-                ->description(__('Loan payments + canteen collections'))
+                ->description(__('All loan collections (O.R. + Invoice) and canteen'))
                 ->descriptionIcon('heroicon-m-arrow-down-tray')
                 ->color('success'),
             Stat::make(__('Collected this month'), '₱'.number_format($canteenMonth + $loanMonth, 2))
-                ->description(__('Loan payments + canteen collections'))
+                ->description(__('All loan collections (O.R. + Invoice) and canteen'))
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color('success'),
         ];
+    }
+
+    protected function loanOfficialReceiptTotalForDate(string $date): float
+    {
+        return (float) LoanPayment::query()
+            ->whereDate('received_at', $date)
+            ->sum('amount');
+    }
+
+    protected function invoiceCollectionTotalForDate(string $date): float
+    {
+        return (float) InvoiceFeePayment::query()
+            ->whereDate('received_at', $date)
+            ->sum('amount');
+    }
+
+    protected function loanOfficialReceiptTotalBetween($start, $end): float
+    {
+        return (float) LoanPayment::query()
+            ->whereBetween('received_at', [$start, $end])
+            ->sum('amount');
+    }
+
+    protected function invoiceCollectionTotalBetween($start, $end): float
+    {
+        return (float) InvoiceFeePayment::query()
+            ->whereBetween('received_at', [$start, $end])
+            ->sum('amount');
     }
 }

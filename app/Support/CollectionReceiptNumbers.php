@@ -27,6 +27,16 @@ final class CollectionReceiptNumbers
         ]);
     }
 
+    public static function displayOfficialReceipt(?string $number): string
+    {
+        return self::withKindSuffix($number, 'OR');
+    }
+
+    public static function displayInvoice(?string $number): string
+    {
+        return self::withKindSuffix($number, 'IN');
+    }
+
     /**
      * @param  array<int, iterable<int, mixed>>  $series
      */
@@ -47,5 +57,18 @@ final class CollectionReceiptNumbers
         }
 
         return str_pad((string) ($max + 1), 6, '0', STR_PAD_LEFT);
+    }
+
+    private static function withKindSuffix(?string $number, string $kind): string
+    {
+        $number = trim((string) $number);
+
+        if ($number === '') {
+            return '';
+        }
+
+        $stripped = preg_replace('/-(OR|IN)$/i', '', $number) ?? $number;
+
+        return $stripped.'-'.$kind;
     }
 }

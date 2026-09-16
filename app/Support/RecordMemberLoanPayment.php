@@ -49,10 +49,9 @@ final class RecordMemberLoanPayment
             : $loan->payments()->get();
 
         if ($loan instanceof QuickLoan) {
-            $due = QuickLoanLedgerEntries::totalPayable($principal);
             $paid = round((float) $payments->sum(fn (LoanPayment $payment): float => (float) $payment->amount), 2);
 
-            return round(max(0, $due - $paid), 2);
+            return round(max(0, $principal - $paid), 2);
         }
 
         if ($loan instanceof RegularLoan) {
@@ -117,6 +116,24 @@ final class RecordMemberLoanPayment
         if (in_array($type, LoanTypes::characterFamily(), true)
             && ! in_array($kind, [CharacterLoanLedgerEntries::KIND_INTEREST, CharacterLoanLedgerEntries::KIND_PRINCIPAL], true)) {
             throw new InvalidArgumentException(__('Choose interest or principal.'));
+        }
+
+        if ($kind === CharacterLoanLedgerEntries::KIND_INTEREST
+            && in_array($type, LoanTypes::characterFamily(), true)) {
+            throw new InvalidArgumentException(__('Collect character loan interest on Invoice, not Official Receipt.'));
+        }
+
+        if (in_array($type, LoanTypes::characterFamily(), true)
+            && ! CharacterLoanLedgerEntries::principalUnlocked($loan)) {
+            throw new InvalidArgumentException(__('Pay the ₱:amount interest on Invoice first.', [
+                'amount' => number_format(CharacterLoanLedgerEntries::periodInterest($loan), 2),
+            ]));
+        }
+
+        if ($loan instanceof QuickLoan && ! QuickLoanLedgerEntries::principalUnlocked($loan)) {
+            throw new InvalidArgumentException(__('Pay the ₱:amount interest on Invoice first.', [
+                'amount' => number_format(QuickLoanLedgerEntries::interestOn((float) $loan->loan_amount), 2),
+            ]));
         }
 
         if ($loan instanceof RegularLoan) {

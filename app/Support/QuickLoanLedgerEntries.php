@@ -18,9 +18,19 @@ final class QuickLoanLedgerEntries
 
     public const MAX_AMOUNT = 2000.0;
 
+    public static function interestOn(float $amount): float
+    {
+        return round($amount * self::INTEREST_RATE, 2);
+    }
+
     public static function totalPayable(float $amount): float
     {
-        return round($amount + ($amount * self::INTEREST_RATE), 2);
+        return self::interestOn($amount);
+    }
+
+    public static function principalUnlocked(QuickLoan $loan): bool
+    {
+        return InvoiceInterestSettlement::covers($loan);
     }
 
     /**
@@ -44,7 +54,7 @@ final class QuickLoanLedgerEntries
         }
 
         $principal = round((float) $loan->loan_amount, 2);
-        $interest = round($principal * self::INTEREST_RATE, 2);
+        $interest = self::interestOn($principal);
         $releaseDate = Carbon::parse($loan->loan_date ?? $loan->approved_at ?? $loan->created_at);
 
         $payments = LoanPayment::inRecordedOrder(
@@ -53,7 +63,7 @@ final class QuickLoanLedgerEntries
                 : $loan->payments()->get()
         );
 
-        $due = self::totalPayable($principal);
+        $due = round($principal + $interest, 2);
         $firstDue = $loan->first_payment_due_date
             ? Carbon::parse($loan->first_payment_due_date)->format('n-j-Y')
             : $releaseDate->copy()->addMonthNoOverflow()->format('n-j-Y');
@@ -68,14 +78,39 @@ final class QuickLoanLedgerEntries
             'voucher' => '',
             'released' => $principal,
             'interest' => $interest,
+            'interest_in_parens' => false,
             'payment' => 0.0,
             'balance' => $due,
+            'balance_blank' => false,
             'surcharge_payment' => 0.0,
             'surcharge_balance' => 0.0,
             'remarks' => $firstDue,
         ]);
 
         $balance = $due;
+
+        foreach (InvoiceInterestSettlement::allocationsFor($loan) as $allocation) {
+            $amount = round((float) $allocation['amount'], 2);
+            $balance = round(max(0, $balance - $amount), 2);
+            $storedAt = Carbon::parse($allocation['received_at']);
+
+            $entries->push([
+                'date' => $storedAt,
+                'stored_at' => $storedAt,
+                'stored_id' => (int) $allocation['id'],
+                'or' => CollectionReceiptNumbers::displayInvoice((string) $allocation['invoice_no']),
+                'voucher' => '',
+                'released' => 0.0,
+                'interest' => 0.0,
+                'interest_in_parens' => false,
+                'payment' => $amount,
+                'balance' => $balance,
+                'balance_blank' => false,
+                'surcharge_payment' => 0.0,
+                'surcharge_balance' => 0.0,
+                'remarks' => '',
+            ]);
+        }
 
         foreach ($payments as $payment) {
             $amount = round((float) $payment->amount, 2);
@@ -88,12 +123,14 @@ final class QuickLoanLedgerEntries
                 'date' => $storedAt,
                 'stored_at' => $storedAt,
                 'stored_id' => (int) $payment->id,
-                'or' => (string) ($payment->official_receipt_no ?? ''),
+                'or' => CollectionReceiptNumbers::displayOfficialReceipt((string) ($payment->official_receipt_no ?? '')),
                 'voucher' => '',
                 'released' => 0.0,
                 'interest' => 0.0,
+                'interest_in_parens' => false,
                 'payment' => $amount,
-                'balance' => $balance,
+                'balance' => $clearsLoan ? 0.0 : $balance,
+                'balance_blank' => $clearsLoan,
                 'surcharge_payment' => 0.0,
                 'surcharge_balance' => 0.0,
                 'remarks' => $clearsLoan ? __('paid') : '',

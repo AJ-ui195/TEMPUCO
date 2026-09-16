@@ -417,7 +417,7 @@ class ApplyLoan extends Page
                         ->minValue(0)
                         ->readOnly()
                         ->dehydrated()
-                        ->helperText(__('Automatically set to loan amount + 1% interest.'))
+                        ->helperText(__('Automatically set to 1% interest. Collect this on Invoice; the loan amount on Official Receipt.'))
                         ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK)
                 ),
                 DatePicker::make('first_payment_due_date')
@@ -848,7 +848,7 @@ class ApplyLoan extends Page
                 return;
             }
 
-            $installmentAmount = QuickLoanLedgerEntries::totalPayable($amount);
+            $installmentAmount = QuickLoanLedgerEntries::interestOn($amount);
             $signedAt = $data['applicant_signed_at'] ?? now()->toDateString();
             $firstPaymentDueDate = Carbon::parse($signedAt)->addMonthNoOverflow()->toDateString();
         }
@@ -1013,7 +1013,7 @@ class ApplyLoan extends Page
             return;
         }
 
-        $set('installment_amount', number_format(QuickLoanLedgerEntries::totalPayable($amount), 2, '.', ','));
+        $set('installment_amount', number_format(QuickLoanLedgerEntries::interestOn($amount), 2, '.', ','));
     }
 
     /**

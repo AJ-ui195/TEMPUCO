@@ -79,7 +79,7 @@ final class LoanApplicationService
         $signedAt = $data['applicant_signed_at'] ?? now()->toDateString();
 
         if ($applicationType === 'quick') {
-            $installmentAmount = QuickLoanLedgerEntries::totalPayable($loanAmount);
+            $installmentAmount = QuickLoanLedgerEntries::interestOn($loanAmount);
             $firstPaymentDueDate = Carbon::parse($signedAt)->addMonthNoOverflow()->toDateString();
             $periodMonths = 1;
         }

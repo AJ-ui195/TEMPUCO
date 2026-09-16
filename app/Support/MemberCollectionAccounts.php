@@ -116,9 +116,23 @@ final class MemberCollectionAccounts
     {
         $type = self::accountType($loan);
         $kind = RecordMemberLoanPayment::kindOf($loan);
-        $balance = RecordMemberLoanPayment::remainingPrincipal($loan);
+        $principal = RecordMemberLoanPayment::remainingPrincipal($loan);
+        $balance = $principal;
+        $collectable = $loan->status === LoanStatus::Approved && $principal > RecordMemberLoanPayment::EPSILON;
 
-        $collectable = $loan->status === LoanStatus::Approved && $balance > RecordMemberLoanPayment::EPSILON;
+        if ($loan->status === LoanStatus::Approved && $type === self::TYPE_CHARACTER) {
+            if (! CharacterLoanLedgerEntries::principalUnlocked($loan)) {
+                $balance = 0.0;
+                $collectable = false;
+            }
+        }
+
+        if ($loan->status === LoanStatus::Approved && $type === self::TYPE_QUICK && $loan instanceof QuickLoan) {
+            if (! QuickLoanLedgerEntries::principalUnlocked($loan)) {
+                $balance = 0.0;
+                $collectable = false;
+            }
+        }
 
         return [
             'key' => $type.':'.$loan->getKey(),
@@ -235,7 +249,7 @@ final class MemberCollectionAccounts
         if ($type === self::TYPE_QUICK && $loan instanceof QuickLoan) {
             return QuickLoanLedgerEntries::forLoan($loan)
                 ->map(function (array $row): array {
-                    $debit = (float) $row['released'] + (float) $row['interest'];
+                    $debit = (float) $row['released'] + ((float) $row['interest'] > 0 && empty($row['interest_in_parens']) ? (float) $row['interest'] : 0.0);
                     $credit = (float) $row['payment'];
                     $description = $row['released'] > 0
                         ? __('Loan released')
@@ -310,7 +324,7 @@ final class MemberCollectionAccounts
                 'stored_at' => $storedAt,
                 'stored_id' => (int) $payment->id,
                 'description' => $isInterest ? __('Interest') : __('Payment'),
-                'reference' => (string) ($payment->official_receipt_no ?? ''),
+                'reference' => CollectionReceiptNumbers::displayOfficialReceipt((string) ($payment->official_receipt_no ?? '')),
                 'debit' => $isInterest ? $amount : 0.0,
                 'credit' => $isInterest ? 0.0 : $amount,
                 'balance' => $running,
