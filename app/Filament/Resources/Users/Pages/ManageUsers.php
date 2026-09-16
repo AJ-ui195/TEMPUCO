@@ -3,6 +3,8 @@
 namespace App\Filament\Resources\Users\Pages;
 
 use App\Filament\Resources\Users\UserResource;
+use App\Models\User;
+use App\Support\StaffAccount;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 
@@ -10,12 +12,13 @@ class ManageUsers extends ManageRecords
 {
     protected static string $resource = UserResource::class;
 
-    protected static ?string $title = 'Users';
+    protected static ?string $title = 'Staff';
 
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->using(fn (array $data): User => StaffAccount::create($data)),
         ];
     }
 }

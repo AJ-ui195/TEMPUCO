@@ -32,6 +32,8 @@ class MemberFactory extends Factory
             'employer_department' => fake()->company(),
             'is_retiree' => false,
             'points' => 0,
+            'is_active' => true,
+            'must_change_password' => false,
         ];
     }
 }

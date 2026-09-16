@@ -3,6 +3,8 @@
         'schedule' => $schedule,
         'borrowerName' => $borrowerName,
         'blankAmounts' => $blankAmounts ?? false,
+        'loan' => $loan ?? null,
+        'paidCash' => $paidCash ?? 0,
     ])
 </div>
 

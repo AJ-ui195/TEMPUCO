@@ -1,5 +1,10 @@
 @php
     $blankAmounts = $blankAmounts ?? false;
+    $allocation = $blankAmounts
+        ? ['periods' => []]
+        : (isset($loan) && $loan instanceof \App\Models\RegularLoan
+            ? \App\Support\RegularLoanPaymentAllocation::forLoan($loan)
+            : \App\Support\RegularLoanPaymentAllocation::allocate($schedule, (float) ($paidCash ?? 0), 1));
     $money = function (?float $amount) use ($blankAmounts): string {
         if ($blankAmounts || $amount === null) {
             return '';
@@ -15,6 +20,29 @@
         'notarial_fee' => __('Notarial fee'),
         'verification_fee' => __('Verification fee'),
     ];
+    $apdsClass = function (?string $status): string {
+        return match ($status) {
+            \App\Support\RegularLoanPaymentAllocation::STATUS_PAID => 'apds-paid',
+            \App\Support\RegularLoanPaymentAllocation::STATUS_PARTIAL => 'apds-partial',
+            \App\Support\RegularLoanPaymentAllocation::STATUS_UNPAID => 'apds-unpaid',
+            default => '',
+        };
+    };
+    $apdsCell = function (?float $original, ?string $status, ?float $remaining, bool $cashFlow = false, bool $strike = false) use ($blankAmounts): string {
+        if ($blankAmounts || $original === null) {
+            return $cashFlow && ! $blankAmounts ? '-' : '';
+        }
+
+        $formatted = $cashFlow
+            ? '('.number_format($original, 2).')'
+            : number_format($original, 2);
+
+        if ($status === \App\Support\RegularLoanPaymentAllocation::STATUS_PARTIAL && $strike) {
+            return e(number_format((float) $remaining, 2)).' <s>'.e($formatted).'</s>';
+        }
+
+        return e($formatted);
+    };
 @endphp
 
 <div class="apds">
@@ -141,14 +169,17 @@
             </thead>
             <tbody>
                 @foreach ($schedule->rows as $row)
+                    @php
+                        $periodStatus = $allocation['periods'][(int) $row['period']] ?? null;
+                    @endphp
                     <tr>
                         <td class="num" colspan="2">{{ $row['period'] }}</td>
                         <td class="num">{{ $money($row['gross_loan']) }}</td>
-                        <td class="num">{{ $money($row['principal']) }}</td>
-                        <td class="num">{{ $money($row['interest']) }}</td>
+                        <td class="num {{ $apdsClass($periodStatus['principal_status'] ?? null) }}">{!! $apdsCell($row['principal'], $periodStatus['principal_status'] ?? null, $periodStatus['principal_remaining'] ?? null, false, true) !!}</td>
+                        <td class="num {{ $apdsClass($periodStatus['interest_status'] ?? null) }}">{!! $apdsCell($row['interest'], $periodStatus['interest_status'] ?? null, $periodStatus['interest_remaining'] ?? null) !!}</td>
                         <td class="num">{{ $money($row['other_charges']) }}</td>
                         <td class="num">{{ $money($row['net_proceeds']) }}</td>
-                        <td class="num">{{ $blankAmounts || $row['cash_flow'] === null ? ($blankAmounts ? '' : '-') : '('.number_format($row['cash_flow'], 2).')' }}</td>
+                        <td class="num {{ $apdsClass($periodStatus['cash_flow_status'] ?? null) }}">{!! $apdsCell($row['cash_flow'], $periodStatus['cash_flow_status'] ?? null, $periodStatus['cash_flow_remaining'] ?? null, true) !!}</td>
                         <td class="num">{{ $row['outstanding'] == 0 && $row['period'] > 0 ? '-' : $money($row['outstanding']) }}</td>
                     </tr>
                 @endforeach
@@ -266,9 +297,25 @@
         padding-left: 1.1rem !important;
     }
 
-    .highlight {
-        background: #f4b183;
+    .apds-paid {
+        color: #15803d;
         font-weight: 700;
+    }
+
+    .apds-partial {
+        color: #c2410c;
+        font-weight: 700;
+    }
+
+    .apds-unpaid {
+        color: #b91c1c;
+        font-weight: 700;
+    }
+
+    .apds-paid s,
+    .apds-partial s {
+        text-decoration: line-through;
+        font-weight: 500;
     }
 
     .apds-scroll {

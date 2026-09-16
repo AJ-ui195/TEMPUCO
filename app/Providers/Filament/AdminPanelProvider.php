@@ -2,8 +2,12 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Pages\ChangePassword;
 use App\Filament\Auth\Pages\Login;
 use App\Filament\Pages\Dashboard;
+use App\Http\Middleware\EnsurePasswordChanged;
+use App\Support\AdminEmailMfa;
+use Filament\Auth\MultiFactor\Pages\SetUpRequiredMultiFactorAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -41,22 +45,14 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
+                ChangePassword::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->userMenu(false)
-            ->renderHook(
-                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
-                fn (): string => view('filament.hooks.login-panel-switch', [
-                    'url' => url('/portal/login'),
-                    'message' => __('Click here to login to the Members Portal'),
-                ])->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
-                fn (): string => view('filament.hooks.login-panel-switch', [
-                    'url' => url('/pos/login'),
-                    'message' => __('Click here to login to POS'),
-                ])->render(),
+            ->multiFactorAuthentication(
+                [AdminEmailMfa::provider()],
+                SetUpRequiredMultiFactorAuthentication::class,
+                true,
             )
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
@@ -103,6 +99,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsurePasswordChanged::class,
             ]);
     }
 }

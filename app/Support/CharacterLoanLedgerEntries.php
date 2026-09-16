@@ -3,7 +3,7 @@
 namespace App\Support;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
+use App\Models\Contracts\MemberLoan;
 use App\Models\LoanPayment;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -23,7 +23,7 @@ final class CharacterLoanLedgerEntries
     /**
      * Recurring interest for one repayment period (Character-Emergency: 2%/mo × term, typically 3 → 6%).
      */
-    public static function periodInterest(Loan $loan): float
+    public static function periodInterest(MemberLoan $loan): float
     {
         $principal = round((float) $loan->loan_amount, 2);
         $stored = round((float) $loan->installment_amount, 2);
@@ -38,7 +38,7 @@ final class CharacterLoanLedgerEntries
         return round($principal * self::MONTHLY_INTEREST_RATE * $periodMonths, 2);
     }
 
-    public static function repaymentIntervalMonths(Loan $loan): int
+    public static function repaymentIntervalMonths(MemberLoan $loan): int
     {
         $months = max(1, (int) $loan->loan_period_months);
 
@@ -60,7 +60,7 @@ final class CharacterLoanLedgerEntries
      *     remarks: string
      * }>
      */
-    public static function forLoan(Loan $loan): Collection
+    public static function forLoan(MemberLoan $loan): Collection
     {
         if ($loan->status !== LoanStatus::Approved) {
             return collect();
@@ -68,29 +68,25 @@ final class CharacterLoanLedgerEntries
 
         $principal = round((float) $loan->loan_amount, 2);
         $periodInterest = self::periodInterest($loan);
-        $intervalMonths = self::repaymentIntervalMonths($loan);
         $releaseDate = Carbon::parse($loan->loan_date ?? $loan->approved_at ?? $loan->created_at);
 
-        $payments = $loan->relationLoaded('payments')
-            ? $loan->payments->sortBy([
-                fn (LoanPayment $payment) => $payment->received_at?->timestamp ?? 0,
-                fn (LoanPayment $payment) => $payment->id,
-            ])->values()
-            : $loan->payments()->orderBy('received_at')->orderBy('id')->get();
+        $payments = LoanPayment::inRecordedOrder(
+            $loan->relationLoaded('payments')
+                ? $loan->payments
+                : $loan->payments()->get()
+        );
 
-        $principalPaid = round((float) $payments
-            ->filter(fn (LoanPayment $payment): bool => self::isPrincipalPayment($payment))
-            ->sum(fn (LoanPayment $payment) => (float) $payment->amount), 2);
-
-        $isPaid = $principalPaid + 0.005 >= $principal;
-        $nextDue = $loan->first_payment_due_date
+        $remarksIntervalMonths = 3;
+        $dueCursor = $loan->first_payment_due_date
             ? Carbon::parse($loan->first_payment_due_date)
-            : $releaseDate->copy()->addMonthsNoOverflow($intervalMonths);
+            : $releaseDate->copy()->addMonthsNoOverflow($remarksIntervalMonths);
 
         $entries = collect();
 
         $entries->push([
             'date' => $releaseDate,
+            'stored_at' => $loan->created_at ?? $releaseDate,
+            'stored_id' => 0,
             'or' => '',
             'voucher' => '',
             'released' => $principal,
@@ -100,22 +96,23 @@ final class CharacterLoanLedgerEntries
             'balance' => $principal,
             'balance_blank' => false,
             'surcharge' => 0.0,
-            'remarks' => $isPaid ? '' : $nextDue->format('n-j-Y'),
+            'remarks' => $dueCursor->format('n-j-Y'),
         ]);
 
         $balance = $principal;
-        $dueCursor = $nextDue->copy();
 
         foreach ($payments as $payment) {
             $amount = round((float) $payment->amount, 2);
-            $date = Carbon::parse($payment->received_at);
+            $date = $payment->created_at ?? Carbon::parse($payment->received_at);
             $or = (string) ($payment->official_receipt_no ?? '');
 
             if (self::isInterestPayment($payment)) {
-                $dueCursor = $date->copy()->addMonthsNoOverflow($intervalMonths);
+                $dueCursor = $dueCursor->copy()->addMonthsNoOverflow($remarksIntervalMonths);
 
                 $entries->push([
                     'date' => $date,
+                    'stored_at' => $date,
+                    'stored_id' => (int) $payment->id,
                     'or' => $or,
                     'voucher' => '',
                     'released' => 0.0,
@@ -125,7 +122,7 @@ final class CharacterLoanLedgerEntries
                     'balance' => $balance,
                     'balance_blank' => false,
                     'surcharge' => 0.0,
-                    'remarks' => $isPaid ? '' : $dueCursor->format('n-j-Y'),
+                    'remarks' => $dueCursor->format('n-j-Y'),
                 ]);
 
                 continue;
@@ -136,6 +133,8 @@ final class CharacterLoanLedgerEntries
 
             $entries->push([
                 'date' => $date,
+                'stored_at' => $date,
+                'stored_id' => (int) $payment->id,
                 'or' => $or,
                 'voucher' => '',
                 'released' => 0.0,
@@ -153,21 +152,16 @@ final class CharacterLoanLedgerEntries
     }
 
     /**
-     * @param  Collection<int, Loan>  $loans
+     * @param  Collection<int, MemberLoan>  $loans
      * @return Collection<int, array<string, mixed>>
      */
     public static function forLoans(Collection $loans): Collection
     {
-        return $loans
-            ->sortBy([
-                fn (Loan $loan) => $loan->loan_date?->timestamp
-                    ?? $loan->approved_at?->timestamp
-                    ?? $loan->created_at?->timestamp
-                    ?? 0,
-                fn (Loan $loan) => $loan->id,
-            ])
-            ->flatMap(fn (Loan $loan): Collection => self::forLoan($loan))
-            ->values();
+        return LedgerChronology::sortByStoredTime(
+            $loans,
+            fn (MemberLoan $loan) => $loan->created_at ?? $loan->loan_date,
+            fn (MemberLoan $loan): int => (int) $loan->id,
+        )->flatMap(fn (MemberLoan $loan): Collection => self::forLoan($loan))->values();
     }
 
     public static function isInterestPayment(LoanPayment $payment): bool

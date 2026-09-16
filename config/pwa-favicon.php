@@ -12,13 +12,13 @@ return [
     // densities + 512 master + maskable) is built at request time from the
     // `manifest.icons` density map below, so do NOT hand-write `icons` here.
     'manifest' => [
-        'name' => 'Members Portal',
-        'short_name' => 'Portal',
-        'description' => 'DICNHS Members Portal — sign in to view loans, credits, and account details.',
+        'name' => 'TEMPUCO',
+        'short_name' => 'TEMPUCO',
+        'description' => 'DICNHS TEMPUCO — sign in to view loans, credits, and account details.',
         // start_url carries a `source=pwa` flag so analytics can split
         // installs vs regular web hits without affecting routing.
-        'start_url' => '/portal/login?source=pwa',
-        'scope' => '/portal/',
+        'start_url' => '/login?source=pwa',
+        'scope' => '/',
         'id' => '/portal/',
         'display' => 'standalone',
         'orientation' => 'portrait-primary',

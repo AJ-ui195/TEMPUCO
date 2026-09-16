@@ -9,6 +9,7 @@ use App\Support\MemberQrCode;
 use App\Support\PrintMemberQrCode;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
@@ -26,9 +27,18 @@ class ManageMembers extends ManageRecords
                 ->label(__('Add member'))
                 ->modalHeading(__('Add member'))
                 ->createAnother(false)
-                ->successNotificationTitle(__('Member added'))
+                ->successNotification(
+                    Notification::make()
+                        ->success()
+                        ->title(__('Confirmation email sent'))
+                        ->body(__('The member account can be used only after they confirm the address in the Email field.')),
+                )
                 ->using(fn (array $data): Member => MemberAccount::create($data))
                 ->after(function (Member $record): void {
+                    if (! $record->hasVerifiedEmail()) {
+                        return;
+                    }
+
                     $this->replaceMountedAction('showMemberQr', [
                         'member' => $record->getKey(),
                     ]);

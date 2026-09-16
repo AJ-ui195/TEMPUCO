@@ -73,21 +73,40 @@
         opacity: 0.35;
     }
 
-    /* Glass sections create stacking contexts; raise the active section so
-       select/date dropdowns are not clipped by sections rendered below. */
+    /* Glass + backdrop-filter creates a stacking context. Raise the schema
+       grid item (fi-sc-section), not only the inner card — later siblings
+       otherwise paint over overflowing selects/date pickers.
+       Do not use :has(.fi-fo-date-time-picker-panel) or bare
+       [aria-expanded=true]: date panels stay in the DOM, and collapse
+       buttons are expanded whenever a section is open. */
     .fi-panel-admin .fi-section:not(.fi-section-not-contained):not(.fi-aside),
     .fi-panel-admin .fi-section.fi-aside > .fi-section-content-ctn,
     .fi-panel-admin .fi-section-content-ctn,
-    .fi-panel-admin .fi-section-content {
+    .fi-panel-admin .fi-section-content,
+    .fi-panel-admin .fi-sc-grid > *,
+    .fi-panel-admin .fi-fo-field-wrp,
+    .fi-panel-admin .fi-fo-field-content-col {
         overflow: visible;
     }
 
-    .fi-panel-admin .fi-section:has(.fi-select-input-btn[aria-expanded="true"]) {
+    .fi-panel-admin .fi-sc-section,
+    .fi-panel-admin .fi-section:not(.fi-section-not-contained):not(.fi-aside),
+    .fi-panel-admin .fi-ta-ctn {
         position: relative;
-        z-index: 50;
+        z-index: 1;
     }
 
-    .fi-panel-admin .fi-select-input-ctn .fi-dropdown-panel {
-        z-index: 60;
+    .fi-panel-admin .fi-sc-section:focus-within,
+    .fi-panel-admin .fi-sc-section:has(.fi-select-input-btn[aria-expanded="true"]),
+    .fi-panel-admin .fi-section:focus-within,
+    .fi-panel-admin .fi-section:has(.fi-select-input-btn[aria-expanded="true"]),
+    .fi-panel-admin .fi-ta-ctn:focus-within,
+    .fi-panel-admin .fi-ta-ctn:has(.fi-select-input-btn[aria-expanded="true"]) {
+        z-index: 80;
+    }
+
+    .fi-panel-admin .fi-select-input-ctn .fi-dropdown-panel,
+    .fi-panel-admin .fi-fo-date-time-picker-panel {
+        z-index: 90;
     }
 </style>

@@ -3,10 +3,9 @@
 namespace App\Filament\User\Pages;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
+use App\Models\CharacterLoan;
 use App\Models\Member;
 use App\Support\CharacterLoanLedgerEntries;
-use App\Support\LoanTypes;
 use BackedEnum;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Pages\Page;
@@ -55,13 +54,12 @@ class CharacterLoanLedger extends Page
     }
 
     /**
-     * @return Collection<int, Loan>
+     * @return Collection<int, CharacterLoan>
      */
     protected function characterLoans(Member $user): Collection
     {
-        return Loan::query()
+        return CharacterLoan::query()
             ->forUser($user)
-            ->where('loan_type', LoanTypes::CHARACTER)
             ->where('status', LoanStatus::Approved)
             ->with('payments')
             ->orderedByLoanDate()

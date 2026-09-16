@@ -3,8 +3,8 @@
 namespace App\Support;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
 use App\Models\LoanPayment;
+use App\Models\QuickLoan;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -15,6 +15,13 @@ use Illuminate\Support\Collection;
 final class QuickLoanLedgerEntries
 {
     public const INTEREST_RATE = 0.01;
+
+    public const MAX_AMOUNT = 2000.0;
+
+    public static function totalPayable(float $amount): float
+    {
+        return round($amount + ($amount * self::INTEREST_RATE), 2);
+    }
 
     /**
      * @return Collection<int, array{
@@ -30,7 +37,7 @@ final class QuickLoanLedgerEntries
      *     remarks: string
      * }>
      */
-    public static function forLoan(Loan $loan): Collection
+    public static function forLoan(QuickLoan $loan): Collection
     {
         if ($loan->status !== LoanStatus::Approved) {
             return collect();
@@ -40,53 +47,47 @@ final class QuickLoanLedgerEntries
         $interest = round($principal * self::INTEREST_RATE, 2);
         $releaseDate = Carbon::parse($loan->loan_date ?? $loan->approved_at ?? $loan->created_at);
 
-        $payments = $loan->relationLoaded('payments')
-            ? $loan->payments->sortBy([
-                fn (LoanPayment $payment) => $payment->received_at?->timestamp ?? 0,
-                fn (LoanPayment $payment) => $payment->id,
-            ])->values()
-            : $loan->payments()->orderBy('received_at')->orderBy('id')->get();
+        $payments = LoanPayment::inRecordedOrder(
+            $loan->relationLoaded('payments')
+                ? $loan->payments
+                : $loan->payments()->get()
+        );
 
-        $totalPaid = round((float) $payments->sum(fn (LoanPayment $payment) => (float) $payment->amount), 2);
-        $isPaid = $totalPaid + 0.005 >= $principal;
+        $due = self::totalPayable($principal);
+        $firstDue = $loan->first_payment_due_date
+            ? Carbon::parse($loan->first_payment_due_date)->format('n-j-Y')
+            : $releaseDate->copy()->addMonthNoOverflow()->format('n-j-Y');
 
         $entries = collect();
 
         $entries->push([
             'date' => $releaseDate,
+            'stored_at' => $loan->created_at ?? $releaseDate,
+            'stored_id' => 0,
             'or' => '',
             'voucher' => '',
             'released' => $principal,
-            'interest' => 0.0,
-            'payment' => 0.0,
-            'balance' => $principal,
-            'surcharge_payment' => 0.0,
-            'surcharge_balance' => 0.0,
-            'remarks' => $isPaid ? '' : __('unpaid'),
-        ]);
-
-        $entries->push([
-            'date' => $releaseDate,
-            'or' => '',
-            'voucher' => '',
-            'released' => 0.0,
             'interest' => $interest,
             'payment' => 0.0,
-            'balance' => $principal,
+            'balance' => $due,
             'surcharge_payment' => 0.0,
             'surcharge_balance' => 0.0,
-            'remarks' => '',
+            'remarks' => $firstDue,
         ]);
 
-        $balance = $principal;
+        $balance = $due;
 
         foreach ($payments as $payment) {
             $amount = round((float) $payment->amount, 2);
             $balance = round(max(0, $balance - $amount), 2);
             $clearsLoan = $balance < 0.005;
 
+            $storedAt = $payment->created_at ?? Carbon::parse($payment->received_at);
+
             $entries->push([
-                'date' => Carbon::parse($payment->received_at),
+                'date' => $storedAt,
+                'stored_at' => $storedAt,
+                'stored_id' => (int) $payment->id,
                 'or' => (string) ($payment->official_receipt_no ?? ''),
                 'voucher' => '',
                 'released' => 0.0,
@@ -103,7 +104,7 @@ final class QuickLoanLedgerEntries
     }
 
     /**
-     * @param  Collection<int, Loan>  $loans
+     * @param  Collection<int, QuickLoan>  $loans
      * @return Collection<int, array{
      *     date: Carbon,
      *     or: string,
@@ -119,15 +120,10 @@ final class QuickLoanLedgerEntries
      */
     public static function forLoans(Collection $loans): Collection
     {
-        return $loans
-            ->sortBy([
-                fn (Loan $loan) => $loan->loan_date?->timestamp
-                    ?? $loan->approved_at?->timestamp
-                    ?? $loan->created_at?->timestamp
-                    ?? 0,
-                fn (Loan $loan) => $loan->id,
-            ])
-            ->flatMap(fn (Loan $loan): Collection => self::forLoan($loan))
-            ->values();
+        return LedgerChronology::sortByStoredTime(
+            $loans,
+            fn (QuickLoan $loan) => $loan->created_at ?? $loan->loan_date,
+            fn (QuickLoan $loan): int => (int) $loan->id,
+        )->flatMap(fn (QuickLoan $loan): Collection => self::forLoan($loan))->values();
     }
 }

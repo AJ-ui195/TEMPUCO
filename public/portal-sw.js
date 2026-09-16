@@ -1,7 +1,7 @@
 const CACHE = 'member-portal-shell-v1';
 
 const SHELL = [
-    '/portal/login',
+    '/login',
     '/manifest.json',
 ];
 

@@ -3,9 +3,9 @@
 namespace App\Support;
 
 use App\Enums\LoanStatus;
-use App\Models\Loan;
 use App\Models\Member;
-use Illuminate\Support\Carbon;
+use App\Models\RegularLoan;
+use Carbon\Carbon;
 
 /**
  * APDS policy rules (Sections 2–5) for regular / salary loans.
@@ -19,6 +19,14 @@ final class ApdsRules
     public const SERVICE_CHARGE_SECOND_ACCOUNT = 0.06;
 
     public const CAPITAL_BUILD_UP_RETENTION = 5000.0;
+
+    public const FIRST_APDS_CAPITAL_BUILD_UP = 10000.0;
+
+    public const FIRST_APDS_MAX_AMOUNT = 300000.0;
+
+    public const FIRST_APDS_MIN_TERM_MONTHS = 12;
+
+    public const FIRST_APDS_MAX_TERM_MONTHS = 60;
 
     public const RESTRUCTURE_AGGREGATE_MAX = 750000.0;
 
@@ -71,15 +79,15 @@ final class ApdsRules
         };
     }
 
-    public static function ageAt(?Carbon $dateOfBirth): ?int
+    public static function ageAt(?\DateTimeInterface $dateOfBirth): ?int
     {
-        return $dateOfBirth?->age;
+        return $dateOfBirth === null ? null : Carbon::instance($dateOfBirth)->age;
     }
 
     /**
      * @return string|null Validation error message, or null if OK / skipped.
      */
-    public static function ageRequirementError(?Carbon $dateOfBirth, int $termMonths): ?string
+    public static function ageRequirementError(?\DateTimeInterface $dateOfBirth, int $termMonths): ?string
     {
         if ($dateOfBirth === null) {
             return null; // DOB optional — skip Section 3 when blank
@@ -92,7 +100,7 @@ final class ApdsRules
             return null;
         }
 
-        $age = $dateOfBirth->age;
+        $age = Carbon::instance($dateOfBirth)->age;
 
         if ($age > $maxAge) {
             return __('For a :years-year term, the borrower must not be more than :max years old at application. Current age: :age.', [
@@ -107,10 +115,10 @@ final class ApdsRules
 
     public static function isSecondApdsAccount(Member $user, ?int $excludeLoanId = null): bool
     {
-        $query = Loan::query()
+        $query = RegularLoan::query()
             ->forUser($user)
             ->where('status', LoanStatus::Approved)
-            ->whereNotIn('loan_type', LoanTypes::nonRegular());
+            ->whereNotIn('loan_type', LoanTypes::excludedFromApdsAccounts());
 
         if ($excludeLoanId !== null) {
             $query->whereKeyNot($excludeLoanId);
@@ -119,9 +127,66 @@ final class ApdsRules
         return $query->exists();
     }
 
+    public static function approvedApdsAmount(Member $user): float
+    {
+        return round((float) RegularLoan::query()
+            ->forUser($user)
+            ->where('status', LoanStatus::Approved)
+            ->whereNotIn('loan_type', LoanTypes::excludedFromApdsAccounts())
+            ->sum('loan_amount'), 2);
+    }
+
+    public static function hasQualifyingApdsForCharacter(Member $user): bool
+    {
+        return self::approvedApdsAmount($user) + 0.005 >= self::FIRST_APDS_MAX_AMOUNT;
+    }
+
     public static function capitalBuildUpRetention(bool $isSecondApdsAccount): float
     {
-        return $isSecondApdsAccount ? self::CAPITAL_BUILD_UP_RETENTION : 0.0;
+        return $isSecondApdsAccount
+            ? self::CAPITAL_BUILD_UP_RETENTION
+            : self::FIRST_APDS_CAPITAL_BUILD_UP;
+    }
+
+    /**
+     * First APDS for new members: loanable amount up to ₱300,000.
+     *
+     * @return string|null Validation error message, or null if OK / not first APDS.
+     */
+    public static function firstApdsAmountError(Member $user, float $amount): ?string
+    {
+        if (self::isSecondApdsAccount($user)) {
+            return null;
+        }
+
+        if ($amount > self::FIRST_APDS_MAX_AMOUNT) {
+            return __('Qualified new members may avail up to ₱:max on the first APDS regular loan.', [
+                'max' => number_format(self::FIRST_APDS_MAX_AMOUNT, 2),
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * First APDS for new members: term of 1–5 years.
+     *
+     * @return string|null Validation error message, or null if OK / not first APDS.
+     */
+    public static function firstApdsTermError(Member $user, int $termMonths): ?string
+    {
+        if (self::isSecondApdsAccount($user)) {
+            return null;
+        }
+
+        if ($termMonths < self::FIRST_APDS_MIN_TERM_MONTHS || $termMonths > self::FIRST_APDS_MAX_TERM_MONTHS) {
+            return __('The first APDS regular loan term must be one (1) to five (5) years (:min–:max months).', [
+                'min' => self::FIRST_APDS_MIN_TERM_MONTHS,
+                'max' => self::FIRST_APDS_MAX_TERM_MONTHS,
+            ]);
+        }
+
+        return null;
     }
 
     /**
@@ -139,10 +204,10 @@ final class ApdsRules
             return null;
         }
 
-        $existing = (float) Loan::query()
+        $existing = (float) RegularLoan::query()
             ->forUser($user)
             ->where('status', LoanStatus::Approved)
-            ->whereNotIn('loan_type', LoanTypes::nonRegular())
+            ->whereNotIn('loan_type', LoanTypes::excludedFromApdsAccounts())
             ->when($excludeLoanId !== null, fn ($q) => $q->whereKeyNot($excludeLoanId))
             ->sum('loan_amount');
 

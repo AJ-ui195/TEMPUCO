@@ -4,12 +4,16 @@ namespace App\Filament\User\Pages;
 
 use App\Enums\LoanCategory;
 use App\Enums\LoanPurpose;
-use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
-use App\Models\Loan;
 use App\Models\Member;
 use App\Support\ApdsRules;
+use App\Support\CharacterLoanRules;
+use App\Support\CollateralizedLoanRules;
+use App\Support\LoanApplicationException;
+use App\Support\LoanApplicationService;
 use App\Support\LoanTypes;
+use App\Support\PesoInput;
+use App\Support\QuickLoanLedgerEntries;
 use App\Support\RegularLoanSchedule;
 use BackedEnum;
 use Carbon\Carbon;
@@ -30,6 +34,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 
 class ApplyLoan extends Page
 {
@@ -51,6 +56,13 @@ class ApplyLoan extends Page
      * @var array<string, mixed>|null
      */
     public ?array $data = [];
+
+    public static function canAccess(): bool
+    {
+        $member = auth()->user();
+
+        return $member instanceof Member && $member->isActive();
+    }
 
     public function mount(): void
     {
@@ -74,14 +86,34 @@ class ApplyLoan extends Page
             'quick_email' => $member->email,
             'quick_occupation' => $member->occupation,
             'quick_employer_department' => $member->employer_department,
-            'loan_period_months' => 1,
-            'loan_type' => 'QUICK LOAN',
+            'loan_period_months' => 12,
+            'loan_type' => LoanTypes::REGULAR,
+            'first_payment_due_date' => now()->addMonthNoOverflow()->toDateString(),
         ]);
     }
 
     public function getTitle(): string|Htmlable
     {
         return static::$title ?? __('Loan application');
+    }
+
+    public function collateralizedRequirementsAction(): Action
+    {
+        /** @var Member $member */
+        $member = auth()->user();
+
+        return Action::make('collateralizedRequirements')
+            ->label(__('Requirements'))
+            ->modalHeading(__('Collateralized loan'))
+            ->modalDescription(__('Please review the documentary requirements and loan terms.'))
+            ->modalContent(fn (): HtmlString => new HtmlString(
+                view('filament.user.collateralized-loan-requirements', [
+                    'member' => $member,
+                ])->render()
+            ))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('Close'))
+            ->hidden();
     }
 
     public function defaultForm(Schema $schema): Schema
@@ -113,12 +145,26 @@ class ApplyLoan extends Page
                             ])
                             ->inline()
                             ->live()
-                            ->afterStateUpdated(function (?string $state, callable $set): void {
-                                match ($state) {
-                                    self::APPLICATION_TYPE_QUICK => $set('loan_type', LoanTypes::QUICK),
-                                    self::APPLICATION_TYPE_CHARACTER => $set('loan_type', LoanTypes::CHARACTER),
-                                    default => $set('loan_type', null),
-                                };
+                            ->afterStateUpdated(function (?string $state, callable $set, callable $get): void {
+                                if ($state === self::APPLICATION_TYPE_QUICK) {
+                                    $set('loan_type', LoanTypes::QUICK);
+                                    $set('loan_period_months', 1);
+                                    $this->syncQuickPayable($set, $get);
+                                    $this->syncQuickDueDate($set, $get);
+
+                                    return;
+                                }
+
+                                if ($state === self::APPLICATION_TYPE_CHARACTER) {
+                                    $set('character_loan_type', LoanTypes::CHARACTER);
+                                    $set('character_variant', CharacterLoanRules::VARIANT_EMERGENCY);
+                                    $this->syncCharacterDefaults($set, $get);
+
+                                    return;
+                                }
+
+                                $set('loan_type', LoanTypes::REGULAR);
+                                $set('loan_period_months', 12);
                             })
                             ->required()
                             ->columnSpanFull(),
@@ -141,7 +187,7 @@ class ApplyLoan extends Page
                     ->columnSpanFull(),
 
                 Section::make(__('Applicant\'s request (Regular loan)'))
-                    ->description(__('Complete all fields below. I hereby certify that all statements made hereon are true and complete.'))
+                    ->description(__('First APDS for new members: up to ₱300,000, 1–5 years, and ₱10,000 capital build-up from net proceeds. I hereby certify that all statements made hereon are true and complete.'))
                     ->schema([
                         TextInput::make('applicant_name')
                             ->label(__('Name'))
@@ -157,41 +203,165 @@ class ApplyLoan extends Page
                             ->label(__('Date of birth'))
                             ->native(false)
                             ->maxDate(now())
-                            ->helperText(__('Optional. Required only to enforce APDS age limits for 4–7 year terms.'))
+                            ->helperText(__('Optional. Age caps if DOB is set: 4yr≤56, 5yr≤55. First APDS terms are 1–5 years.'))
                             ->columnSpanFull(),
-                        TextInput::make('loan_type')
+                        Select::make('loan_type')
                             ->label(__('Type of loan'))
-                            ->placeholder(__('e.g. Emergency, Educational'))
+                            ->options(LoanTypes::regularOptions())
+                            ->default(LoanTypes::REGULAR)
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
-                            ->maxLength(255)
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function (?string $state, callable $set, callable $get): void {
+                                if (LoanTypes::isCollateralized((string) $state)) {
+                                    $months = (int) ($get('loan_period_months') ?? 12);
+                                    if (
+                                        $months < CollateralizedLoanRules::MIN_TERM_MONTHS
+                                        || $months > CollateralizedLoanRules::MAX_TERM_MONTHS
+                                    ) {
+                                        $set('loan_period_months', CollateralizedLoanRules::MIN_TERM_MONTHS);
+                                    }
+
+                                    $this->syncRegularInstallment($set, $get);
+                                    $this->mountAction('collateralizedRequirements');
+
+                                    return;
+                                }
+
+                                $this->syncRegularInstallment($set, $get);
+                            })
+                            ->visible(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->columnSpanFull(),
-                        TextInput::make('loan_amount')
-                            ->label(__('Loan amount (PHP)'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
-                            ->numeric()
-                            ->minValue(1)
-                            ->step(0.01)
-                            ->prefix('₱')
-                            ->live(onBlur: true)
-                            ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncRegularInstallment($set, $get)),
+                        Actions::make([
+                            Action::make('viewCollateralizedRequirements')
+                                ->label(__('View requirements'))
+                                ->color('gray')
+                                ->modalHeading(__('Collateralized loan'))
+                                ->modalDescription(__('Please review the documentary requirements and loan terms.'))
+                                ->modalContent(function (): HtmlString {
+                                    /** @var Member $member */
+                                    $member = auth()->user();
+
+                                    return new HtmlString(
+                                        view('filament.user.collateralized-loan-requirements', [
+                                            'member' => $member,
+                                        ])->render()
+                                    );
+                                })
+                                ->modalSubmitAction(false)
+                                ->modalCancelActionLabel(__('Close')),
+                        ])
+                            ->visible(fn (callable $get): bool => LoanTypes::isCollateralized((string) ($get('loan_type') ?? '')))
+                            ->columnSpanFull(),
+                        PesoInput::decorate(
+                            TextInput::make('loan_amount')
+                                ->label(__('Loan amount (PHP)'))
+                                ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
+                                ->minValue(1)
+                                ->maxValue(function (callable $get): float {
+                                    if ($get('loan_application_type') === self::APPLICATION_TYPE_QUICK) {
+                                        return QuickLoanLedgerEntries::MAX_AMOUNT;
+                                    }
+
+                                    if (LoanTypes::isCollateralized((string) ($get('loan_type') ?? ''))) {
+                                        return CollateralizedLoanRules::MAX_AMOUNT;
+                                    }
+
+                                    $member = auth()->user();
+
+                                    if ($member instanceof Member && ! ApdsRules::isSecondApdsAccount($member)) {
+                                        return ApdsRules::FIRST_APDS_MAX_AMOUNT;
+                                    }
+
+                                    return 999999999;
+                                })
+                                ->helperText(function (callable $get): string {
+                                    if (LoanTypes::isCollateralized((string) ($get('loan_type') ?? ''))) {
+                                        return __('Collateralized loan: maximum ₱:max. Equal monthly amortization on a diminishing balance.', [
+                                            'max' => number_format(CollateralizedLoanRules::MAX_AMOUNT, 2),
+                                        ]);
+                                    }
+
+                                    $member = auth()->user();
+
+                                    if ($member instanceof Member && ! ApdsRules::isSecondApdsAccount($member)) {
+                                        return __('First APDS (new members): maximum ₱:max. ₱:cbu accrues to share capital from net proceeds.', [
+                                            'max' => number_format(ApdsRules::FIRST_APDS_MAX_AMOUNT, 2),
+                                            'cbu' => number_format(ApdsRules::FIRST_APDS_CAPITAL_BUILD_UP, 2),
+                                        ]);
+                                    }
+
+                                    return __('Enter the requested regular loan amount.');
+                                })
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncRegularInstallment($set, $get))
+                        ),
                         TextInput::make('loan_period_months')
                             ->label(__('Repayment period'))
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
                             ->integer()
-                            ->minValue(1)
-                            ->maxValue(84)
+                            ->minValue(function (callable $get): int {
+                                if (LoanTypes::isCollateralized((string) ($get('loan_type') ?? ''))) {
+                                    return CollateralizedLoanRules::MIN_TERM_MONTHS;
+                                }
+
+                                $member = auth()->user();
+
+                                if ($member instanceof Member && ! ApdsRules::isSecondApdsAccount($member)) {
+                                    return ApdsRules::FIRST_APDS_MIN_TERM_MONTHS;
+                                }
+
+                                return 1;
+                            })
+                            ->maxValue(function (callable $get): int {
+                                if (LoanTypes::isCollateralized((string) ($get('loan_type') ?? ''))) {
+                                    return CollateralizedLoanRules::MAX_TERM_MONTHS;
+                                }
+
+                                $member = auth()->user();
+
+                                if ($member instanceof Member && ! ApdsRules::isSecondApdsAccount($member)) {
+                                    return ApdsRules::FIRST_APDS_MAX_TERM_MONTHS;
+                                }
+
+                                return 84;
+                            })
                             ->suffix(__('month(s)'))
-                            ->helperText(__('APDS age caps (if DOB is set): 4yr≤56, 5yr≤55, 6yr≤54, 7yr≤53.'))
+                            ->helperText(function (callable $get): string {
+                                if (LoanTypes::isCollateralized((string) ($get('loan_type') ?? ''))) {
+                                    return __('Collateralized loan: 12 to 24 months. Insurance is required.');
+                                }
+
+                                $member = auth()->user();
+
+                                if ($member instanceof Member && ! ApdsRules::isSecondApdsAccount($member)) {
+                                    return __('First APDS: one (1) to five (5) years (12–60 months). Age caps if DOB is set: 4yr≤56, 5yr≤55.');
+                                }
+
+                                return __('APDS age caps (if DOB is set): 4yr≤56, 5yr≤55, 6yr≤54, 7yr≤53.');
+                            })
                             ->live(onBlur: true)
                             ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncRegularInstallment($set, $get)),
-                        TextInput::make('installment_amount')
-                            ->label(__('Monthly installment (PHP)'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
-                            ->numeric()
-                            ->minValue(0)
-                            ->step(0.01)
-                            ->prefix('₱')
-                            ->helperText(__('Auto-calculated from APDS declining-balance schedule. You may adjust if needed.')),
+                        PesoInput::decorate(
+                            TextInput::make('installment_amount')
+                                ->label(__('Monthly installment (PHP)'))
+                                ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
+                                ->minValue(0)
+                                ->helperText(function (callable $get): string {
+                                    if (LoanTypes::isCollateralized((string) ($get('loan_type') ?? ''))) {
+                                        $member = auth()->user();
+                                        $rate = $member instanceof Member && $member->isRetiree()
+                                            ? '1%'
+                                            : '2%';
+
+                                        return __('Auto-calculated at :rate monthly on a diminishing balance (equal monthly amortization).', [
+                                            'rate' => $rate,
+                                        ]);
+                                    }
+
+                                    return __('Auto-calculated from APDS declining-balance schedule. You may adjust if needed.');
+                                })
+                        ),
                         DatePicker::make('first_payment_due_date')
                             ->label(__('First payment due on'))
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_REGULAR)
@@ -278,14 +448,19 @@ class ApplyLoan extends Page
                             ->dehydrated()
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK)
                             ->columnSpanFull(),
-                        TextInput::make('loan_amount')
-                            ->label(__('Amount to borrow (Maximum ₱2,000)'))
-                            ->numeric()
-                            ->minValue(1)
-                            ->maxValue(2000)
-                            ->step(0.01)
-                            ->prefix('₱')
-                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK),
+                        PesoInput::decorate(
+                            TextInput::make('loan_amount')
+                                ->label(__('Amount to borrow (Maximum ₱2,000)'))
+                                ->minValue(1)
+                                ->maxValue(QuickLoanLedgerEntries::MAX_AMOUNT)
+                                ->rule('max:'.QuickLoanLedgerEntries::MAX_AMOUNT)
+                                ->validationAttribute(__('amount to borrow'))
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(function (mixed $state, callable $set, callable $get): void {
+                                    $this->syncQuickPayable($set, $get);
+                                })
+                                ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK)
+                        ),
                         TextInput::make('loan_period_months')
                             ->label(__('Term'))
                             ->numeric()
@@ -293,22 +468,29 @@ class ApplyLoan extends Page
                             ->readOnly()
                             ->suffix(__('month'))
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK),
-                        TextInput::make('installment_amount')
-                            ->label(__('Total amount to be paid'))
-                            ->numeric()
-                            ->minValue(0)
-                            ->step(0.01)
-                            ->prefix('₱')
-                            ->helperText(__('Set this to loan amount + 1% interest.'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK),
+                        PesoInput::decorate(
+                            TextInput::make('installment_amount')
+                                ->label(__('Total amount to be paid'))
+                                ->minValue(0)
+                                ->readOnly()
+                                ->dehydrated()
+                                ->helperText(__('Automatically set to loan amount + 1% interest.'))
+                                ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK)
+                        ),
                         DatePicker::make('first_payment_due_date')
                             ->label(__('Due date'))
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK)
-                            ->native(false),
+                            ->native(false)
+                            ->readOnly()
+                            ->dehydrated(),
                         DatePicker::make('applicant_signed_at')
                             ->label(__('Date'))
                             ->required()
-                            ->native(false),
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function (mixed $state, callable $set, callable $get): void {
+                                $this->syncQuickDueDate($set, $get);
+                            }),
                     ])
                     ->columns(2)
                     ->visible(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_QUICK)
@@ -327,44 +509,139 @@ class ApplyLoan extends Page
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
                             ->rows(2)
                             ->columnSpanFull(),
-                        TextInput::make('loan_type')
+                        Select::make('character_loan_type')
                             ->label(__('Type of loan'))
-                            ->default(LoanTypes::CHARACTER)
-                            ->readOnly()
-                            ->dehydrated()
+                            ->options(function (): array {
+                                $member = auth()->user();
+
+                                return LoanTypes::characterOptions($member instanceof Member ? $member : null);
+                            })
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncCharacterDefaults($set, $get))
+                            ->helperText(function (callable $get): ?string {
+                                $type = (string) ($get('character_loan_type') ?? '');
+
+                                return match (true) {
+                                    LoanTypes::isCharacter($type) => __('Granted on integrity and repayment record. Replaces Emergency and Short-Term for qualified regular members.'),
+                                    LoanTypes::isCalamity($type) => __('Immediate assistance after a calamity. Maximum ₱40,000. 5% per annum. Term 24 months (NTHP).'),
+                                    LoanTypes::isEmergency($type) => __('Term 3 months. 1% per month prepaid from proceeds. Renewable up to two (2) times. 7-day grace. Repayment every 3 months.'),
+                                    LoanTypes::isTravel($type) => __('Yazrock Travel and Tours only. Maximum ₱70,000. 2% regular / 1% retiree. Term 6 months. Not convertible to cash.'),
+                                    LoanTypes::isRetireeShortTerm($type) => __('Retirees with share capital. 12–24 months. 1% monthly diminishing. Optional prepaid interest. 7-day grace. Max 90% of share capital.'),
+                                    default => null,
+                                };
+                            })
                             ->columnSpanFull(),
-                        TextInput::make('loan_amount')
-                            ->label(__('Loan amount (PHP)'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
-                            ->numeric()
-                            ->minValue(1)
-                            ->step(0.01)
-                            ->prefix('₱'),
+                        Radio::make('character_variant')
+                            ->label(__('Character loan terms'))
+                            ->options([
+                                CharacterLoanRules::VARIANT_EMERGENCY => __('Character-Emergency (3 months)'),
+                                CharacterLoanRules::VARIANT_SHORT_TERM => __('Character Short-Term (12 months)'),
+                            ])
+                            ->descriptions([
+                                CharacterLoanRules::VARIANT_EMERGENCY => __('2% monthly, prepaid. Renewable up to two (2) times. 7-day grace. Repayment every 3 months.'),
+                                CharacterLoanRules::VARIANT_SHORT_TERM => __('2% monthly diminishing. Interest deducted from proceeds. 7-day grace. Equal monthly amortization.'),
+                            ])
+                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER
+                                && LoanTypes::isCharacter((string) ($get('character_loan_type') ?? '')))
+                            ->visible(fn (callable $get): bool => LoanTypes::isCharacter((string) ($get('character_loan_type') ?? '')))
+                            ->live()
+                            ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncCharacterDefaults($set, $get))
+                            ->columnSpanFull(),
+                        PesoInput::decorate(
+                            TextInput::make('loan_amount')
+                                ->label(__('Loan amount (PHP)'))
+                                ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                                ->minValue(1)
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncCharacterDefaults($set, $get))
+                                ->helperText(function (callable $get): string {
+                                    $type = (string) ($get('character_loan_type') ?? '');
+                                    $member = auth()->user();
+
+                                    if (LoanTypes::isCharacter($type) && $member instanceof Member) {
+                                        if (ApdsRules::hasQualifyingApdsForCharacter($member)) {
+                                            return __('Existing APDS of at least ₱300,000: maximum ₱:max.', [
+                                                'max' => number_format(CharacterLoanRules::CHARACTER_WITH_APDS_MAX, 2),
+                                            ]);
+                                        }
+
+                                        return __('No APDS loan: 90% of share capital or ₱:max, whichever is lower. Share capital is not on file, so ₱:max is used.', [
+                                            'max' => number_format(CharacterLoanRules::CHARACTER_WITHOUT_APDS_MAX, 2),
+                                        ]);
+                                    }
+
+                                    return '';
+                                })
+                        ),
                         TextInput::make('loan_period_months')
                             ->label(__('Term'))
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
                             ->integer()
                             ->minValue(1)
-                            ->default(3)
+                            ->default(24)
                             ->suffix(__('month(s)'))
-                            ->helperText(__('Character-Emergency is typically 3 months; Short-Term is 12 months.')),
-                        TextInput::make('installment_amount')
-                            ->label(__('Period interest (PHP)'))
-                            ->helperText(__('Default: 2% monthly × term (e.g. ₱30,000 × 6% for 3 months = ₱1,800).'))
-                            ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
-                            ->numeric()
-                            ->minValue(0)
-                            ->step(0.01)
-                            ->prefix('₱'),
+                            ->disabled(fn (callable $get): bool => CharacterLoanRules::termIsLocked(
+                                CharacterLoanRules::resolveStoredType(
+                                    (string) ($get('character_loan_type') ?? ''),
+                                    $get('character_variant'),
+                                )
+                            ))
+                            ->dehydrated()
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncCharacterDefaults($set, $get))
+                            ->helperText(function (callable $get): string {
+                                $type = CharacterLoanRules::resolveStoredType(
+                                    (string) ($get('character_loan_type') ?? ''),
+                                    $get('character_variant'),
+                                );
+
+                                return match (true) {
+                                    LoanTypes::isCharacterEmergency($type) => __('Fixed at 3 months.'),
+                                    LoanTypes::isCharacterShortTerm($type) => __('Fixed at 12 months.'),
+                                    LoanTypes::isCalamity($type) => __('Fixed at 24 months.'),
+                                    LoanTypes::isEmergency($type) => __('Fixed at 3 months.'),
+                                    LoanTypes::isTravel($type) => __('Fixed at 6 months.'),
+                                    LoanTypes::isRetireeShortTerm($type) => __('12 to 24 months.'),
+                                    default => '',
+                                };
+                            }),
+                        PesoInput::decorate(
+                            TextInput::make('installment_amount')
+                                ->label(__('Period interest (PHP)'))
+                                ->helperText(function (callable $get): string {
+                                    $type = CharacterLoanRules::resolveStoredType(
+                                        (string) ($get('character_loan_type') ?? ''),
+                                        $get('character_variant'),
+                                    );
+
+                                    return match (true) {
+                                        LoanTypes::isCharacterEmergency($type) => __('Prepaid: 2% monthly × 3 months.'),
+                                        LoanTypes::isCharacterShortTerm($type) => __('2% monthly on diminishing balance (first period). Interest deducted from proceeds.'),
+                                        LoanTypes::isCalamity($type) => __('5% per annum × term in years (e.g. ₱40,000 × 10% for 24 months).'),
+                                        LoanTypes::isEmergency($type) => __('Prepaid: 1% per month × 3 months, deducted from proceeds.'),
+                                        LoanTypes::isTravel($type) => __('2% of principal (regular) or 1% (retiree).'),
+                                        LoanTypes::isRetireeShortTerm($type) => __('1% monthly on diminishing balance (optional prepaid).'),
+                                        default => '',
+                                    };
+                                })
+                                ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
+                                ->minValue(0)
+                        ),
                         DatePicker::make('first_payment_due_date')
                             ->label(__('First payment due on'))
+                            ->helperText(__('Three months after the loan date (e.g. 9-15-2026 → 12-15-2026).'))
                             ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
                             ->native(false),
                         DatePicker::make('applicant_signed_at')
                             ->label(__('Date'))
                             ->required()
-                            ->native(false),
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function (?string $state, callable $set, callable $get): void {
+                                $this->syncCharacterDueDate($set, $get);
+                            }),
                     ])
                     ->columns(2)
                     ->visible(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
@@ -407,35 +684,114 @@ class ApplyLoan extends Page
         $member = auth()->user();
 
         if ($isRegularLoan) {
-            $dob = filled($data['date_of_birth'] ?? null)
-                ? Carbon::parse($data['date_of_birth'])
-                : $member->date_of_birth;
+            $isCollateralized = LoanTypes::isCollateralized((string) ($data['loan_type'] ?? ''));
 
-            $ageError = ApdsRules::ageRequirementError(
-                $dob,
+            if ($isCollateralized) {
+                $amountError = CollateralizedLoanRules::amountError(PesoInput::parse($data['loan_amount'] ?? 0));
+                if ($amountError !== null) {
+                    Notification::make()
+                        ->title(__('Maximum loanable amount'))
+                        ->body($amountError)
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+
+                $termError = CollateralizedLoanRules::termError((int) ($data['loan_period_months'] ?? 0));
+                if ($termError !== null) {
+                    Notification::make()
+                        ->title(__('Collateralized loan term'))
+                        ->body($termError)
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+            } else {
+                $dob = filled($data['date_of_birth'] ?? null)
+                    ? Carbon::parse($data['date_of_birth'])
+                    : $member->date_of_birth;
+
+                $ageError = ApdsRules::ageRequirementError(
+                    $dob,
+                    (int) ($data['loan_period_months'] ?? 0),
+                );
+
+                if ($ageError !== null) {
+                    Notification::make()
+                        ->title(__('APDS age requirement'))
+                        ->body($ageError)
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+
+                $amountError = ApdsRules::firstApdsAmountError(
+                    $member,
+                    PesoInput::parse($data['loan_amount'] ?? 0),
+                );
+
+                if ($amountError !== null) {
+                    Notification::make()
+                        ->title(__('Maximum loanable amount'))
+                        ->body($amountError)
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+
+                $termError = ApdsRules::firstApdsTermError(
+                    $member,
+                    (int) ($data['loan_period_months'] ?? 0),
+                );
+
+                if ($termError !== null) {
+                    Notification::make()
+                        ->title(__('APDS loan term'))
+                        ->body($termError)
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+
+                $restructureError = ApdsRules::restructureAggregateError(
+                    $member,
+                    PesoInput::parse($data['loan_amount'] ?? 0),
+                    ($data['loan_category'] ?? null) === LoanCategory::Restructure->value,
+                );
+
+                if ($restructureError !== null) {
+                    Notification::make()
+                        ->title(__('Maximum loanable amount'))
+                        ->body($restructureError)
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+            }
+        }
+
+        if ($isCharacterLoan) {
+            $characterType = CharacterLoanRules::resolveStoredType(
+                (string) ($data['character_loan_type'] ?? ''),
+                $data['character_variant'] ?? null,
+            );
+            $characterError = CharacterLoanRules::applicationError(
+                $member,
+                $characterType,
+                PesoInput::parse($data['loan_amount'] ?? 0),
                 (int) ($data['loan_period_months'] ?? 0),
             );
 
-            if ($ageError !== null) {
+            if ($characterError !== null) {
                 Notification::make()
-                    ->title(__('APDS age requirement'))
-                    ->body($ageError)
-                    ->danger()
-                    ->send();
-
-                return;
-            }
-
-            $restructureError = ApdsRules::restructureAggregateError(
-                $member,
-                (float) ($data['loan_amount'] ?? 0),
-                ($data['loan_category'] ?? null) === LoanCategory::Restructure->value,
-            );
-
-            if ($restructureError !== null) {
-                Notification::make()
-                    ->title(__('Maximum loanable amount'))
-                    ->body($restructureError)
+                    ->title(__('Character loan'))
+                    ->body($characterError)
                     ->danger()
                     ->send();
 
@@ -470,47 +826,112 @@ class ApplyLoan extends Page
 
         $loanType = match ($applicationType) {
             self::APPLICATION_TYPE_QUICK => LoanTypes::QUICK,
-            self::APPLICATION_TYPE_CHARACTER => LoanTypes::CHARACTER,
-            default => (string) ($data['loan_type'] ?? ''),
+            self::APPLICATION_TYPE_CHARACTER => CharacterLoanRules::resolveStoredType(
+                (string) ($data['character_loan_type'] ?? ''),
+                $data['character_variant'] ?? null,
+            ),
+            default => in_array((string) ($data['loan_type'] ?? ''), [
+                LoanTypes::REGULAR,
+                LoanTypes::COLLATERALIZED,
+            ], true)
+                ? (string) $data['loan_type']
+                : LoanTypes::REGULAR,
         };
 
         $isSecondApds = $isRegularLoan && ApdsRules::isSecondApdsAccount($member);
-        $installmentAmount = $data['installment_amount'];
+        $installmentAmount = PesoInput::parse($data['installment_amount'] ?? 0);
+        $firstPaymentDueDate = $data['first_payment_due_date'] ?? null;
+
+        if ($isQuickLoan) {
+            $amount = PesoInput::parse($data['loan_amount'] ?? 0);
+
+            if ($amount > QuickLoanLedgerEntries::MAX_AMOUNT) {
+                Notification::make()
+                    ->title(__('Maximum loanable amount'))
+                    ->body(__('Quick loans may not exceed ₱:max.', [
+                        'max' => number_format(QuickLoanLedgerEntries::MAX_AMOUNT, 2),
+                    ]))
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+
+            $installmentAmount = QuickLoanLedgerEntries::totalPayable($amount);
+            $signedAt = $data['applicant_signed_at'] ?? now()->toDateString();
+            $firstPaymentDueDate = Carbon::parse($signedAt)->addMonthNoOverflow()->toDateString();
+        }
 
         if ($isRegularLoan) {
-            $schedule = RegularLoanSchedule::calculate(
-                (float) $data['loan_amount'],
-                (int) $data['loan_period_months'],
-                $isSecondApds,
-            );
+            if (LoanTypes::isCollateralized($loanType)) {
+                $schedule = RegularLoanSchedule::calculateCollateralized(
+                    PesoInput::parse($data['loan_amount']),
+                    (int) $data['loan_period_months'],
+                    $member->isRetiree(),
+                );
+            } else {
+                $schedule = RegularLoanSchedule::calculate(
+                    PesoInput::parse($data['loan_amount']),
+                    (int) $data['loan_period_months'],
+                    $isSecondApds,
+                );
+            }
             $installmentAmount = $schedule->monthlyInstallment;
         }
 
-        Loan::query()->create([
-            'user_id' => auth()->id(),
-            'status' => LoanStatus::Pending,
-            'loan_category' => ($isQuickLoan || $isCharacterLoan)
-                ? LoanCategory::AdditionalNew
-                : $data['loan_category'],
-            'loan_type' => $loanType,
-            'loan_amount' => $data['loan_amount'],
-            'loan_period_months' => $data['loan_period_months'],
-            'installment_amount' => $installmentAmount,
-            'first_payment_due_date' => $data['first_payment_due_date'] ?? null,
-            'purpose_of_loan' => $isQuickLoan ? null : $data['purpose_of_loan'],
-            'purpose_of_loan_other' => $isQuickLoan ? null : (
-                ($data['purpose_of_loan'] ?? null) === LoanPurpose::Others->value
-                    ? ($data['purpose_of_loan_other'] ?? null)
-                    : null
-            ),
-            'application_notes' => $isQuickLoan ? $this->buildQuickLoanPurpose($data) : null,
-            'mode_of_payment' => $data['mode_of_payment'],
-            'applicant_signed_at' => $data['applicant_signed_at'] ?? now()->toDateString(),
-            'loan_date' => now()->toDateString(),
-        ]);
+        if ($isCharacterLoan) {
+            $installmentAmount = CharacterLoanRules::periodInterest(
+                $loanType,
+                PesoInput::parse($data['loan_amount'] ?? 0),
+                (int) ($data['loan_period_months'] ?? 0),
+                $member->isRetiree(),
+            );
+            $signedAt = $data['applicant_signed_at'] ?? now()->toDateString();
+            $firstPaymentDueDate = Carbon::parse($signedAt)->addMonthsNoOverflow(3)->toDateString();
+            $data['applicant_signed_at'] = $signedAt;
+        }
+
+        $data['loan_type'] = $loanType;
+        $data['loan_period_months'] = $isQuickLoan ? 1 : ($data['loan_period_months'] ?? null);
+        $data['installment_amount'] = $installmentAmount;
+        $data['first_payment_due_date'] = $firstPaymentDueDate;
+        $data['applicant_signed_at'] = $data['applicant_signed_at'] ?? now()->toDateString();
+        $data['loan_date'] = $isCharacterLoan
+            ? ($data['applicant_signed_at'] ?? now()->toDateString())
+            : now()->toDateString();
+
+        if ($isCharacterLoan) {
+            $data['character_loan_type'] = $data['character_loan_type'] ?? $loanType;
+        }
+
+        try {
+            app(LoanApplicationService::class)->submit($member, $data);
+        } catch (LoanApplicationException $exception) {
+            Notification::make()
+                ->title($exception->title)
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        } catch (ValidationException $exception) {
+            $message = collect($exception->errors())->flatten()->first()
+                ?? $exception->getMessage();
+
+            Notification::make()
+                ->title(__('Application not submitted'))
+                ->body($message)
+                ->danger()
+                ->send();
+
+            throw $exception;
+        }
 
         Notification::make()
-            ->title(__('Loan application submitted'))
+            ->title(__('Confirm the application from your email'))
+            ->body(__('We sent a confirmation link to :email. TEMPUCO can review and approve the loan only after you confirm it.', [
+                'email' => $member->email,
+            ]))
             ->success()
             ->send();
 
@@ -527,7 +948,7 @@ class ApplyLoan extends Page
             return;
         }
 
-        $amount = (float) ($get('loan_amount') ?? 0);
+        $amount = PesoInput::parse($get('loan_amount'));
         $months = (int) ($get('loan_period_months') ?? 0);
 
         if ($amount <= 0 || $months < 1) {
@@ -536,13 +957,132 @@ class ApplyLoan extends Page
 
         /** @var Member $user */
         $user = auth()->user();
-        $schedule = RegularLoanSchedule::calculate(
-            $amount,
-            $months,
-            ApdsRules::isSecondApdsAccount($user),
+
+        if (LoanTypes::isCollateralized((string) ($get('loan_type') ?? ''))) {
+            $schedule = RegularLoanSchedule::calculateCollateralized(
+                $amount,
+                $months,
+                $user->isRetiree(),
+            );
+        } else {
+            $schedule = RegularLoanSchedule::calculate(
+                $amount,
+                $months,
+                ApdsRules::isSecondApdsAccount($user),
+            );
+        }
+
+        $set('installment_amount', number_format($schedule->monthlyInstallment, 2, '.', ','));
+    }
+
+    /**
+     * @param  callable(string, mixed): void  $set
+     * @param  callable(string): mixed  $get
+     */
+    private function syncCharacterDefaults(callable $set, callable $get): void
+    {
+        if ($get('loan_application_type') !== self::APPLICATION_TYPE_CHARACTER) {
+            return;
+        }
+
+        $type = CharacterLoanRules::resolveStoredType(
+            (string) ($get('character_loan_type') ?: LoanTypes::CHARACTER),
+            $get('character_variant') ?: CharacterLoanRules::VARIANT_EMERGENCY,
         );
 
-        $set('installment_amount', $schedule->monthlyInstallment);
+        if (CharacterLoanRules::termIsLocked($type) || LoanTypes::isCharacter((string) ($get('character_loan_type') ?? ''))) {
+            $set('loan_period_months', CharacterLoanRules::defaultTermMonths($type));
+        } elseif (LoanTypes::isRetireeShortTerm($type)) {
+            $months = (int) ($get('loan_period_months') ?? 0);
+            if (
+                $months < CharacterLoanRules::RETIREE_SHORT_TERM_MIN_MONTHS
+                || $months > CharacterLoanRules::RETIREE_SHORT_TERM_MAX_MONTHS
+            ) {
+                $set('loan_period_months', CharacterLoanRules::RETIREE_SHORT_TERM_MIN_MONTHS);
+            }
+        }
+
+        $this->syncCharacterDueDate($set, $get);
+
+        $amount = PesoInput::parse($get('loan_amount'));
+        $months = (int) ($get('loan_period_months') ?? CharacterLoanRules::defaultTermMonths($type));
+        $member = auth()->user();
+
+        if ($amount <= 0) {
+            return;
+        }
+
+        $set('installment_amount', number_format(CharacterLoanRules::periodInterest(
+            $type,
+            $amount,
+            $months,
+            $member instanceof Member && $member->isRetiree(),
+        ), 2, '.', ','));
+    }
+
+    /**
+     * @param  callable(string, mixed): void  $set
+     * @param  callable(string): mixed  $get
+     */
+    private function syncQuickPayable(callable $set, callable $get): void
+    {
+        if ($get('loan_application_type') !== self::APPLICATION_TYPE_QUICK) {
+            return;
+        }
+
+        $amount = PesoInput::parse($get('loan_amount'));
+
+        if ($amount <= 0 || $amount > QuickLoanLedgerEntries::MAX_AMOUNT) {
+            $set('installment_amount', null);
+
+            return;
+        }
+
+        $set('installment_amount', number_format(QuickLoanLedgerEntries::totalPayable($amount), 2, '.', ','));
+    }
+
+    /**
+     * @param  callable(string, mixed): void  $set
+     * @param  callable(string): mixed  $get
+     */
+    private function syncQuickDueDate(callable $set, callable $get): void
+    {
+        if ($get('loan_application_type') !== self::APPLICATION_TYPE_QUICK) {
+            return;
+        }
+
+        $signedAt = $get('applicant_signed_at');
+
+        if (blank($signedAt)) {
+            return;
+        }
+
+        $set(
+            'first_payment_due_date',
+            Carbon::parse((string) $signedAt)->addMonthNoOverflow()->toDateString(),
+        );
+    }
+
+    /**
+     * @param  callable(string, mixed): void  $set
+     * @param  callable(string): mixed  $get
+     */
+    private function syncCharacterDueDate(callable $set, callable $get): void
+    {
+        if ($get('loan_application_type') !== self::APPLICATION_TYPE_CHARACTER) {
+            return;
+        }
+
+        $signedAt = $get('applicant_signed_at');
+
+        if (blank($signedAt)) {
+            return;
+        }
+
+        $set(
+            'first_payment_due_date',
+            Carbon::parse((string) $signedAt)->addMonthsNoOverflow(3)->toDateString(),
+        );
     }
 
     /**
@@ -578,47 +1118,5 @@ class ApplyLoan extends Page
                 ->maxLength(1000)
                 ->columnSpanFull(),
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function formatLoanPurposeSummary(array $data): string
-    {
-        $purposeLabel = LoanPurpose::tryFrom((string) ($data['purpose_of_loan'] ?? ''))?->getLabel()
-            ?? (string) ($data['purpose_of_loan'] ?? '');
-
-        if (($data['purpose_of_loan'] ?? null) === LoanPurpose::Others->value && filled($data['purpose_of_loan_other'] ?? null)) {
-            return $purposeLabel.': '.($data['purpose_of_loan_other']);
-        }
-
-        return $purposeLabel;
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function buildQuickLoanPurpose(array $data): string
-    {
-        $paymentLabel = ModeOfPayment::tryFrom((string) ($data['mode_of_payment'] ?? ''))?->getLabel()
-            ?? (string) ($data['mode_of_payment'] ?? 'N/A');
-
-        $details = [
-            'Purpose of loan: '.$this->formatLoanPurposeSummary($data),
-            'Mode of payment: '.$paymentLabel,
-            '',
-            'Quick Loan Applicant Details:',
-            'Address: '.($data['applicant_address'] ?? 'N/A'),
-            'Date of birth: '.($data['quick_date_of_birth'] ?? 'N/A'),
-            'Age: '.($data['quick_age'] ?? 'N/A'),
-            'Sex: '.ucfirst((string) ($data['quick_sex'] ?? 'N/A')),
-            'Civil status: '.ucfirst((string) ($data['quick_civil_status'] ?? 'N/A')),
-            'Contact number: '.($data['quick_contact_number'] ?? 'N/A'),
-            'Email: '.($data['quick_email'] ?? 'N/A'),
-            'Occupation / Position: '.($data['quick_occupation'] ?? 'N/A'),
-            'Employer / Department: '.($data['quick_employer_department'] ?? 'N/A'),
-        ];
-
-        return implode(PHP_EOL, $details);
     }
 }

@@ -2,20 +2,27 @@
 
 namespace App\Filament\Auth\Pages;
 
+use App\Enums\UserRole;
+use App\Models\Member;
+use App\Models\User;
+use App\Support\AdminEmailMfa;
+use App\Support\AuditLog;
+use App\Support\RoleDashboard;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\MultiFactor\Contracts\HasBeforeChallengeHook;
-use Filament\Auth\MultiFactor\Contracts\MultiFactorAuthenticationProvider;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Illuminate\Auth\SessionGuard;
-use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
@@ -23,14 +30,27 @@ class Login extends BaseLogin
 {
     protected const MAX_ATTEMPTS = 5;
 
-    protected const LOCKOUT_SECONDS = 50;
+    protected const LOCKOUT_SECONDS = 900;
 
     public int $throttleSecondsRemaining = 0;
 
     public function mount(): void
     {
-        parent::mount();
+        if (Filament::getCurrentPanel()?->getId() !== 'auth') {
+            $this->redirect(RoleDashboard::loginUrl());
 
+            return;
+        }
+
+        $account = RoleDashboard::currentUser();
+
+        if ($account && ($url = RoleDashboard::url($account))) {
+            $this->redirect($url);
+
+            return;
+        }
+
+        $this->form->fill();
         $this->syncThrottleSecondsRemaining();
     }
 
@@ -67,41 +87,61 @@ class Login extends BaseLogin
         $this->ensureIsNotRateLimited();
 
         $data = $this->form->getState();
+        $credentials = $this->getCredentialsFromFormData($data);
+        $account = $this->findAccountByEmail((string) ($credentials['email'] ?? ''));
 
         /** @var SessionGuard $authGuard */
-        $authGuard = Filament::auth();
+        $authGuard = $account instanceof Member
+            ? Auth::guard('member')
+            : Auth::guard('web');
 
-        $authProvider = $authGuard->getProvider(); /** @phpstan-ignore-line */
-        $credentials = $this->getCredentialsFromFormData($data);
-
-        $user = $authProvider->retrieveByCredentials($credentials);
-
-        if ((! $user) || (! $authProvider->validateCredentials($user, $credentials))) {
+        if (
+            (! $account)
+            || (! Hash::check((string) ($credentials['password'] ?? ''), (string) $account->getAuthPassword()))
+        ) {
             $this->userUndertakingMultiFactorAuthentication = null;
 
-            $this->fireFailedEvent($authGuard, $user, $credentials);
+            $this->fireFailedEvent($authGuard, $account, $credentials);
             $this->throwFailureValidationException();
         }
 
+        if (($account instanceof User || $account instanceof Member) && ! $account->isActive()) {
+            $this->userUndertakingMultiFactorAuthentication = null;
+
+            throw ValidationException::withMessages([
+                'data.email' => __('This account has been disabled.'),
+            ]);
+        }
+
+        if ($account instanceof Member && ! $account->hasVerifiedEmail()) {
+            $this->userUndertakingMultiFactorAuthentication = null;
+
+            throw ValidationException::withMessages([
+                'data.email' => __('Confirm this email address before signing in. Check the inbox for the confirmation link.'),
+            ]);
+        }
+
         if (
-            filled($this->userUndertakingMultiFactorAuthentication) &&
-            (decrypt($this->userUndertakingMultiFactorAuthentication) === $user->getAuthIdentifier())
+            filled($this->userUndertakingMultiFactorAuthentication)
+            && $account instanceof User
+            && (decrypt($this->userUndertakingMultiFactorAuthentication) === $account->getAuthIdentifier())
         ) {
-            if ($this->isMultiFactorChallengeRateLimited($user)) {
+            if ($this->isMultiFactorChallengeRateLimited($account)) {
                 return null;
             }
 
             $this->multiFactorChallengeForm->validate();
-        } else {
+            AdminEmailMfa::remember($account);
+        } elseif ($account instanceof User && ! AdminEmailMfa::isRemembered($account)) {
             foreach (Filament::getMultiFactorAuthenticationProviders() as $multiFactorAuthenticationProvider) {
-                if (! $multiFactorAuthenticationProvider->isEnabled($user)) {
+                if (! $multiFactorAuthenticationProvider->isEnabled($account)) {
                     continue;
                 }
 
-                $this->userUndertakingMultiFactorAuthentication = encrypt($user->getAuthIdentifier());
+                $this->userUndertakingMultiFactorAuthentication = encrypt($account->getAuthIdentifier());
 
                 if ($multiFactorAuthenticationProvider instanceof HasBeforeChallengeHook) {
-                    $multiFactorAuthenticationProvider->beforeChallenge($user);
+                    $multiFactorAuthenticationProvider->beforeChallenge($account);
                 }
 
                 break;
@@ -114,16 +154,21 @@ class Login extends BaseLogin
             }
         }
 
-        if (! $authGuard->attemptWhen($credentials, function (Authenticatable $user): bool {
-            if (! ($user instanceof FilamentUser)) {
-                return true;
-            }
+        $panelId = RoleDashboard::panelId($account);
 
-            return $user->canAccessPanel(Filament::getCurrentOrDefaultPanel());
-        }, $data['remember'] ?? false)) {
-            $this->fireFailedEvent($authGuard, $user, $credentials);
+        if (
+            $panelId === null
+            || ! ($account instanceof FilamentUser)
+            || ! $account->canAccessPanel(Filament::getPanel($panelId))
+        ) {
+            $this->fireFailedEvent($authGuard, $account, $credentials);
             $this->throwFailureValidationException();
         }
+
+        Auth::guard('web')->logout();
+        Auth::guard('member')->logout();
+
+        $authGuard->login($account, (bool) ($data['remember'] ?? false));
 
         $this->clearLoginRateLimiter();
 
@@ -149,7 +194,7 @@ class Login extends BaseLogin
         $component = parent::getFormContentComponent();
 
         $component->footer([
-            \Filament\Schemas\Components\Actions::make($this->getFormActions())
+            Actions::make($this->getFormActions())
                 ->alignment($this->getFormActionsAlignment())
                 ->fullWidth($this->hasFullWidthFormActions())
                 ->key('login-form-actions'),
@@ -188,6 +233,26 @@ class Login extends BaseLogin
                 : null);
     }
 
+    protected function findAccountByEmail(string $email): User|Member|null
+    {
+        if ($email === '') {
+            return null;
+        }
+
+        $staff = User::query()
+            ->where('email', $email)
+            ->where('role', '!=', UserRole::User)
+            ->first();
+
+        if ($staff instanceof User) {
+            return $staff;
+        }
+
+        $member = Member::query()->where('email', $email)->first();
+
+        return $member instanceof Member ? $member : null;
+    }
+
     protected function ensureIsNotRateLimited(): void
     {
         $key = $this->getLoginRateLimitKey();
@@ -210,11 +275,10 @@ class Login extends BaseLogin
 
     protected function recordFailedLoginAttempt(): void
     {
-        $panelId = Filament::getCurrentPanel()?->getId() ?? 'default';
         $email = strtolower((string) ($this->data['email'] ?? ''));
 
         if ($email !== '') {
-            session(['login_rate_limit_email_'.$panelId => $email]);
+            session(['login_rate_limit_email' => $email]);
         }
 
         RateLimiter::hit($this->getLoginRateLimitKey(), self::LOCKOUT_SECONDS);
@@ -223,23 +287,20 @@ class Login extends BaseLogin
 
     protected function clearLoginRateLimiter(): void
     {
-        $panelId = Filament::getCurrentPanel()?->getId() ?? 'default';
-
         RateLimiter::clear($this->getLoginRateLimitKey());
-        session()->forget('login_rate_limit_email_'.$panelId);
+        session()->forget('login_rate_limit_email');
         $this->throttleSecondsRemaining = 0;
     }
 
     protected function getLoginRateLimitKey(): string
     {
-        $panelId = Filament::getCurrentPanel()?->getId() ?? 'default';
         $email = strtolower((string) (
             $this->data['email']
-            ?? session('login_rate_limit_email_'.$panelId, '')
+            ?? session('login_rate_limit_email', '')
             ?? ''
         ));
 
-        return 'login-attempts:'.$panelId.':'.sha1($email.'|'.request()->ip());
+        return 'login-attempts:unified:'.sha1($email.'|'.request()->ip());
     }
 
     protected function getThrottledValidationMessage(): string
@@ -257,6 +318,11 @@ class Login extends BaseLogin
 
         if (RateLimiter::tooManyAttempts($key, self::MAX_ATTEMPTS)) {
             $this->throttleSecondsRemaining = RateLimiter::availableIn($key);
+
+            AuditLog::record('login.lockout', null, [
+                'panel' => 'auth',
+                'email' => strtolower((string) ($this->data['email'] ?? '')),
+            ]);
 
             $this->getRateLimitedNotification(new TooManyRequestsException(
                 static::class,

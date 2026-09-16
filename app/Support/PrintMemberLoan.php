@@ -4,23 +4,25 @@ namespace App\Support;
 
 use App\Enums\LoanPurpose;
 use App\Enums\ModeOfPayment;
-use App\Models\Loan;
+use App\Models\Contracts\MemberLoan;
+use App\Models\QuickLoan;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
 final class PrintMemberLoan
 {
-    public static function printUrl(Loan $loan, bool $autoPrint = false): string
+    public static function printUrl(MemberLoan $loan, bool $autoPrint = false): string
     {
         return route('members.loans.print', [
-            'loan' => $loan,
+            'type' => $loan->printType(),
+            'loan' => $loan->getKey(),
             'auto' => $autoPrint ? 1 : 0,
         ]);
     }
 
     /**
      * @return array{
-     *     loan: Loan,
+     *     loan: MemberLoan,
      *     autoPrint: bool,
      *     documentTitle: string,
      *     borrowerName: string,
@@ -33,7 +35,7 @@ final class PrintMemberLoan
      *     disclosure: array<string, mixed>
      * }
      */
-    public static function viewData(Loan $loan, bool $autoPrint = false): array
+    public static function viewData(MemberLoan $loan, bool $autoPrint = false): array
     {
         $loan->loadMissing(['user', 'certification', 'committeeDecision', 'payments']);
 
@@ -66,15 +68,15 @@ final class PrintMemberLoan
         ];
     }
 
-    public static function isQuickLoan(Loan $loan): bool
+    public static function isQuickLoan(MemberLoan $loan): bool
     {
-        return strcasecmp(trim((string) $loan->loan_type), 'QUICK LOAN') === 0;
+        return $loan instanceof QuickLoan;
     }
 
     /**
      * @return array{purpose: ?LoanPurpose, other: ?string}
      */
-    private static function resolvePurpose(Loan $loan): array
+    private static function resolvePurpose(MemberLoan $loan): array
     {
         if ($loan->purpose_of_loan instanceof LoanPurpose) {
             return [
@@ -110,7 +112,7 @@ final class PrintMemberLoan
         return ['purpose' => LoanPurpose::Others, 'other' => $text !== '' ? $text : null];
     }
 
-    private static function parseModeOfPayment(Loan $loan): ?ModeOfPayment
+    private static function parseModeOfPayment(MemberLoan $loan): ?ModeOfPayment
     {
         $notes = (string) $loan->application_notes;
         if (preg_match('/^Mode of payment:\s*(.+)$/mi', $notes, $matches) !== 1) {
@@ -131,7 +133,7 @@ final class PrintMemberLoan
     /**
      * @return array<string, mixed>
      */
-    private static function quickLoanApplicant(Loan $loan, string $borrowerName): array
+    private static function quickLoanApplicant(MemberLoan $loan, string $borrowerName): array
     {
         $notes = (string) $loan->application_notes;
         $member = $loan->user;
@@ -146,28 +148,29 @@ final class PrintMemberLoan
             $totalPayable = round($loanAmount + $interest, 2);
         }
 
-        $dateOfBirth = self::parseNoteLine($notes, 'Date of birth');
-        $sex = strtolower((string) (self::parseNoteLine($notes, 'Sex') ?? ''));
-        $civilStatus = strtolower((string) (self::parseNoteLine($notes, 'Civil status') ?? ''));
+        $dateOfBirth = $member?->date_of_birth
+            ? $member->date_of_birth->toDateString()
+            : self::parseNoteLine($notes, 'Date of birth');
+        $sex = strtolower((string) ($member?->sex ?: (self::parseNoteLine($notes, 'Sex') ?? '')));
+        $civilStatus = strtolower((string) ($member?->civil_status ?: (self::parseNoteLine($notes, 'Civil status') ?? '')));
 
         return [
             'fullName' => $borrowerName,
             'dateOfBirth' => self::prettyDate($dateOfBirth),
-            'age' => self::parseNoteLine($notes, 'Age') ?? '',
+            'age' => $member?->age() !== null ? (string) $member->age() : (self::parseNoteLine($notes, 'Age') ?? ''),
             'sex' => $sex,
             'civilStatus' => $civilStatus,
-            'address' => self::parseNoteLine($notes, 'Address')
-                ?: (string) ($member?->address ?? ''),
-            'contactNumber' => self::parseNoteLine($notes, 'Contact number')
-                ?: (string) ($member?->contact_number ?? ''),
-            'email' => self::parseNoteLine($notes, 'Email')
-                ?: (string) ($member?->email ?? ''),
-            'occupation' => self::parseNoteLine($notes, 'Occupation / Position')
+            'address' => (string) ($member?->address ?: (self::parseNoteLine($notes, 'Address') ?? '')),
+            'contactNumber' => (string) ($member?->contact_number ?: (self::parseNoteLine($notes, 'Contact number') ?? '')),
+            'email' => (string) ($member?->email ?: (self::parseNoteLine($notes, 'Email') ?? '')),
+            'occupation' => (string) ($member?->occupation
+                ?: (self::parseNoteLine($notes, 'Occupation / Position')
                 ?? self::parseNoteLine($notes, 'Occupation/Position')
-                ?? '',
-            'employer' => self::parseNoteLine($notes, 'Employer / Department')
+                ?? '')),
+            'employer' => (string) ($member?->employer_department
+                ?: (self::parseNoteLine($notes, 'Employer / Department')
                 ?? self::parseNoteLine($notes, 'Employer/Department')
-                ?? '',
+                ?? '')),
             'loanAmount' => self::money($loanAmount),
             'interest' => self::money($interest),
             'totalPayable' => self::money($totalPayable),
@@ -208,7 +211,7 @@ final class PrintMemberLoan
     /**
      * @return array<string, mixed>
      */
-    private static function disclosureData(Loan $loan): array
+    private static function disclosureData(MemberLoan $loan): array
     {
         $loanAmount = (float) $loan->loan_amount;
         $installment = (float) $loan->installment_amount;

@@ -149,7 +149,7 @@
         <span class="create-type-card__body">
             <span class="create-type-card__title">{{ __('Admin') }}</span>
             <span class="create-type-card__desc">
-                {{ __('Staff account with QR code: Admin, grocery, or canteen cashier.') }}
+                {{ __('Staff account listed under Staff: Admin, grocery, or canteen cashier.') }}
             </span>
         </span>
     </button>

@@ -7,7 +7,7 @@ use App\Enums\LoanPurpose;
 use App\Enums\LoanStatus;
 use App\Enums\ModeOfPayment;
 use App\Enums\UserRole;
-use App\Models\Loan;
+use App\Models\RegularLoan;
 use App\Models\User;
 use App\Support\MemberAccount;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -22,6 +22,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(AdminUserSeeder::class);
+
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
@@ -39,13 +41,21 @@ class DatabaseSeeder extends Seeder
             'occupation' => 'Teacher',
             'employer_department' => 'DepEd',
             'is_retiree' => false,
-            'password' => 'password',
+            'password' => 'Password12',
+            'must_change_password' => false,
+            'email_verified' => true,
         ]);
 
         User::factory()->create([
             'name' => 'Grocery Cashier',
             'email' => 'cashier@example.com',
             'role' => UserRole::Cashier,
+        ]);
+
+        User::factory()->create([
+            'name' => 'Cashier',
+            'email' => 'collection@example.com',
+            'role' => UserRole::CollectionCashier,
         ]);
 
         User::factory()->create([
@@ -60,8 +70,8 @@ class DatabaseSeeder extends Seeder
             'role' => UserRole::Inventory,
         ]);
 
-        Loan::query()->create([
-            'user_id' => $member->id,
+        (new RegularLoan)->forceFill([
+            'member_id' => $member->id,
             'status' => LoanStatus::Approved,
             'loan_category' => LoanCategory::AdditionalNew,
             'loan_type' => 'Personal loan',
@@ -74,10 +84,11 @@ class DatabaseSeeder extends Seeder
             'applicant_signed_at' => now()->subMonths(2)->toDateString(),
             'loan_date' => now()->subMonths(2)->toDateString(),
             'approved_at' => now()->subMonths(2),
-        ]);
+            'email_verified_at' => now()->subMonths(2),
+        ])->save();
 
-        Loan::query()->create([
-            'user_id' => $member->id,
+        (new RegularLoan)->forceFill([
+            'member_id' => $member->id,
             'status' => LoanStatus::Pending,
             'loan_category' => LoanCategory::AdditionalNew,
             'loan_type' => 'Emergency fund',
@@ -89,6 +100,8 @@ class DatabaseSeeder extends Seeder
             'mode_of_payment' => ModeOfPayment::OverTheCounter,
             'applicant_signed_at' => now()->subWeeks(3)->toDateString(),
             'loan_date' => now()->subWeeks(3)->toDateString(),
-        ]);
+            'email_verified_at' => now()->subWeeks(3),
+        ])->save();
     }
 }
+

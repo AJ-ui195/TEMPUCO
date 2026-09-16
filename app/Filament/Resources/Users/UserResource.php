@@ -5,21 +5,23 @@ namespace App\Filament\Resources\Users;
 use App\Enums\UserRole;
 use App\Filament\Resources\Users\Pages\ManageUsers;
 use App\Models\User;
+use App\Support\PasswordRules;
+use App\Support\StaffAccount;
 use BackedEnum;
-use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class UserResource extends Resource
 {
@@ -29,20 +31,15 @@ class UserResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?string $modelLabel = 'user';
+    protected static ?string $modelLabel = 'staff';
 
-    protected static ?string $pluralModelLabel = 'users';
+    protected static ?string $pluralModelLabel = 'staff';
 
-    protected static ?string $navigationLabel = 'Users';
+    protected static ?string $navigationLabel = 'Staff';
 
     protected static ?int $navigationSort = 11;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
 
     public static function form(Schema $schema): Schema
     {
@@ -62,6 +59,7 @@ class UserResource extends Resource
                     ->label(__('Role'))
                     ->options([
                         UserRole::Admin->value => UserRole::Admin->getLabel(),
+                        UserRole::CollectionCashier->value => UserRole::CollectionCashier->getLabel(),
                         UserRole::Cashier->value => UserRole::Cashier->getLabel(),
                         UserRole::CanteenCashier->value => UserRole::CanteenCashier->getLabel(),
                         UserRole::Inventory->value => UserRole::Inventory->getLabel(),
@@ -69,16 +67,22 @@ class UserResource extends Resource
                     ->required()
                     ->default(UserRole::Admin->value)
                     ->native(false),
-                DateTimePicker::make('email_verified_at')
-                    ->label(__('Email verified at'))
-                    ->seconds(false),
+                Toggle::make('is_active')
+                    ->label(__('Active'))
+                    ->default(true),
                 TextInput::make('password')
                     ->password()
                     ->revealable()
                     ->required(fn (string $operation): bool => $operation === 'create')
-                    ->minLength(8)
+                    ->rule(PasswordRules::rule())
+                    ->confirmed()
                     ->dehydrated(fn (?string $state): bool => filled($state))
-                    ->helperText(__('Leave blank when editing to keep the current password.')),
+                    ->helperText(PasswordRules::helperText().' '.__('Leave blank when editing to keep the current password.')),
+                TextInput::make('password_confirmation')
+                    ->password()
+                    ->revealable()
+                    ->required(fn (string $operation): bool => $operation === 'create')
+                    ->dehydrated(false),
             ]);
     }
 
@@ -113,6 +117,7 @@ class UserResource extends Resource
 
                         return match ($role) {
                             UserRole::Admin => 'danger',
+                            UserRole::CollectionCashier => 'primary',
                             UserRole::Cashier => 'info',
                             UserRole::CanteenCashier => 'warning',
                             UserRole::Inventory => 'success',
@@ -120,33 +125,37 @@ class UserResource extends Resource
                         };
                     })
                     ->sortable(),
-                TextColumn::make('email_verified_at')
-                    ->label(__('Verified'))
-                    ->dateTime()
-                    ->placeholder('—')
+                IconColumn::make('is_active')
+                    ->label(__('Active'))
+                    ->boolean()
                     ->sortable(),
+                TextColumn::make('created_at')
+                    ->label(__('Created'))
+                    ->dateTime('M j, Y g:i A')
+                    ->sortable()
+                    ->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('role')
                     ->label(__('Role'))
                     ->options([
                         UserRole::Admin->value => UserRole::Admin->getLabel(),
+                        UserRole::CollectionCashier->value => UserRole::CollectionCashier->getLabel(),
                         UserRole::Cashier->value => UserRole::Cashier->getLabel(),
                         UserRole::CanteenCashier->value => UserRole::CanteenCashier->getLabel(),
                         UserRole::Inventory->value => UserRole::Inventory->getLabel(),
                     ])
                     ->native(false),
             ])
-            ->defaultSort('name')
+            ->defaultSort('created_at', 'desc')
             ->deferLoading()
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->using(function (Model $record, array $data): Model {
+                        /** @var User $record */
+                        return StaffAccount::update($record, $data);
+                    }),
                 DeleteAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
             ]);
     }
 

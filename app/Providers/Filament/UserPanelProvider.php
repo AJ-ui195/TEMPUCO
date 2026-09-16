@@ -2,8 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Pages\ChangePassword;
 use App\Filament\Auth\Pages\Login;
-use App\Filament\User\Widgets\UserLoansTableWidget;
+use App\Http\Middleware\EnsurePasswordChanged;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -43,9 +44,10 @@ class UserPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->userMenu(false)
             ->discoverPages(in: app_path('Filament/User/Pages'), for: 'App\Filament\User\Pages')
-            ->widgets([
-                UserLoansTableWidget::class,
+            ->pages([
+                ChangePassword::class,
             ])
+            ->widgets([])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -59,22 +61,16 @@ class UserPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsurePasswordChanged::class,
             ]);
 
         return $this->registerPortalUi($panel)
             ->plugins([
                 FilamentPwaPlugin::make()
                     ->themeColor('#0ea5e9')
-                    ->appTitle(__('Members Portal'))
+                    ->appTitle('TEMPUCO')
                     ->manifestUrl('/manifest.json'),
             ])
-            ->renderHook(
-                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
-                fn (): string => view('filament.hooks.login-panel-switch', [
-                    'url' => url('/admin/login'),
-                    'message' => __('Click here to login to Admin'),
-                ])->render(),
-            )
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
                 fn (): string => view('filament.hooks.member-portal-pwa-install')->render(),
