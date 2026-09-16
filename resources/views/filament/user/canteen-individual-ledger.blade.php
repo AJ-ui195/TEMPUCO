@@ -38,15 +38,25 @@
             </thead>
             <tbody>
                 @forelse ($entries as $entry)
+                    @php
+                        $isPayment = ($entry['type'] ?? '') === 'payment';
+                        $remarks = $entry['channel']?->getLabel() ?? '';
+
+                        if ($isPayment) {
+                            $remarks = abs((float) $entry['balance']) < 0.005
+                                ? __('paid')
+                                : '-';
+                        }
+                    @endphp
                     <tr>
                         <td>{{ $entry['date']->format('n-j-Y') }}</td>
-                        <td>{{ $entry['type'] === 'payment' ? $entry['reference'] : '' }}</td>
+                        <td>{{ $entry['reference'] ?? '' }}</td>
                         <td></td>
                         <td class="num">{{ $amount((float) $entry['charge']) }}</td>
                         <td class="num">{{ $amount((float) $entry['payment']) }}</td>
                         <td class="num">{{ number_format((float) $entry['balance'], 2) }}</td>
                         <td></td>
-                        <td></td>
+                        <td>{{ $remarks }}</td>
                     </tr>
                 @empty
                     @for ($blankRow = 0; $blankRow < 8; $blankRow++)

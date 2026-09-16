@@ -20,9 +20,9 @@ final class SettleMemberCredit
      *
      * @return array{applied: float, remaining_balance: float, payment: ?PosCreditPayment}
      */
-    public static function apply(Member $member, PosSaleChannel $channel, float $amount, ?User $cashier = null): array
+    public static function apply(Member $member, PosSaleChannel $channel, float $amount, ?User $cashier = null, ?string $orNumber = null): array
     {
-        return DB::transaction(function () use ($member, $channel, $amount, $cashier): array {
+        return DB::transaction(function () use ($member, $channel, $amount, $cashier, $orNumber): array {
             $credit = new MemberPosCredit($member);
             $outstanding = $credit->outstandingFor($channel);
             $applied = round(min(round($amount, 2), $outstanding), 2);
@@ -40,7 +40,7 @@ final class SettleMemberCredit
                 'cashier_id' => $cashier?->id,
                 'sale_channel' => $channel,
                 'amount' => $applied,
-                'reference' => self::generateReference(),
+                'reference' => self::resolveReference($orNumber),
             ]);
 
             return [
@@ -49,6 +49,51 @@ final class SettleMemberCredit
                 'payment' => $payment,
             ];
         });
+    }
+
+    /**
+     * Apply cash to canteen first, then grocery, so one collection covers both ledgers.
+     *
+     * @return array{applied: float, remaining_balance: float, payment: ?PosCreditPayment}
+     */
+    public static function applyAcrossChannels(Member $member, float $amount, ?User $cashier = null, ?string $orNumber = null): array
+    {
+        $amount = round($amount, 2);
+        $credit = new MemberPosCredit($member);
+        $total = $credit->totalOutstanding();
+        $applied = 0.0;
+        $lastPayment = null;
+
+        foreach ([PosSaleChannel::Canteen, PosSaleChannel::Grocery] as $channel) {
+            if ($amount < self::EPSILON) {
+                break;
+            }
+
+            $result = self::apply($member, $channel, $amount, $cashier, $orNumber);
+            $applied = round($applied + $result['applied'], 2);
+            $amount = round($amount - $result['applied'], 2);
+
+            if ($result['payment'] instanceof PosCreditPayment) {
+                $lastPayment = $result['payment'];
+            }
+        }
+
+        return [
+            'applied' => $applied,
+            'remaining_balance' => round(max(0, $total - $applied), 2),
+            'payment' => $lastPayment,
+        ];
+    }
+
+    private static function resolveReference(?string $orNumber): string
+    {
+        $orNumber = trim((string) $orNumber);
+
+        if ($orNumber !== '') {
+            return $orNumber;
+        }
+
+        return self::generateReference();
     }
 
     private static function generateReference(): string

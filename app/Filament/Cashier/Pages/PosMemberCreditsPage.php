@@ -5,6 +5,7 @@ namespace App\Filament\Cashier\Pages;
 use App\Enums\PosSaleChannel;
 use App\Models\Member;
 use App\Models\PosCreditPayment;
+use App\Support\MemberCreditLedger;
 use App\Support\MemberCreditsLedger;
 use App\Support\MemberPosCredit;
 use App\Support\PrintCreditPaymentReceipt;
@@ -38,11 +39,15 @@ class PosMemberCreditsPage extends Page
 
     public string $paymentAmount = '';
 
+    public string $paymentOrNumber = '';
+
     public ?string $paymentError = null;
 
     public bool $showReceiptModal = false;
 
     public ?int $receiptPaymentId = null;
+
+    public ?int $ledgerMemberId = null;
 
     public function getTitle(): string|Htmlable
     {
@@ -110,6 +115,7 @@ class PosMemberCreditsPage extends Page
         $this->paymentMemberId = $member->id;
         $this->paymentChannel = $saleChannel->value;
         $this->paymentAmount = number_format($outstanding, 2, '.', '');
+        $this->paymentOrNumber = '';
         $this->paymentError = null;
     }
 
@@ -118,6 +124,7 @@ class PosMemberCreditsPage extends Page
         $this->paymentMemberId = null;
         $this->paymentChannel = '';
         $this->paymentAmount = '';
+        $this->paymentOrNumber = '';
         $this->paymentError = null;
     }
 
@@ -202,6 +209,41 @@ class PosMemberCreditsPage extends Page
         $this->receiptPaymentId = null;
     }
 
+    public function openLedgerModal(int $memberId): void
+    {
+        $member = $this->findMember($memberId);
+
+        if (! $member instanceof Member) {
+            return;
+        }
+
+        $this->ledgerMemberId = $member->id;
+    }
+
+    public function closeLedgerModal(): void
+    {
+        $this->ledgerMemberId = null;
+    }
+
+    public function getLedgerMember(): ?Member
+    {
+        return $this->ledgerMemberId === null
+            ? null
+            : $this->findMember($this->ledgerMemberId);
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function getLedgerEntries(): Collection
+    {
+        $member = $this->getLedgerMember();
+
+        return $member instanceof Member
+            ? (new MemberCreditLedger($member))->entries()
+            : collect();
+    }
+
     public function recordPayment(): void
     {
         $member = $this->getPaymentMember();
@@ -222,6 +264,14 @@ class PosMemberCreditsPage extends Page
             return;
         }
 
+        $orNumber = trim($this->paymentOrNumber);
+
+        if ($orNumber === '') {
+            $this->paymentError = __('Enter the official receipt number.');
+
+            return;
+        }
+
         if ($amount - $outstanding > SettleMemberCredit::EPSILON) {
             $this->paymentError = __('Payment cannot be more than the ₱:amount balance.', [
                 'amount' => number_format($outstanding, 2),
@@ -230,7 +280,7 @@ class PosMemberCreditsPage extends Page
             return;
         }
 
-        $result = SettleMemberCredit::apply($member, $channel, $amount, auth()->user());
+        $result = SettleMemberCredit::apply($member, $channel, $amount, auth()->user(), $orNumber);
 
         $remaining = $result['remaining_balance'];
 

@@ -2,7 +2,6 @@
 
 namespace App\Filament\User\Pages;
 
-use App\Enums\PosSaleChannel;
 use App\Models\Member;
 use App\Support\MemberCreditLedger;
 use BackedEnum;
@@ -14,9 +13,9 @@ use Illuminate\Support\HtmlString;
 
 class CanteenCreditLedger extends Page
 {
-    protected static ?string $navigationLabel = 'Canteen credit';
+    protected static ?string $navigationLabel = 'Canteen / Grocery credit';
 
-    protected static ?string $title = 'Canteen credit';
+    protected static ?string $title = 'Canteen / Grocery credit';
 
     protected static ?string $slug = 'loan-ledger/canteen-credit';
 
@@ -28,7 +27,7 @@ class CanteenCreditLedger extends Page
 
     public function getTitle(): string|Htmlable
     {
-        return static::$title ?? __('Canteen credit');
+        return static::$title ?? __('Canteen / Grocery credit');
     }
 
     public function content(Schema $schema): Schema
@@ -43,7 +42,7 @@ class CanteenCreditLedger extends Page
                     ->state(fn (): HtmlString => new HtmlString(
                         view('filament.user.canteen-credit-ledger', [
                             'user' => $user,
-                            'entries' => (new MemberCreditLedger($user))->entries(PosSaleChannel::Canteen),
+                            'entries' => (new MemberCreditLedger($user))->entries(),
                         ])->render()
                     ))
                     ->columnSpanFull(),

@@ -275,7 +275,7 @@ class CollectionPayment extends Page
         return [
             'user' => $member,
             'entries' => $member instanceof Member
-                ? (new MemberCreditLedger($member))->entries(PosSaleChannel::Canteen)
+                ? (new MemberCreditLedger($member))->entries()
                 : collect(),
         ];
     }
@@ -504,11 +504,11 @@ class CollectionPayment extends Page
             return;
         }
 
-        $result = SettleMemberCredit::apply($member, PosSaleChannel::Canteen, $amount, auth()->user());
+        $result = SettleMemberCredit::applyAcrossChannels($member, $amount, auth()->user());
 
         Notification::make()
             ->title(__('Payment recorded'))
-            ->body(__(':member paid ₱:paid toward canteen credit.', [
+            ->body(__(':member paid ₱:paid toward canteen / grocery credit.', [
                 'member' => $member->name,
                 'paid' => number_format($result['applied'], 2),
             ]))

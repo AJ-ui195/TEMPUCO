@@ -117,13 +117,14 @@
                                         {{ __('Pay canteen credit') }}
                                     </button>
                                 @endif
-                                <a
-                                    href="{{ \App\Filament\Cashier\Pages\PosMemberLedgerPage::getUrl(panel: 'pos').'?member='.$member->id }}"
+                                <button
+                                    type="button"
+                                    wire:click="openLedgerModal({{ $member->id }})"
                                     class="pos-btn-secondary"
-                                    style="width: auto; padding: 0.5rem 0.875rem; font-size: 0.8125rem; display: inline-flex; align-items: center; text-decoration: none;"
+                                    style="width: auto; padding: 0.5rem 0.875rem; font-size: 0.8125rem;"
                                 >
                                     {{ __('View ledger') }}
-                                </a>
+                                </button>
                             </div>
 
                             @if ($recentPayments->isNotEmpty())
@@ -243,6 +244,18 @@
                         {{ __('Pay full balance') }}
                     </button>
 
+                    <label for="credit-payment-or" style="display: block; font-size: 0.8125rem; font-weight: 600; margin: 1rem 0 0.375rem;">
+                        {{ __('OR #') }}
+                    </label>
+                    <input
+                        id="credit-payment-or"
+                        type="text"
+                        wire:model="paymentOrNumber"
+                        class="pos-input"
+                        style="padding: 0.625rem 0.75rem; font-size: 1rem;"
+                        autocomplete="off"
+                    />
+
                     @if ($paymentError)
                         <p style="margin: 0.75rem 0 0; font-size: 0.8125rem; font-weight: 600; color: rgb(185 28 28);">
                             {{ $paymentError }}
@@ -307,7 +320,33 @@
                 </div>
             </div>
         @endif
+
+        @php($ledgerMember = $this->getLedgerMember())
+
+        @if ($ledgerMember)
+            <div class="pos-credit-modal" wire:key="credit-ledger-{{ $ledgerMember->id }}">
+                <div class="pos-credit-modal__backdrop" wire:click="closeLedgerModal"></div>
+                <div class="pos-credit-modal__dialog pos-credit-modal__dialog--ledger">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <h3 style="margin: 0; font-size: 1.0625rem; font-weight: 700;">
+                            {{ __('Canteen / Grocery credit') }}
+                        </h3>
+                        <button type="button" wire:click="closeLedgerModal" class="pos-btn-secondary" style="width: auto; padding: 0.375rem 0.75rem; font-size: 0.75rem;">
+                            {{ __('Close') }}
+                        </button>
+                    </div>
+
+                    @include('filament.user.canteen-individual-ledger', [
+                        'user' => $ledgerMember,
+                        'entries' => $this->getLedgerEntries(),
+                        'department' => __('Canteen / Grocery Department'),
+                    ])
+                </div>
+            </div>
+        @endif
     </div>
+
+    @include('filament.user.partials.loan-ledger-styles')
 
     <style>
         .fi-pos-ui .pos-credit-modal {
@@ -339,6 +378,12 @@
         .dark .fi-pos-ui .pos-credit-modal__dialog {
             background: rgb(30 41 59);
             color: #fff;
+        }
+
+        .fi-pos-ui .pos-credit-modal__dialog--ledger {
+            max-width: min(72rem, 100%);
+            max-height: calc(100vh - 2rem);
+            overflow: auto;
         }
 
         .fi-pos-ui .pos-receipt-paper {

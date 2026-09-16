@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Enums\LoanStatus;
-use App\Enums\PosSaleChannel;
 use App\Models\CharacterLoan;
 use App\Models\Contracts\MemberLoan;
 use App\Models\LoanPayment;
@@ -31,7 +30,7 @@ final class MemberCollectionAccounts
         return [
             self::TYPE_REGULAR => __('Regular loan'),
             self::TYPE_CHARACTER => __('Character loan'),
-            self::TYPE_CANTEEN => __('Canteen credit'),
+            self::TYPE_CANTEEN => __('Canteen / Grocery credit'),
             self::TYPE_QUICK => __('Quick loan'),
         ];
     }
@@ -45,7 +44,7 @@ final class MemberCollectionAccounts
     {
         $loans = MemberLoans::forMember($member);
         $loans->each(fn (MemberLoan $loan) => $loan->loadMissing('payments'));
-        $canteenBalance = (new MemberPosCredit($member))->canteenOutstanding();
+        $creditBalance = (new MemberPosCredit($member))->totalOutstanding();
 
         $byType = [
             self::TYPE_REGULAR => collect(),
@@ -58,7 +57,7 @@ final class MemberCollectionAccounts
             $byType[$type]->push(self::loanRow($loan));
         }
 
-        $canteen = self::canteenRow($member, $canteenBalance);
+        $canteen = self::canteenRow($member, $creditBalance);
         $labels = self::typeLabels();
 
         return [
@@ -133,7 +132,7 @@ final class MemberCollectionAccounts
     public static function canteenRow(Member $member, float $balance): array
     {
         $entries = (new MemberCreditLedger($member))
-            ->entries(PosSaleChannel::Canteen)
+            ->entries()
             ->map(fn (array $entry): array => [
                 'date' => $entry['date'],
                 'stored_at' => $entry['date'],
@@ -149,7 +148,7 @@ final class MemberCollectionAccounts
             'key' => self::TYPE_CANTEEN,
             'type' => self::TYPE_CANTEEN,
             'loan_id' => null,
-            'label' => __('Canteen credit'),
+            'label' => __('Canteen / Grocery credit'),
             'status' => __('Open'),
             'loan_amount' => $balance,
             'balance' => $balance,
