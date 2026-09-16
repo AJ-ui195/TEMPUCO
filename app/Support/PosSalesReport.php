@@ -192,7 +192,7 @@ class PosSalesReport
             return collect();
         }
 
-        $members = User::query()
+        $members = Member::query()
             ->whereIn('id', $rows->pluck('member_id'))
             ->get()
             ->keyBy('id');

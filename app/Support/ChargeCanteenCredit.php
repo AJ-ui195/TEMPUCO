@@ -24,11 +24,11 @@ final class ChargeCanteenCredit
         }
 
         $channel = PosSaleChannel::Canteen;
-        $remaining = MemberCreditLimit::remainingThisMonth($member->id, $channel);
+        $remaining = MemberCreditLimit::remaining($member->id, $channel);
 
         if (! MemberCreditLimit::allows($amount, $remaining)) {
-            throw new InvalidArgumentException(__('This charge exceeds the ₱:limit monthly canteen credit limit. Remaining this month: ₱:remaining.', [
-                'limit' => number_format(MemberCreditLimit::MONTHLY_LIMIT, 2),
+            throw new InvalidArgumentException(__('This charge exceeds the ₱:limit canteen credit limit. Remaining: ₱:remaining. Settle the account to free credit.', [
+                'limit' => number_format(MemberCreditLimit::LIMIT, 2),
                 'remaining' => number_format($remaining, 2),
             ]));
         }

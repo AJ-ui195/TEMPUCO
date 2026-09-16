@@ -105,6 +105,8 @@ return new class extends Migration
         }
 
         if (Schema::hasTable('loans')) {
+            // Safe to re-run after a partial failure: clear typed copies, then copy again.
+            $this->resetTypedLoanCopies();
             $this->copyExistingLoans();
         }
 
@@ -150,44 +152,47 @@ return new class extends Migration
         Schema::dropIfExists('regular_loans');
     }
 
+    private function resetTypedLoanCopies(): void
+    {
+        foreach (['loan_payments', 'loan_certifications', 'loan_committee_decisions'] as $table) {
+            if (! Schema::hasTable($table)) {
+                continue;
+            }
+
+            if (Schema::hasColumn($table, 'loanable_type') && Schema::hasColumn($table, 'loanable_id')) {
+                DB::table($table)->update([
+                    'loanable_type' => null,
+                    'loanable_id' => null,
+                ]);
+            }
+        }
+
+        foreach (['regular_loans', 'quick_loans', 'character_loans'] as $table) {
+            if (Schema::hasTable($table)) {
+                DB::table($table)->delete();
+            }
+        }
+    }
+
     private function dropLoanId(string $table): void
     {
         if (! Schema::hasColumn($table, 'loan_id')) {
             return;
         }
 
-        Schema::disableForeignKeyConstraints();
+        // MySQL keeps the FK index — drop the foreign key before the column.
+        $foreign = collect(Schema::getForeignKeys($table))
+            ->first(fn (array $key): bool => in_array('loan_id', $key['columns'], true));
 
-        try {
-            Schema::table($table, function (Blueprint $blueprint) use ($table): void {
-                foreach (Schema::getIndexes($table) as $index) {
-                    $columns = $index['columns'] ?? [];
-                    $name = $index['name'] ?? null;
-
-                    if ($name === null || ($index['primary'] ?? false)) {
-                        continue;
-                    }
-
-                    if ($columns === ['loan_id'] && ($index['unique'] ?? false)) {
-                        $blueprint->dropUnique($name);
-                    } elseif ($columns === ['loan_id']) {
-                        $blueprint->dropIndex($name);
-                    }
-                }
-
-                try {
-                    $blueprint->dropForeign(['loan_id']);
-                } catch (Throwable) {
-                    // SQLite may not expose the foreign key name the same way.
-                }
+        if ($foreign !== null) {
+            Schema::table($table, function (Blueprint $blueprint) use ($foreign): void {
+                $blueprint->dropForeign($foreign['name']);
             });
-
-            Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->dropColumn('loan_id');
-            });
-        } finally {
-            Schema::enableForeignKeyConstraints();
         }
+
+        Schema::table($table, function (Blueprint $blueprint): void {
+            $blueprint->dropColumn('loan_id');
+        });
     }
 
     private function addMorphColumns(string $table): void

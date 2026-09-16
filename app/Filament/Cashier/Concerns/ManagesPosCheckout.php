@@ -167,23 +167,41 @@ trait ManagesPosCheckout
         return $this->paymentType === 'credit';
     }
 
-    public function getMonthlyCreditLimit(): float
+    public function getCreditLimit(): float
     {
-        return MemberCreditLimit::MONTHLY_LIMIT;
+        return MemberCreditLimit::LIMIT;
     }
 
-    public function getCreditUsedThisMonth(): float
+    /** @deprecated Use getCreditLimit() */
+    public function getMonthlyCreditLimit(): float
+    {
+        return $this->getCreditLimit();
+    }
+
+    public function getCreditUsed(): float
     {
         return $this->memberId === null
             ? 0.0
-            : MemberCreditLimit::usedThisMonth($this->memberId, $this->getSaleChannel());
+            : MemberCreditLimit::used($this->memberId, $this->getSaleChannel());
     }
 
-    public function getCreditRemainingThisMonth(): float
+    /** @deprecated Use getCreditUsed() */
+    public function getCreditUsedThisMonth(): float
+    {
+        return $this->getCreditUsed();
+    }
+
+    public function getCreditRemaining(): float
     {
         return $this->memberId === null
-            ? MemberCreditLimit::MONTHLY_LIMIT
-            : MemberCreditLimit::remainingThisMonth($this->memberId, $this->getSaleChannel());
+            ? MemberCreditLimit::LIMIT
+            : MemberCreditLimit::remaining($this->memberId, $this->getSaleChannel());
+    }
+
+    /** @deprecated Use getCreditRemaining() */
+    public function getCreditRemainingThisMonth(): float
+    {
+        return $this->getCreditRemaining();
     }
 
     /** Portion of the cart that would go on the member's account. */
@@ -192,16 +210,16 @@ trait ManagesPosCheckout
         return round(max(0, $this->getCartTotal() - max(0, (float) $this->amountPaid)), 2);
     }
 
-    /** Cash to collect now so the credit portion fits the monthly limit. */
+    /** Cash to collect now so the credit portion fits the available limit. */
     public function getMinimumCashDue(): float
     {
         return MemberCreditLimit::minimumCashDue(
             $this->getCartTotal(),
-            $this->getCreditRemainingThisMonth(),
+            $this->getCreditRemaining(),
         );
     }
 
-    public function exceedsMonthlyCreditLimit(): bool
+    public function exceedsCreditLimit(): bool
     {
         if (! $this->isCreditSale() || $this->memberId === null || $this->cartLines === []) {
             return false;
@@ -209,8 +227,14 @@ trait ManagesPosCheckout
 
         return ! MemberCreditLimit::allows(
             $this->getCreditPortion(),
-            $this->getCreditRemainingThisMonth(),
+            $this->getCreditRemaining(),
         );
+    }
+
+    /** @deprecated Use exceedsCreditLimit() */
+    public function exceedsMonthlyCreditLimit(): bool
+    {
+        return $this->exceedsCreditLimit();
     }
 
     public function useMinimumCashDue(): void
@@ -426,23 +450,23 @@ trait ManagesPosCheckout
                 return;
             }
 
-            $remaining = MemberCreditLimit::remainingThisMonth($this->memberId, $this->getSaleChannel());
+            $remaining = MemberCreditLimit::remaining($this->memberId, $this->getSaleChannel());
 
             if (! MemberCreditLimit::allows(round($total - max(0, $paid), 2), $remaining)) {
                 Notification::make()
                     ->title($remaining > 0
-                        ? __('Monthly credit limit reached')
-                        : __('No credit left this month'))
+                        ? __('Credit limit reached')
+                        : __('No credit available'))
                     ->body($remaining > 0
-                        ? __(':member has ₱:remaining left of the ₱:limit monthly limit. Collect at least ₱:cash in cash to complete this sale.', [
+                        ? __(':member has ₱:remaining left of the ₱:limit credit limit. Collect at least ₱:cash in cash to complete this sale.', [
                             'member' => $this->memberName,
                             'remaining' => number_format($remaining, 2),
-                            'limit' => number_format(MemberCreditLimit::MONTHLY_LIMIT, 2),
+                            'limit' => number_format(MemberCreditLimit::LIMIT, 2),
                             'cash' => number_format(MemberCreditLimit::minimumCashDue($total, $remaining), 2),
                         ])
-                        : __(':member has used the full ₱:limit monthly limit. This sale must be paid in cash.', [
+                        : __(':member has used the full ₱:limit credit limit. Settle the account or pay this sale in cash.', [
                             'member' => $this->memberName,
-                            'limit' => number_format(MemberCreditLimit::MONTHLY_LIMIT, 2),
+                            'limit' => number_format(MemberCreditLimit::LIMIT, 2),
                         ]))
                     ->danger()
                     ->send();
