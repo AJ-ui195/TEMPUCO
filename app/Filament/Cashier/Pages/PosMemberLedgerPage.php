@@ -139,7 +139,7 @@ class PosMemberLedgerPage extends Page
     {
         $member = $this->getSelectedMember();
 
-        return $member instanceof User
+        return $member instanceof Member
             ? PrintMemberLedger::url($member, $this->getChannelFilter(), $this->fromDate, $this->toDate)
             : null;
     }
@@ -175,7 +175,7 @@ class PosMemberLedgerPage extends Page
     {
         $member = $this->getSelectedMember();
 
-        if (! $member instanceof User) {
+        if (! $member instanceof Member) {
             return collect();
         }
 
@@ -192,7 +192,7 @@ class PosMemberLedgerPage extends Page
     {
         $member = $this->getSelectedMember();
 
-        if (! $member instanceof User) {
+        if (! $member instanceof Member) {
             return ['opening' => 0.0, 'charged' => 0.0, 'paid' => 0.0, 'balance' => 0.0, 'entry_count' => 0];
         }
 
