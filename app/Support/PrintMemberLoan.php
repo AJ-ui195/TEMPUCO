@@ -139,14 +139,15 @@ final class PrintMemberLoan
         $member = $loan->user;
         $loanAmount = (float) $loan->loan_amount;
         $installment = (float) $loan->installment_amount;
-        $interest = round($loanAmount * 0.01, 2);
+        $interest = QuickLoanLedgerEntries::interestOn($loanAmount);
 
-        if ($installment > $loanAmount) {
+        if ($installment > 0.005 && $installment + 0.005 < $loanAmount) {
+            $interest = $installment;
+        } elseif ($installment > $loanAmount) {
             $interest = round($installment - $loanAmount, 2);
-            $totalPayable = $installment;
-        } else {
-            $totalPayable = round($loanAmount + $interest, 2);
         }
+
+        $totalPayable = $interest;
 
         $dateOfBirth = $member?->date_of_birth
             ? $member->date_of_birth->toDateString()

@@ -107,10 +107,32 @@ final class CharacterLoanLedgerEntries
 
         $balance = $principal;
 
+        foreach (InvoiceInterestSettlement::allocationsFor($loan) as $allocation) {
+            $amount = round((float) $allocation['amount'], 2);
+            $storedAt = Carbon::parse($allocation['received_at']);
+            $dueCursor = $dueCursor->copy()->addMonthsNoOverflow($remarksIntervalMonths);
+
+            $entries->push([
+                'date' => $storedAt,
+                'stored_at' => $storedAt,
+                'stored_id' => (int) $allocation['id'],
+                'or' => CollectionReceiptNumbers::displayInvoice((string) $allocation['invoice_no']),
+                'voucher' => '',
+                'released' => 0.0,
+                'interest' => 0.0,
+                'interest_in_parens' => false,
+                'payment' => $amount,
+                'balance' => $balance,
+                'balance_blank' => false,
+                'surcharge' => 0.0,
+                'remarks' => $dueCursor->format('n-j-Y'),
+            ]);
+        }
+
         foreach ($payments as $payment) {
             $amount = round((float) $payment->amount, 2);
             $date = $payment->created_at ?? Carbon::parse($payment->received_at);
-            $or = (string) ($payment->official_receipt_no ?? '');
+            $or = CollectionReceiptNumbers::displayOfficialReceipt((string) ($payment->official_receipt_no ?? ''));
 
             if (self::isInterestPayment($payment)) {
                 $dueCursor = $dueCursor->copy()->addMonthsNoOverflow($remarksIntervalMonths);
@@ -178,5 +200,42 @@ final class CharacterLoanLedgerEntries
     public static function isPrincipalPayment(LoanPayment $payment): bool
     {
         return ! self::isInterestPayment($payment);
+    }
+
+    public static function interestPaymentCount(MemberLoan $loan): int
+    {
+        $payments = $loan->relationLoaded('payments')
+            ? $loan->payments
+            : $loan->payments()->get();
+
+        return $payments
+            ->filter(fn (LoanPayment $payment): bool => self::isInterestPayment($payment))
+            ->count();
+    }
+
+    public static function interestPeriodsDue(MemberLoan $loan): int
+    {
+        $due = 1;
+        $releaseDate = Carbon::parse($loan->loan_date ?? $loan->approved_at ?? $loan->created_at);
+        $cursor = $loan->first_payment_due_date
+            ? Carbon::parse($loan->first_payment_due_date)->startOfDay()
+            : $releaseDate->copy()->addMonthsNoOverflow(3)->startOfDay();
+        $today = now()->startOfDay();
+
+        while ($cursor->lte($today)) {
+            $due++;
+            $cursor->addMonthsNoOverflow(3);
+        }
+
+        return $due;
+    }
+
+    public static function principalUnlocked(MemberLoan $loan): bool
+    {
+        if (self::interestPaymentCount($loan) >= self::interestPeriodsDue($loan)) {
+            return true;
+        }
+
+        return InvoiceInterestSettlement::covers($loan);
     }
 }

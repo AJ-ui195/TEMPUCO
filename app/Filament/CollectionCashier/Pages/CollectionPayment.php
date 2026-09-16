@@ -20,6 +20,7 @@ use App\Support\ChargeCanteenCredit;
 use App\Support\CollectionReceiptNumbers;
 use App\Support\CollectionReceipts;
 use App\Support\InvoiceFeeItems;
+use App\Support\InvoiceInterestSettlement;
 use App\Support\LoanTypes;
 use App\Support\MemberCollectionAccounts;
 use App\Support\MemberCreditLedger;
@@ -254,6 +255,7 @@ class CollectionPayment extends Page
         $this->closeCollectForm();
         $this->resetInvoiceFees();
         $this->collectionMethod = 'cash';
+        $this->fillInvoiceInterestFromQuickLoans();
     }
 
     public function clearMember(): void
@@ -305,8 +307,13 @@ class CollectionPayment extends Page
         $ledger = $this->getExpandedLedger();
 
         if ($ledger !== null) {
-            $this->paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
-            $this->paymentAmount = $this->pesoOrZero($ledger['balance']);
+            $account = collect($ledger['accounts'] ?? [])->first();
+            $this->fillPaymentFields(is_array($account) ? $account : null);
+
+            if (! is_array($account)) {
+                $this->paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+                $this->paymentAmount = $this->pesoOrZero($ledger['balance']);
+            }
         }
     }
 
@@ -809,7 +816,20 @@ class CollectionPayment extends Page
         }
 
         if ($this->paymentKind === CharacterLoanLedgerEntries::KIND_INTEREST) {
-            $this->paymentAmount = $this->pesoOrZero(CharacterLoanLedgerEntries::periodInterest($loan));
+            $this->paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+            $this->paymentError = __('Collect interest on Invoice.');
+            $this->paymentAmount = CharacterLoanLedgerEntries::principalUnlocked($loan)
+                ? $this->pesoOrZero(RecordMemberLoanPayment::remainingPrincipal($loan))
+                : '0.00';
+
+            return;
+        }
+
+        if (LoanTypes::isCharacterFamily(RecordMemberLoanPayment::kindOf($loan))
+            && ! CharacterLoanLedgerEntries::principalUnlocked($loan)) {
+            $this->paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+            $this->paymentAmount = '0.00';
+            $this->paymentError = __('Pay the interest on Invoice first.');
 
             return;
         }
@@ -1056,7 +1076,10 @@ class CollectionPayment extends Page
             ? \Illuminate\Support\Carbon::parse($this->paymentDate)
             : now();
 
-        DB::transaction(function () use ($member, $invoiceNo, $receivedAt, $total): void {
+        $interest = PesoInput::parse($this->invoiceInterest);
+        $settlesLoanInterest = $interest >= 0.01;
+
+        DB::transaction(function () use ($member, $invoiceNo, $receivedAt, $total, $interest, $settlesLoanInterest): void {
             InvoiceFeePayment::query()
                 ->whereIn('invoice_no', CollectionReceipts::candidates($invoiceNo))
                 ->delete();
@@ -1064,7 +1087,8 @@ class CollectionPayment extends Page
             InvoiceFeePayment::query()->create([
                 'member_id' => $member->id,
                 'invoice_no' => $invoiceNo,
-                'interest' => PesoInput::parse($this->invoiceInterest),
+                'interest' => $interest,
+                'settles_loan_interest' => $settlesLoanInterest,
                 'surcharge' => PesoInput::parse($this->invoiceSurcharge),
                 'membership_fee' => PesoInput::parse($this->invoiceMembershipFee),
                 'others' => PesoInput::parse($this->invoiceOthers),
@@ -1306,11 +1330,18 @@ class CollectionPayment extends Page
             ? CharacterLoanLedgerEntries::KIND_INTEREST
             : CharacterLoanLedgerEntries::KIND_PRINCIPAL;
 
+        $loan = $this->resolveLoan($account);
+
         if ($account['type'] === MemberCollectionAccounts::TYPE_CHARACTER) {
-            $loan = $this->resolveLoan($account);
-            $this->paymentAmount = $loan
-                ? $this->pesoOrZero(CharacterLoanLedgerEntries::periodInterest($loan))
-                : '0.00';
+            if (! $loan instanceof MemberLoan || ! CharacterLoanLedgerEntries::principalUnlocked($loan)) {
+                $this->paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+                $this->paymentAmount = '0.00';
+
+                return;
+            }
+
+            $this->paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+            $this->paymentAmount = $this->pesoOrZero(RecordMemberLoanPayment::remainingPrincipal($loan));
 
             return;
         }
@@ -1539,6 +1570,21 @@ class CollectionPayment extends Page
 
         $payment->amount = $amount;
         $payment->save();
+    }
+
+    protected function fillInvoiceInterestFromQuickLoans(): void
+    {
+        if (! $this->isInvoiceMode()) {
+            return;
+        }
+
+        $member = $this->getSelectedMember();
+
+        if (! $member instanceof Member) {
+            return;
+        }
+
+        $this->invoiceInterest = $this->pesoOrZero(InvoiceInterestSettlement::outstandingFor($member));
     }
 
     protected function findMember(int $memberId): ?Member

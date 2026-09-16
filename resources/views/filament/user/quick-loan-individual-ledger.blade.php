@@ -49,15 +49,18 @@
             </thead>
             <tbody>
                 @forelse ($entries as $entry)
+                    @php($interestVal = (float) $entry['interest'])
                     <tr>
                         <td>{{ $entry['date']->format('n-j-Y') }}</td>
                         <td>{{ $entry['or'] }}</td>
                         <td>{{ $entry['voucher'] }}</td>
                         <td class="num">{{ $amount((float) $entry['released']) }}</td>
-                        <td class="num">{{ $amount((float) $entry['interest']) }}</td>
+                        <td class="num">
+                            {{ ! empty($entry['interest_in_parens']) ? '('.$amount($interestVal).')' : $amount($interestVal) }}
+                        </td>
                         <td></td>
                         <td class="num">{{ $amount((float) $entry['payment']) }}</td>
-                        <td class="num">{{ number_format((float) $entry['balance'], 2) }}</td>
+                        <td class="num">{{ ! empty($entry['balance_blank']) ? '' : number_format((float) $entry['balance'], 2) }}</td>
                         <td class="num">{{ $amount((float) $entry['surcharge_payment']) }}</td>
                         <td class="num">{{ $amount((float) $entry['surcharge_balance']) }}</td>
                         <td>{{ $entry['remarks'] }}</td>

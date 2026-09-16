@@ -6,6 +6,7 @@ use App\Filament\Auth\Pages\ChangePassword;
 use App\Filament\Auth\Pages\Login;
 use App\Filament\CollectionCashier\Pages\CollectionPayment;
 use App\Filament\CollectionCashier\Pages\Dashboard;
+use App\Filament\CollectionCashier\Pages\GenerateCollectionReport;
 use App\Filament\CollectionCashier\Pages\RegularLoanRemittance;
 use App\Http\Middleware\EnsurePasswordChanged;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
@@ -47,6 +48,7 @@ class CashierPanelProvider extends PanelProvider
                 Dashboard::class,
                 CollectionPayment::class,
                 RegularLoanRemittance::class,
+                GenerateCollectionReport::class,
                 ChangePassword::class,
             ])
             ->widgets([])
