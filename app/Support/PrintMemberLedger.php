@@ -49,7 +49,7 @@ final class PrintMemberLedger
             ? collect([$member])
             : MemberCreditLedger::membersWithActivity($channel, $from, $to);
 
-        $ledgers = $members->map(function (User $each) use ($channel, $from, $to): array {
+        $ledgers = $members->map(function (Member $each) use ($channel, $from, $to): array {
             $ledger = new MemberCreditLedger($each);
 
             return [
