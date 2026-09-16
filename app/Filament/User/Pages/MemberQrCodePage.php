@@ -16,6 +16,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
 
+
 class MemberQrCodePage extends Page
 {
     protected static ?string $navigationLabel = 'QR code';
