@@ -39,6 +39,7 @@ class Member extends Authenticatable implements FilamentUser
         'civil_status',
         'address',
         'contact_number',
+        'tin_number',
         'occupation',
         'employer_department',
         'is_retiree',

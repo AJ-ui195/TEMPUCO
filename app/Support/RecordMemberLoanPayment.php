@@ -7,6 +7,8 @@ use App\Models\Contracts\MemberLoan;
 use App\Models\LoanPayment;
 use App\Models\QuickLoan;
 use App\Models\RegularLoan;
+use App\Models\User;
+use App\Support\RoleDashboard;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -96,6 +98,8 @@ final class RecordMemberLoanPayment
         string $kind,
         ?string $officialReceiptNo = null,
         mixed $receivedAt = null,
+        ?string $receiptKind = null,
+        ?int $receivedBy = null,
     ): LoanPayment {
         if ($loan->status !== LoanStatus::Approved) {
             throw new InvalidArgumentException(__('Only approved loans can receive payments.'));
@@ -137,9 +141,12 @@ final class RecordMemberLoanPayment
             throw new InvalidArgumentException(__('O.R. # is required for this loan.'));
         }
 
-        return DB::transaction(function () use ($loan, $amount, $kind, $officialReceiptNo, $receivedAt, $type): LoanPayment {
+        $officialReceiptNo = filled($officialReceiptNo) ? trim((string) $officialReceiptNo) : null;
+        $receivedBy = $receivedBy ?? self::staffUserId();
+
+        return DB::transaction(function () use ($loan, $amount, $kind, $officialReceiptNo, $receivedAt, $type, $receiptKind, $receivedBy): LoanPayment {
             if ($loan instanceof RegularLoan) {
-                return self::storeRegularSplit($loan, $amount, $officialReceiptNo, $receivedAt);
+                return self::storeRegularSplit($loan, $amount, $officialReceiptNo, $receivedAt, $receiptKind, $receivedBy);
             }
 
             return $loan->payments()->create([
@@ -148,9 +155,74 @@ final class RecordMemberLoanPayment
                     ? $kind
                     : CharacterLoanLedgerEntries::KIND_PRINCIPAL,
                 'official_receipt_no' => $officialReceiptNo,
+                'receipt_kind' => $receiptKind,
                 'received_at' => $receivedAt ?? now(),
+                'received_by' => $receivedBy,
             ]);
         });
+    }
+
+    public static function revise(LoanPayment $payment, float $amount): LoanPayment
+    {
+        $loan = $payment->loan();
+
+        if (! $loan instanceof MemberLoan) {
+            throw new InvalidArgumentException(__('This loan could not be found.'));
+        }
+
+        $amount = round($amount, 2);
+
+        if ($amount < 0.01) {
+            throw new InvalidArgumentException(__('Enter a payment amount.'));
+        }
+
+        $loan->load('payments');
+        $loan->setRelation(
+            'payments',
+            $loan->payments->where('id', '!=', $payment->id)->values(),
+        );
+
+        $kind = strtolower(trim((string) $payment->kind)) ?: CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+
+        if ($loan instanceof RegularLoan) {
+            $remaining = RegularLoanPaymentAllocation::remainingCollectable($loan);
+
+            if ($amount - $remaining > self::EPSILON) {
+                throw new InvalidArgumentException(__('Payment cannot be more than the ₱:amount remaining on this regular loan.', [
+                    'amount' => number_format($remaining, 2),
+                ]));
+            }
+
+            $split = RegularLoanPaymentAllocation::splitAmount($loan, $amount);
+            $payment->fill([
+                'amount' => $amount,
+                'interest_applied' => $split['interest'],
+                'principal_applied' => $split['principal'],
+            ]);
+            $payment->save();
+
+            return $payment->refresh();
+        }
+
+        if ($kind !== CharacterLoanLedgerEntries::KIND_INTEREST) {
+            $remaining = self::remainingPrincipal($loan);
+
+            if ($amount - $remaining > self::EPSILON) {
+                throw new InvalidArgumentException(__('Payment cannot be more than the ₱:amount remaining principal.', [
+                    'amount' => number_format($remaining, 2),
+                ]));
+            }
+        }
+
+        $payment->amount = $amount;
+
+        if ($payment->received_by === null) {
+            $payment->received_by = self::staffUserId();
+        }
+
+        $payment->save();
+
+        return $payment->refresh();
     }
 
     protected static function storeRegularSplit(
@@ -158,6 +230,8 @@ final class RecordMemberLoanPayment
         float $amount,
         ?string $officialReceiptNo,
         mixed $receivedAt,
+        ?string $receiptKind = null,
+        ?int $receivedBy = null,
     ): LoanPayment {
         $split = RegularLoanPaymentAllocation::splitAmount($loan, $amount);
 
@@ -167,8 +241,17 @@ final class RecordMemberLoanPayment
             'interest_applied' => $split['interest'],
             'principal_applied' => $split['principal'],
             'official_receipt_no' => $officialReceiptNo,
+            'receipt_kind' => $receiptKind,
             'received_at' => $receivedAt ?? now(),
+            'received_by' => $receivedBy ?? self::staffUserId(),
         ]);
+    }
+
+    protected static function staffUserId(): ?int
+    {
+        $account = RoleDashboard::currentUser();
+
+        return $account instanceof User ? (int) $account->id : null;
     }
 
     protected static function regularPrincipalApplied(LoanPayment $payment): float

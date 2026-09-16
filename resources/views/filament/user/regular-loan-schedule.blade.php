@@ -97,7 +97,7 @@
                 <td>{{ __('Nominal interest rate') }}</td>
                 <td>{{ __('Per month') }}</td>
                 <td class="eq">=</td>
-                <td class="num">{{ $percent($schedule->monthlyInterestRate) }}</td>
+                <td class="num">{{ $blankAmounts ? '' : $percent($schedule->nominalInterestRate) }}</td>
             </tr>
             <tr>
                 <td>4</td>
@@ -136,7 +136,9 @@
             @if (! $blankAmounts && $schedule->capitalBuildUpRetention > 0)
                 <tr>
                     <td></td>
-                    <td class="indent">{{ __('Capital build-up retention (2nd APDS)') }}</td>
+                    <td class="indent">{{ $schedule->isSecondApdsAccount
+                        ? __('Capital build-up retention (2nd APDS)')
+                        : __('Capital build-up retention (1st APDS)') }}</td>
                     <td class="num">{{ $money($schedule->capitalBuildUpRetention) }}</td>
                     <td colspan="5"></td>
                 </tr>

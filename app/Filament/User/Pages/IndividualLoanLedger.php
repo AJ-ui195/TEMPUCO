@@ -8,20 +8,22 @@ use BackedEnum;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
 
-class RegularLoanLedger extends Page
+class IndividualLoanLedger extends Page
 {
     use HasSalaryLoanAccordion;
     use ResolvesMemberSalaryLoan;
 
-    protected static ?string $navigationLabel = 'Regular loan';
+    protected static ?string $navigationLabel = 'Individual ledger';
 
-    protected static ?string $title = 'Regular loan';
+    protected static ?string $title = 'Individual ledger';
 
-    protected static ?string $slug = 'loan-ledger/regular-loan';
+    protected static ?string $slug = 'loan-ledger/individual-ledger';
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationParentItem = 'Loan Ledger';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     protected static string|BackedEnum|null $navigationIcon = null;
 
@@ -42,7 +44,7 @@ class RegularLoanLedger extends Page
         return match ($this->selected) {
             'regular-1', 'individual-1' => __('Salary loan 1'),
             'regular-2', 'individual-2' => __('Salary loan 2'),
-            default => static::$title ?? __('Regular loan'),
+            default => static::$title ?? __('Individual ledger'),
         };
     }
 
@@ -53,6 +55,6 @@ class RegularLoanLedger extends Page
 
     protected static function defaultSelected(): string
     {
-        return 'regular-1';
+        return '';
     }
 }

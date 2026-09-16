@@ -67,7 +67,7 @@ final class LoanApplicationService
             ),
             default => in_array((string) ($data['loan_type'] ?? ''), [
                 LoanTypes::REGULAR,
-                LoanTypes::COLLATERALIZED,
+                LoanTypes::SALARY_2,
             ], true)
                 ? (string) $data['loan_type']
                 : LoanTypes::REGULAR,
@@ -91,17 +91,11 @@ final class LoanApplicationService
                 ]);
             }
 
-            $schedule = LoanTypes::isCollateralized($loanType)
-                ? RegularLoanSchedule::calculateCollateralized(
-                    $loanAmount,
-                    $periodMonths,
-                    $member->isRetiree(),
-                )
-                : RegularLoanSchedule::calculate(
-                    $loanAmount,
-                    $periodMonths,
-                    ApdsRules::isSecondApdsAccount($member),
-                );
+            $schedule = RegularLoanSchedule::calculate(
+                $loanAmount,
+                $periodMonths,
+                ApdsRules::isSecondAccountType($loanType),
+            );
             $installmentAmount = $schedule->monthlyInstallment;
         }
 

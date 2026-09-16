@@ -32,6 +32,8 @@ final class CharacterLoanRules
 
     public const CHARACTER_MONTHLY_RATE = 0.02;
 
+    public const CHARACTER_MONTHLY_RATE_RETIREE = 0.01;
+
     public const CHARACTER_EMERGENCY_TERM_MONTHS = 3;
 
     public const CHARACTER_SHORT_TERM_MONTHS = 12;
@@ -59,6 +61,13 @@ final class CharacterLoanRules
             : LoanTypes::CHARACTER_EMERGENCY;
     }
 
+    public static function characterMonthlyRate(bool $isRetiree): float
+    {
+        return $isRetiree
+            ? self::CHARACTER_MONTHLY_RATE_RETIREE
+            : self::CHARACTER_MONTHLY_RATE;
+    }
+
     public static function defaultTermMonths(string $loanType): int
     {
         return match (true) {
@@ -66,7 +75,7 @@ final class CharacterLoanRules
             LoanTypes::isEmergency($loanType), LoanTypes::isCharacterEmergency($loanType) => self::CHARACTER_EMERGENCY_TERM_MONTHS,
             LoanTypes::isTravel($loanType) => self::TRAVEL_TERM_MONTHS,
             LoanTypes::isCharacterShortTerm($loanType) => self::CHARACTER_SHORT_TERM_MONTHS,
-            LoanTypes::isRetireeShortTerm($loanType) => self::RETIREE_SHORT_TERM_MIN_MONTHS,
+            LoanTypes::isRetireeShortTerm($loanType), LoanTypes::isCollateralized($loanType) => self::RETIREE_SHORT_TERM_MIN_MONTHS,
             default => 3,
         };
     }
@@ -91,14 +100,21 @@ final class CharacterLoanRules
 
         $months = max(1, $termMonths);
 
+        $rate = self::characterMonthlyRate($isRetiree);
+
         return match (true) {
             LoanTypes::isCalamity($loanType) => round($amount * self::CALAMITY_ANNUAL_RATE * ($months / 12), 2),
             LoanTypes::isEmergency($loanType) => round($amount * self::EMERGENCY_MONTHLY_RATE * $months, 2),
-            LoanTypes::isCharacterEmergency($loanType) => round($amount * self::CHARACTER_MONTHLY_RATE * self::CHARACTER_EMERGENCY_TERM_MONTHS, 2),
-            LoanTypes::isCharacterShortTerm($loanType) => round($amount * self::CHARACTER_MONTHLY_RATE, 2),
+            LoanTypes::isCharacterEmergency($loanType) => round($amount * $rate * self::CHARACTER_EMERGENCY_TERM_MONTHS, 2),
+            LoanTypes::isCharacterShortTerm($loanType) => round($amount * $rate, 2),
             LoanTypes::isTravel($loanType) => round($amount * ($isRetiree ? self::TRAVEL_RATE_RETIREE : self::TRAVEL_RATE_REGULAR), 2),
             LoanTypes::isRetireeShortTerm($loanType) => round($amount * self::RETIREE_SHORT_TERM_MONTHLY_RATE, 2),
-            default => round($amount * CharacterLoanLedgerEntries::MONTHLY_INTEREST_RATE * min($months, 3), 2),
+            LoanTypes::isCollateralized($loanType) => RegularLoanSchedule::calculateCollateralized(
+                $amount,
+                $months,
+                $isRetiree,
+            )->monthlyInstallment,
+            default => round($amount * $rate * min($months, 3), 2),
         };
     }
 
@@ -143,6 +159,11 @@ final class CharacterLoanRules
             return LoanTypes::isCharacter($loanType)
                 ? __('Choose Character-Emergency or Character Short-Term.')
                 : __('Choose a character loan type.');
+        }
+
+        if (LoanTypes::isCollateralized($loanType)) {
+            return CollateralizedLoanRules::amountError($amount)
+                ?? CollateralizedLoanRules::termError($termMonths);
         }
 
         if (LoanTypes::isRetireeShortTerm($loanType) && ! $member->isRetiree()) {
