@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToTypedLoan;
 use App\Support\LedgerChronology;
+use App\Support\RoleDashboard;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection;
@@ -21,6 +22,7 @@ class LoanPayment extends Model
         'interest_applied',
         'principal_applied',
         'official_receipt_no',
+        'receipt_kind',
         'received_at',
         'received_by',
     ];
@@ -36,6 +38,21 @@ class LoanPayment extends Model
             'principal_applied' => 'decimal:2',
             'received_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $payment): void {
+            if ($payment->received_by !== null) {
+                return;
+            }
+
+            $account = RoleDashboard::currentUser();
+
+            if ($account instanceof User) {
+                $payment->received_by = $account->id;
+            }
+        });
     }
 
     /**

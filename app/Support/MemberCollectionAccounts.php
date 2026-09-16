@@ -16,6 +16,10 @@ final class MemberCollectionAccounts
 {
     public const TYPE_REGULAR = 'regular';
 
+    public const TYPE_SALARY_1 = 'salary_1';
+
+    public const TYPE_SALARY_2 = 'salary_2';
+
     public const TYPE_QUICK = 'quick';
 
     public const TYPE_CHARACTER = 'character';
@@ -28,7 +32,8 @@ final class MemberCollectionAccounts
     public static function typeLabels(): array
     {
         return [
-            self::TYPE_REGULAR => __('Regular loan'),
+            self::TYPE_SALARY_1 => __('Salary loan 1'),
+            self::TYPE_SALARY_2 => __('Salary loan 2'),
             self::TYPE_CHARACTER => __('Character loan'),
             self::TYPE_CANTEEN => __('Canteen / Grocery credit'),
             self::TYPE_QUICK => __('Quick loan'),
@@ -47,7 +52,8 @@ final class MemberCollectionAccounts
         $creditBalance = (new MemberPosCredit($member))->totalOutstanding();
 
         $byType = [
-            self::TYPE_REGULAR => collect(),
+            self::TYPE_SALARY_1 => collect(),
+            self::TYPE_SALARY_2 => collect(),
             self::TYPE_CHARACTER => collect(),
             self::TYPE_QUICK => collect(),
         ];
@@ -62,7 +68,8 @@ final class MemberCollectionAccounts
 
         return [
             'ledgers' => [
-                self::TYPE_REGULAR => self::loanLedger(self::TYPE_REGULAR, $labels[self::TYPE_REGULAR], $byType[self::TYPE_REGULAR]),
+                self::TYPE_SALARY_1 => self::loanLedger(self::TYPE_SALARY_1, $labels[self::TYPE_SALARY_1], $byType[self::TYPE_SALARY_1]),
+                self::TYPE_SALARY_2 => self::loanLedger(self::TYPE_SALARY_2, $labels[self::TYPE_SALARY_2], $byType[self::TYPE_SALARY_2]),
                 self::TYPE_CHARACTER => self::loanLedger(self::TYPE_CHARACTER, $labels[self::TYPE_CHARACTER], $byType[self::TYPE_CHARACTER]),
                 self::TYPE_CANTEEN => self::canteenLedger($labels[self::TYPE_CANTEEN], $canteen),
                 self::TYPE_QUICK => self::loanLedger(self::TYPE_QUICK, $labels[self::TYPE_QUICK], $byType[self::TYPE_QUICK]),
@@ -313,17 +320,37 @@ final class MemberCollectionAccounts
         return $entries->values();
     }
 
+    public static function isSalaryLedger(string $type): bool
+    {
+        return in_array($type, [
+            self::TYPE_REGULAR,
+            self::TYPE_SALARY_1,
+            self::TYPE_SALARY_2,
+        ], true);
+    }
+
+    public static function ledgerType(MemberLoan $loan): string
+    {
+        return self::accountType($loan);
+    }
+
     private static function accountType(MemberLoan $loan): string
     {
         if ($loan instanceof QuickLoan) {
             return self::TYPE_QUICK;
         }
 
+        if ($loan instanceof RegularLoan) {
+            return LoanTypes::isSalary2((string) $loan->loan_type)
+                ? self::TYPE_SALARY_2
+                : self::TYPE_SALARY_1;
+        }
+
         if ($loan instanceof CharacterLoan || in_array(RecordMemberLoanPayment::kindOf($loan), LoanTypes::characterFamily(), true)) {
             return self::TYPE_CHARACTER;
         }
 
-        return self::TYPE_REGULAR;
+        return self::TYPE_SALARY_1;
     }
 
     private static function loanLabel(MemberLoan $loan, string $kind): string
@@ -338,7 +365,9 @@ final class MemberCollectionAccounts
             $kind === LoanTypes::RETIREE_SHORT_TERM => __('Retirees’ short-term loan'),
             $kind === LoanTypes::TRAVEL => __('Travel loan'),
             LoanTypes::isCollateralized($kind) => __('Collateralized loan'),
-            $loan instanceof RegularLoan => __('Regular loan'),
+            $kind === LoanTypes::SALARY_2 => __('Salary loan 2'),
+            $kind === LoanTypes::REGULAR => __('Salary loan 1'),
+            $loan instanceof RegularLoan => __('Salary loan'),
             default => $kind !== '' ? $kind : __('Loan'),
         };
 

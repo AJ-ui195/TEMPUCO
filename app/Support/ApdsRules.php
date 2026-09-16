@@ -26,12 +26,21 @@ final class ApdsRules
 
     public const FIRST_APDS_MIN_TERM_MONTHS = 12;
 
-    public const FIRST_APDS_MAX_TERM_MONTHS = 60;
+    public const FIRST_APDS_MAX_TERM_MONTHS = 84;
+
+    public const APDS_MAX_TERM_MONTHS = 84;
 
     public const RESTRUCTURE_AGGREGATE_MAX = 750000.0;
 
+    public static function isSecondAccountType(string $loanType): bool
+    {
+        return LoanTypes::isSalary2($loanType);
+    }
+
     /**
      * Section 2 — one-time service charge rate.
+     * First APDS (Salary loan 1): 5.25% for 1–5 years, 6.00% for 6–7 years.
+     * Second APDS (Salary loan 2): 6.00% for 1–7 years.
      */
     public static function serviceChargeRate(bool $isSecondApdsAccount, int $termMonths): float
     {
@@ -153,9 +162,9 @@ final class ApdsRules
      *
      * @return string|null Validation error message, or null if OK / not first APDS.
      */
-    public static function firstApdsAmountError(Member $user, float $amount): ?string
+    public static function firstApdsAmountError(Member $user, float $amount, string $loanType = LoanTypes::REGULAR): ?string
     {
-        if (self::isSecondApdsAccount($user)) {
+        if (self::isSecondAccountType($loanType)) {
             return null;
         }
 
@@ -169,21 +178,22 @@ final class ApdsRules
     }
 
     /**
-     * First APDS for new members: term of 1–5 years.
+     * Salary loan 1 (first APDS) and Salary loan 2 (second APDS): 1–7 years.
      *
-     * @return string|null Validation error message, or null if OK / not first APDS.
+     * @return string|null Validation error message, or null if OK.
      */
-    public static function firstApdsTermError(Member $user, int $termMonths): ?string
+    public static function firstApdsTermError(Member $user, int $termMonths, string $loanType = LoanTypes::REGULAR): ?string
     {
-        if (self::isSecondApdsAccount($user)) {
-            return null;
-        }
-
-        if ($termMonths < self::FIRST_APDS_MIN_TERM_MONTHS || $termMonths > self::FIRST_APDS_MAX_TERM_MONTHS) {
-            return __('The first APDS regular loan term must be one (1) to five (5) years (:min–:max months).', [
-                'min' => self::FIRST_APDS_MIN_TERM_MONTHS,
-                'max' => self::FIRST_APDS_MAX_TERM_MONTHS,
-            ]);
+        if ($termMonths < self::FIRST_APDS_MIN_TERM_MONTHS || $termMonths > self::APDS_MAX_TERM_MONTHS) {
+            return self::isSecondAccountType($loanType)
+                ? __('The second APDS (Salary loan 2) term must be one (1) to seven (7) years (:min–:max months).', [
+                    'min' => self::FIRST_APDS_MIN_TERM_MONTHS,
+                    'max' => self::APDS_MAX_TERM_MONTHS,
+                ])
+                : __('The first APDS (Salary loan 1) term must be one (1) to seven (7) years (:min–:max months).', [
+                    'min' => self::FIRST_APDS_MIN_TERM_MONTHS,
+                    'max' => self::APDS_MAX_TERM_MONTHS,
+                ]);
         }
 
         return null;

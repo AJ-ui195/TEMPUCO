@@ -20,9 +20,16 @@ final class SettleMemberCredit
      *
      * @return array{applied: float, remaining_balance: float, payment: ?PosCreditPayment}
      */
-    public static function apply(Member $member, PosSaleChannel $channel, float $amount, ?User $cashier = null, ?string $orNumber = null): array
-    {
-        return DB::transaction(function () use ($member, $channel, $amount, $cashier, $orNumber): array {
+    public static function apply(
+        Member $member,
+        PosSaleChannel $channel,
+        float $amount,
+        ?User $cashier = null,
+        ?string $orNumber = null,
+        ?string $invoiceNo = null,
+        ?string $receiptKind = null,
+    ): array {
+        return DB::transaction(function () use ($member, $channel, $amount, $cashier, $orNumber, $invoiceNo, $receiptKind): array {
             $credit = new MemberPosCredit($member);
             $outstanding = $credit->outstandingFor($channel);
             $applied = round(min(round($amount, 2), $outstanding), 2);
@@ -35,12 +42,16 @@ final class SettleMemberCredit
                 ];
             }
 
+            $invoice = trim((string) $invoiceNo);
+
             $payment = PosCreditPayment::query()->create([
                 'member_id' => $member->id,
                 'cashier_id' => $cashier?->id,
                 'sale_channel' => $channel,
                 'amount' => $applied,
                 'reference' => self::resolveReference($orNumber),
+                'invoice_no' => $invoice !== '' ? $invoice : null,
+                'receipt_kind' => $receiptKind,
             ]);
 
             return [
@@ -56,8 +67,14 @@ final class SettleMemberCredit
      *
      * @return array{applied: float, remaining_balance: float, payment: ?PosCreditPayment}
      */
-    public static function applyAcrossChannels(Member $member, float $amount, ?User $cashier = null, ?string $orNumber = null): array
-    {
+    public static function applyAcrossChannels(
+        Member $member,
+        float $amount,
+        ?User $cashier = null,
+        ?string $orNumber = null,
+        ?string $invoiceNo = null,
+        ?string $receiptKind = null,
+    ): array {
         $amount = round($amount, 2);
         $credit = new MemberPosCredit($member);
         $total = $credit->totalOutstanding();
@@ -69,7 +86,7 @@ final class SettleMemberCredit
                 break;
             }
 
-            $result = self::apply($member, $channel, $amount, $cashier, $orNumber);
+            $result = self::apply($member, $channel, $amount, $cashier, $orNumber, $invoiceNo, $receiptKind);
             $applied = round($applied + $result['applied'], 2);
             $amount = round($amount - $result['applied'], 2);
 

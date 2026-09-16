@@ -4,6 +4,10 @@ namespace App\Providers\Filament;
 
 use App\Filament\Auth\Pages\ChangePassword;
 use App\Filament\Auth\Pages\Login;
+use App\Filament\User\Pages\IndividualSalaryLoan1Ledger;
+use App\Filament\User\Pages\IndividualSalaryLoan2Ledger;
+use App\Filament\User\Pages\RegularSalaryLoan1Ledger;
+use App\Filament\User\Pages\RegularSalaryLoan2Ledger;
 use App\Http\Middleware\EnsurePasswordChanged;
 use App\Providers\Filament\Concerns\RegistersPortalUi;
 use Filament\Http\Middleware\Authenticate;
@@ -46,6 +50,10 @@ class UserPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/User/Pages'), for: 'App\Filament\User\Pages')
             ->pages([
                 ChangePassword::class,
+                RegularSalaryLoan1Ledger::class,
+                RegularSalaryLoan2Ledger::class,
+                IndividualSalaryLoan1Ledger::class,
+                IndividualSalaryLoan2Ledger::class,
             ])
             ->widgets([])
             ->middleware([

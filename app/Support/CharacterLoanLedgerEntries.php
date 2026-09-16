@@ -11,17 +11,20 @@ use Illuminate\Support\Collection;
 /**
  * Character / Character-Emergency style ledger:
  * release + prepaid interest, interest payments (balance unchanged), then principal payoff.
+ * Regular members: 2%/mo. Retirees (`is_retiree`): 1%/mo.
  */
 final class CharacterLoanLedgerEntries
 {
     public const MONTHLY_INTEREST_RATE = 0.02;
+
+    public const MONTHLY_INTEREST_RATE_RETIREE = 0.01;
 
     public const KIND_INTEREST = 'interest';
 
     public const KIND_PRINCIPAL = 'principal';
 
     /**
-     * Recurring interest for one repayment period (Character-Emergency: 2%/mo × term, typically 3 → 6%).
+     * Recurring interest for one repayment period (Character-Emergency: rate/mo × term, typically 3).
      */
     public static function periodInterest(MemberLoan $loan): float
     {
@@ -34,8 +37,11 @@ final class CharacterLoanLedgerEntries
 
         $months = max(1, (int) $loan->loan_period_months);
         $periodMonths = $months <= 3 ? $months : ($months >= 12 ? 1 : $months);
+        $rate = $loan->user?->isRetiree()
+            ? self::MONTHLY_INTEREST_RATE_RETIREE
+            : self::MONTHLY_INTEREST_RATE;
 
-        return round($principal * self::MONTHLY_INTEREST_RATE * $periodMonths, 2);
+        return round($principal * $rate * $periodMonths, 2);
     }
 
     public static function repaymentIntervalMonths(MemberLoan $loan): int

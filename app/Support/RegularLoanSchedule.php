@@ -40,6 +40,7 @@ final class RegularLoanSchedule
         public float $annualEir,
         public float $annualInterestRate,
         public float $monthlyInterestRate,
+        public float $nominalInterestRate,
         public bool $isSecondApdsAccount,
         public array $otherChargeLines,
         public array $rows,
@@ -52,9 +53,19 @@ final class RegularLoanSchedule
         $principal = round((float) $loan->loan_amount, 2);
         $termMonths = max(1, (int) $loan->loan_period_months);
         $user = $loan->user;
-        $isSecond = false;
+        $loanType = (string) $loan->loan_type;
 
-        if ($user) {
+        if (LoanTypes::isCollateralized($loanType)) {
+            return self::calculateCollateralized(
+                $principal,
+                $termMonths,
+                (bool) $user?->isRetiree(),
+            );
+        }
+
+        $isSecond = ApdsRules::isSecondAccountType($loanType);
+
+        if (! $isSecond && $user && ! LoanTypes::isSalary2($loanType) && strcasecmp(trim($loanType), LoanTypes::REGULAR) !== 0) {
             $orderedIds = RegularLoan::query()
                 ->forUser($user)
                 ->where('status', LoanStatus::Approved)
@@ -64,33 +75,22 @@ final class RegularLoanSchedule
                 ->pluck('id');
 
             $position = $orderedIds->search($loan->getKey());
-
-            // First approved APDS = index 0; any later approved APDS = second account.
             $isSecond = $position !== false && $position >= 1;
 
-            // Pending / not yet in approved list: treat as second if an approved APDS already exists.
             if ($position === false) {
                 $isSecond = $orderedIds->isNotEmpty();
             }
-        }
-
-        if (LoanTypes::isCollateralized((string) $loan->loan_type)) {
-            return self::calculateCollateralized(
-                $principal,
-                $termMonths,
-                (bool) $user?->isRetiree(),
-            );
         }
 
         return self::calculate($principal, $termMonths, $isSecond);
     }
 
     /** Empty APDS form so the layout still shows when no loan is selected. */
-    public static function blank(): self
+    public static function blank(bool $isSecondApdsAccount = false): self
     {
         $annualRate = self::annualInterestRateForTerm(12);
         $monthlyRate = round($annualRate / 12, 8);
-        $chargeRate = ApdsRules::SERVICE_CHARGE_FIRST_1_TO_5_YEARS;
+        $chargeRate = ApdsRules::serviceChargeRate($isSecondApdsAccount, 12);
 
         return new self(
             principal: 0,
@@ -104,11 +104,12 @@ final class RegularLoanSchedule
             capitalBuildUpRetention: 0,
             netProceeds: 0,
             monthlyInstallment: 0,
-            monthlyEir: 0,
-            annualEir: 0,
+            monthlyEir: $monthlyRate,
+            annualEir: round((pow(1 + $monthlyRate, 12) - 1), 6),
             annualInterestRate: $annualRate,
             monthlyInterestRate: $monthlyRate,
-            isSecondApdsAccount: false,
+            nominalInterestRate: 0,
+            isSecondApdsAccount: $isSecondApdsAccount,
             otherChargeLines: ApdsRules::otherChargeLines($chargeRate),
             rows: [[
                 'period' => 0,
@@ -235,7 +236,13 @@ final class RegularLoanSchedule
             ];
         }
 
-        $monthlyEir = self::monthlyEffectiveRate($netProceeds, $installment, $lastCashFlow, $termMonths);
+        $eirPresentValue = round($principal - $otherCharges, 2);
+        $monthlyEir = self::monthlyEffectiveRate($eirPresentValue, $installment, $installment, $termMonths);
+        $annualEir = round((pow(1 + $monthlyEir, 12) - 1), 6);
+        $termYears = max($termMonths / 12, 1 / 12);
+        $nominalInterestRate = $principal > 0
+            ? round((($installment * $termMonths) - $principal) / ($principal * $termYears), 8)
+            : 0.0;
 
         return new self(
             principal: $principal,
@@ -250,9 +257,10 @@ final class RegularLoanSchedule
             netProceeds: $netProceeds,
             monthlyInstallment: $installment,
             monthlyEir: $monthlyEir,
-            annualEir: round((pow(1 + $monthlyEir, 12) - 1), 6),
+            annualEir: $annualEir,
             annualInterestRate: $annualRate,
             monthlyInterestRate: $monthlyRate,
+            nominalInterestRate: $nominalInterestRate,
             isSecondApdsAccount: $isSecondApdsAccount,
             otherChargeLines: $otherChargeLines,
             rows: $rows,

@@ -5,6 +5,34 @@
         gap: 1.25rem;
     }
 
+    .ll-tabs {
+        display: flex;
+        gap: 0.375rem;
+        padding: 0.25rem;
+        border-radius: 0.75rem;
+        background: color-mix(in srgb, var(--gray-400, #94a3b8) 16%, transparent);
+        width: fit-content;
+        max-width: 100%;
+    }
+
+    .ll-tab {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        border-radius: 0.55rem;
+        padding: 0.5rem 0.9rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        opacity: 0.72;
+    }
+
+    .ll-tab.is-active {
+        opacity: 1;
+        background: color-mix(in srgb, var(--gray-50, #f8fafc) 88%, transparent);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+    }
+
     .ll-field {
         display: flex;
         flex-direction: column;

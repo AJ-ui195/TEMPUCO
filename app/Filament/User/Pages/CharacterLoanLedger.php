@@ -24,7 +24,7 @@ class CharacterLoanLedger extends Page
 
     protected static ?string $navigationParentItem = 'Loan Ledger';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     protected static string|BackedEnum|null $navigationIcon = null;
 

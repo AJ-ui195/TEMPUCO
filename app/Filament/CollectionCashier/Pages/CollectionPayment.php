@@ -4,8 +4,12 @@ namespace App\Filament\CollectionCashier\Pages;
 
 use App\Enums\LoanStatus;
 use App\Enums\PosSaleChannel;
+use App\Enums\ReceiptKind;
+use App\Models\CancelledReceipt;
 use App\Models\CharacterLoan;
 use App\Models\Contracts\MemberLoan;
+use App\Models\InvoiceFeePayment;
+use App\Models\LoanPayment;
 use App\Models\Member;
 use App\Models\PosCreditPayment;
 use App\Models\QuickLoan;
@@ -13,6 +17,10 @@ use App\Models\RegularLoan;
 use App\Models\User;
 use App\Support\CharacterLoanLedgerEntries;
 use App\Support\ChargeCanteenCredit;
+use App\Support\CollectionReceiptNumbers;
+use App\Support\CollectionReceipts;
+use App\Support\InvoiceFeeItems;
+use App\Support\LoanTypes;
 use App\Support\MemberCollectionAccounts;
 use App\Support\MemberCreditLedger;
 use App\Support\MemberCreditLimit;
@@ -27,9 +35,14 @@ use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Filament\Navigation\NavigationItem;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Livewire\Attributes\Url;
+
+use function Filament\Support\original_request;
 
 class CollectionPayment extends Page
 {
@@ -55,15 +68,55 @@ class CollectionPayment extends Page
 
     public ?string $collectKey = null;
 
+    public bool $collectModalOpen = false;
+
     public ?int $collectLoanId = null;
 
     public ?int $regularViewLoanId = null;
 
     public string $paymentKind = CharacterLoanLedgerEntries::KIND_INTEREST;
 
-    public string $paymentAmount = '';
+    public string $paymentAmount = '0.00';
+
+    public string $cashTendered = '';
+
+    public string $invoiceInterest = '0.00';
+
+    public string $invoiceSurcharge = '0.00';
+
+    public string $invoiceMembershipFee = '0.00';
+
+    public string $invoiceOthers = '0.00';
+
+    public bool $editingInvoiceFees = false;
+
+    public string $collectionMethod = 'cash';
 
     public string $officialReceiptNo = '';
+
+    public string $invoiceNo = '';
+
+    public string $receiptKind = '';
+
+    public bool $kindChosen = false;
+
+    #[Url(except: '')]
+    public string $receipt = '';
+
+    public string $paymentDate = '';
+
+    public bool $showSavedModal = false;
+
+    public string $savedTitle = '';
+
+    public string $savedMessage = '';
+
+    public string $savedTone = 'save';
+
+    /**
+     * @var array<string, mixed>
+     */
+    public array $printedPreview = [];
 
     public ?string $paymentError = null;
 
@@ -77,9 +130,87 @@ class CollectionPayment extends Page
 
     public ?int $receiptPaymentId = null;
 
+    public ?int $editingLoanPaymentId = null;
+
+    public ?int $editingPosPaymentId = null;
+
     public function getTitle(): string|Htmlable
     {
         return static::$title ?? __('Collection payment');
+    }
+
+    public function getHeading(): string|Htmlable
+    {
+        return '';
+    }
+
+    public function mount(): void
+    {
+        $this->paymentDate = now()->toDateString();
+        $this->refreshReceiptNumbers();
+
+        if ($this->receipt === 'invoice') {
+            $this->chooseReceiptKind(ReceiptKind::Invoice->value);
+        } else {
+            $this->chooseReceiptKind(ReceiptKind::OfficialReceipt->value);
+        }
+    }
+
+    /**
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        $url = static::getUrl();
+
+        return [
+            NavigationItem::make(static::getNavigationLabel())
+                ->key(static::class)
+                ->icon(static::getNavigationIcon())
+                ->activeIcon(static::getActiveNavigationIcon())
+                ->sort(static::getNavigationSort())
+                ->url($url.'?receipt=or')
+                ->isActiveWhen(fn (): bool => original_request()->routeIs(static::getRouteName()))
+                ->childItems([
+                    NavigationItem::make(__('Official Receipt'))
+                        ->url($url.'?receipt=or')
+                        ->isActiveWhen(fn (): bool => original_request()->routeIs(static::getRouteName())
+                            && original_request()->query('receipt') === 'or')
+                        ->sort(1),
+                    NavigationItem::make(__('Invoice'))
+                        ->url($url.'?receipt=invoice')
+                        ->isActiveWhen(fn (): bool => original_request()->routeIs(static::getRouteName())
+                            && original_request()->query('receipt') === 'invoice')
+                        ->sort(2),
+                ]),
+        ];
+    }
+
+    public function refreshReceiptNumbers(): void
+    {
+        $this->officialReceiptNo = CollectionReceiptNumbers::nextOfficialReceiptNo();
+        $this->invoiceNo = CollectionReceiptNumbers::nextInvoiceNo();
+    }
+
+    public function chooseReceiptKind(string $kind): void
+    {
+        if (! in_array($kind, [ReceiptKind::OfficialReceipt->value, ReceiptKind::Invoice->value], true)) {
+            return;
+        }
+
+        $this->receiptKind = $kind;
+        $this->kindChosen = true;
+        $this->receipt = $kind === ReceiptKind::Invoice->value ? 'invoice' : 'or';
+    }
+
+    public function updatedOfficialReceiptNo(): void
+    {
+        $this->tryLoadFromReceiptNumber(false);
+    }
+
+    public function updatedInvoiceNo(): void
+    {
+        $this->tryLoadFromReceiptNumber(false);
     }
 
     public function updatedMemberSearch(): void
@@ -97,21 +228,13 @@ class CollectionPayment extends Page
     {
         $term = trim($this->memberSearch);
 
-        if ($term === '' || $this->selectedMemberId) {
+        if ($term === '' || $this->selectedMemberId || $this->isCancelledAccountLabel($term)) {
             return collect();
         }
 
         return Member::query()
             ->orderedByName()
-            ->where(function ($query) use ($term): void {
-                $query->where('name', 'like', '%'.$term.'%')
-                    ->orWhere('email', 'like', '%'.$term.'%')
-                    ->orWhere('contact_number', 'like', '%'.$term.'%');
-
-                if (ctype_digit($term)) {
-                    $query->orWhere('id', (int) $term);
-                }
-            })
+            ->where('name', 'like', '%'.$term.'%')
             ->limit(20)
             ->get();
     }
@@ -129,6 +252,8 @@ class CollectionPayment extends Page
         $this->expandedKey = null;
         $this->regularViewLoanId = null;
         $this->closeCollectForm();
+        $this->resetInvoiceFees();
+        $this->collectionMethod = 'cash';
     }
 
     public function clearMember(): void
@@ -138,6 +263,7 @@ class CollectionPayment extends Page
         $this->expandedKey = null;
         $this->regularViewLoanId = null;
         $this->closeCollectForm();
+        $this->resetInvoiceFees();
     }
 
     public function getSelectedMember(): ?Member
@@ -172,9 +298,339 @@ class CollectionPayment extends Page
         $this->expandedKey = $this->expandedKey === $key ? null : $key;
         $this->closeCollectForm();
 
-        if ($this->expandedKey === MemberCollectionAccounts::TYPE_REGULAR) {
+        if (MemberCollectionAccounts::isSalaryLedger((string) $this->expandedKey)) {
             $this->regularViewLoanId = $this->regularLoansForSchedule()->first()?->id;
         }
+
+        $ledger = $this->getExpandedLedger();
+
+        if ($ledger !== null) {
+            $this->paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+            $this->paymentAmount = $this->pesoOrZero($ledger['balance']);
+        }
+    }
+
+    public function getOverallAmount(): float
+    {
+        return PesoInput::parse($this->cashTendered);
+    }
+
+    public function isInvoiceMode(): bool
+    {
+        return $this->receiptKind === ReceiptKind::Invoice->value;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getInvoiceFeeLabels(): array
+    {
+        return InvoiceFeeItems::labels();
+    }
+
+    public function normalizeInvoiceFees(): void
+    {
+        $this->invoiceInterest = $this->pesoOrZero($this->invoiceInterest);
+        $this->invoiceSurcharge = $this->pesoOrZero($this->invoiceSurcharge);
+        $this->invoiceMembershipFee = $this->pesoOrZero($this->invoiceMembershipFee);
+        $this->invoiceOthers = $this->pesoOrZero($this->invoiceOthers);
+    }
+
+    public function updatedInvoiceInterest(mixed $value): void
+    {
+        $this->invoiceInterest = $this->digitsOnly($value);
+    }
+
+    public function updatedInvoiceSurcharge(mixed $value): void
+    {
+        $this->invoiceSurcharge = $this->digitsOnly($value);
+    }
+
+    public function updatedInvoiceMembershipFee(mixed $value): void
+    {
+        $this->invoiceMembershipFee = $this->digitsOnly($value);
+    }
+
+    public function updatedInvoiceOthers(mixed $value): void
+    {
+        $this->invoiceOthers = $this->digitsOnly($value);
+    }
+
+    public function updatedPaymentAmount(mixed $value): void
+    {
+        $this->paymentAmount = $this->digitsOnly($value);
+    }
+
+    public function normalizePaymentAmount(): void
+    {
+        $this->paymentAmount = $this->pesoOrZero($this->paymentAmount);
+    }
+
+    public function getTotalAmount(): float
+    {
+        if ($this->isInvoiceMode()) {
+            $total = 0.0;
+
+            foreach ($this->invoiceFeeAmounts() as $amount) {
+                $total = round($total + PesoInput::parse($amount), 2);
+            }
+
+            return $total;
+        }
+
+        return PesoInput::parse($this->paymentAmount);
+    }
+
+    public function getChangeAmount(): float
+    {
+        return round(max(0, $this->getOverallAmount() - $this->getTotalAmount()), 2);
+    }
+
+    public function savePayment(): void
+    {
+        $this->paymentError = null;
+        $this->editingLoanPaymentId = null;
+        $this->editingPosPaymentId = null;
+
+        if (! $this->assertSaveGuards()) {
+            return;
+        }
+
+        if ($this->getSelectedMember() === null) {
+            $this->paymentError = __('Select a member to collect.');
+
+            return;
+        }
+
+        if ($this->isInvoiceMode()) {
+            $this->recordInvoiceFees();
+
+            return;
+        }
+
+        if ($this->expandedKey === null || $this->expandedKey === '') {
+            $this->paymentError = __('Select an account.');
+
+            return;
+        }
+
+        $ledger = $this->findLedger($this->expandedKey);
+
+        if ($ledger === null || collect($ledger['accounts'])->isEmpty()) {
+            Notification::make()
+                ->title(__('Nothing to collect'))
+                ->body(__('This ledger has no remaining balance.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->collectKey = $this->expandedKey;
+        $this->collectLoanId = $this->expandedKey === MemberCollectionAccounts::TYPE_CANTEEN
+            ? null
+            : (int) collect($ledger['accounts'])->first()['loan_id'];
+
+        $this->recordCollection();
+    }
+
+    public function cancelOfficialReceipt(): void
+    {
+        $this->paymentError = null;
+        $kind = $this->receiptKind !== '' ? $this->receiptKind : ReceiptKind::OfficialReceipt->value;
+        $number = CollectionReceipts::currentNumber($kind, $this->officialReceiptNo, $this->invoiceNo);
+
+        if ($number === '') {
+            $this->paymentError = $kind === ReceiptKind::Invoice->value
+                ? __('Enter the invoice number.')
+                : __('Enter the O.R. number.');
+
+            return;
+        }
+
+        if (CollectionReceipts::isTaken($number, $kind)) {
+            $this->paymentError = __('This number is already used or cancelled.');
+
+            return;
+        }
+
+        CancelledReceipt::query()->create([
+            'number' => $number,
+            'kind' => $kind,
+            'cancelled_by' => auth()->id(),
+        ]);
+
+        $this->refreshReceiptNumbers();
+        $this->openSavedModal(
+            __('Cancelled OR#'),
+            __(':number was recorded as cancelled and cannot be used again.', ['number' => $number]),
+            'cancel',
+        );
+    }
+
+    public function deletePaymentDraft(): void
+    {
+        $this->paymentError = null;
+        $kind = $this->receiptKind !== '' ? $this->receiptKind : ReceiptKind::OfficialReceipt->value;
+        $number = CollectionReceipts::currentNumber($kind, $this->officialReceiptNo, $this->invoiceNo);
+
+        if ($number === '') {
+            $this->paymentError = $kind === ReceiptKind::Invoice->value
+                ? __('Enter the invoice number to delete.')
+                : __('Enter the O.R. number to delete.');
+
+            return;
+        }
+
+        if (CollectionReceipts::isCancelled($number, $kind)) {
+            $this->paymentError = __('This number was cancelled and cannot be deleted as a payment.');
+
+            return;
+        }
+
+        $hit = CollectionReceipts::findPosted($number, $kind);
+        $loanPayment = $hit['loan'];
+        $canteenPayment = $hit['canteen'];
+        $invoiceFees = $kind === ReceiptKind::Invoice->value
+            ? CollectionReceipts::findInvoiceFees($number)
+            : collect();
+
+        if (
+            ! $loanPayment instanceof LoanPayment
+            && ! $canteenPayment instanceof PosCreditPayment
+            && $invoiceFees->isEmpty()
+        ) {
+            $this->paymentError = __('No payment found for this number.');
+
+            return;
+        }
+
+        if ($invoiceFees->isNotEmpty()) {
+            $invoiceFees->each->delete();
+        }
+
+        if ($loanPayment instanceof LoanPayment) {
+            $loanPayment->delete();
+        }
+
+        if ($canteenPayment instanceof PosCreditPayment) {
+            $canteenPayment->delete();
+        }
+
+        $this->editingLoanPaymentId = null;
+        $this->editingPosPaymentId = null;
+        $this->paymentAmount = '0.00';
+        $this->cashTendered = '';
+        $this->expandedKey = null;
+        $this->regularViewLoanId = null;
+        $this->closeCollectForm();
+        $this->resetInvoiceFees();
+        $this->refreshReceiptNumbers();
+        $this->openSavedModal(
+            __('Payment deleted'),
+            __('The receipt :number was removed.', ['number' => $number]),
+            'delete',
+        );
+    }
+
+    public function updatePayment(): void
+    {
+        $this->paymentError = null;
+        $kind = $this->receiptKind !== '' ? $this->receiptKind : ReceiptKind::OfficialReceipt->value;
+        $number = CollectionReceipts::currentNumber($kind, $this->officialReceiptNo, $this->invoiceNo);
+
+        if ($number === '') {
+            $this->paymentError = $kind === ReceiptKind::Invoice->value
+                ? __('Enter the invoice number.')
+                : __('Enter the O.R. number.');
+
+            return;
+        }
+
+        if (CollectionReceipts::isCancelled($number, $kind)) {
+            $this->paymentError = __('This number was cancelled and cannot be updated.');
+
+            return;
+        }
+
+        $hit = CollectionReceipts::findPosted($number, $kind);
+        $loanPayment = $hit['loan'];
+        $canteenPayment = $hit['canteen'];
+        $invoiceFees = $kind === ReceiptKind::Invoice->value
+            ? CollectionReceipts::findInvoiceFees($number)
+            : collect();
+
+        if ($invoiceFees->isNotEmpty()) {
+            if (! $this->editingInvoiceFees) {
+                $this->loadInvoiceFeePayment($invoiceFees);
+                $this->openSavedModal(
+                    __('Payment loaded'),
+                    __('Account information was loaded for :number. Change the amount, then click Update payment again.', [
+                        'number' => $number,
+                    ]),
+                    'update',
+                );
+
+                return;
+            }
+
+            if (! $this->assertCashTendered()) {
+                return;
+            }
+
+            $this->recordInvoiceFees();
+
+            return;
+        }
+
+        if (! $loanPayment instanceof LoanPayment && ! $canteenPayment instanceof PosCreditPayment) {
+            $this->paymentError = __('No payment found for this number.');
+
+            return;
+        }
+
+        $alreadyLoaded = ($loanPayment instanceof LoanPayment && $this->editingLoanPaymentId === $loanPayment->id)
+            || ($canteenPayment instanceof PosCreditPayment && $this->editingPosPaymentId === $canteenPayment->id);
+
+        if (! $alreadyLoaded) {
+            $this->loadPostedPayment($loanPayment, $canteenPayment);
+
+            if ($this->selectedMemberId) {
+                $this->openSavedModal(
+                    __('Payment loaded'),
+                    __('Account information was loaded for :number. Change the amount, then click Update payment again.', [
+                        'number' => $number,
+                    ]),
+                    'update',
+                );
+            }
+
+            return;
+        }
+
+        if (! $this->assertCashTendered()) {
+            return;
+        }
+
+        try {
+            if ($loanPayment instanceof LoanPayment) {
+                RecordMemberLoanPayment::revise($loanPayment, PesoInput::parse($this->paymentAmount));
+            }
+
+            if ($canteenPayment instanceof PosCreditPayment) {
+                $this->reviseCanteenPayment($canteenPayment);
+            }
+        } catch (InvalidArgumentException $exception) {
+            $this->paymentError = $exception->getMessage();
+
+            return;
+        }
+
+        $this->openSavedModal(
+            __('Payment updated'),
+            __('Receipt :number was updated in the database.', ['number' => $number]),
+            'update',
+        );
     }
 
     /**
@@ -188,13 +644,23 @@ class CollectionPayment extends Page
             return collect();
         }
 
-        return RegularLoan::query()
+        $query = RegularLoan::query()
             ->forUser($member)
             ->where('status', LoanStatus::Approved)
             ->with('payments')
             ->orderedByLoanDate()
-            ->orderByDesc('id')
-            ->get();
+            ->orderByDesc('id');
+
+        if ($this->expandedKey === MemberCollectionAccounts::TYPE_SALARY_2) {
+            $query->whereRaw('UPPER(TRIM(loan_type)) = ?', [LoanTypes::SALARY_2]);
+        } else {
+            $query->where(function ($inner): void {
+                $inner->whereNull('loan_type')
+                    ->orWhereRaw('UPPER(TRIM(loan_type)) <> ?', [LoanTypes::SALARY_2]);
+            });
+        }
+
+        return $query->get();
     }
 
     /**
@@ -208,7 +674,7 @@ class CollectionPayment extends Page
         return [
             'schedule' => $loan instanceof RegularLoan
                 ? RegularLoanSchedule::fromLoan($loan)
-                : RegularLoanSchedule::blank(),
+                : RegularLoanSchedule::blank($this->expandedKey === MemberCollectionAccounts::TYPE_SALARY_2),
             'blankAmounts' => ! $loan instanceof RegularLoan,
             'loans' => $loans,
             'loan' => $loan instanceof RegularLoan ? $loan : null,
@@ -290,8 +756,8 @@ class CollectionPayment extends Page
 
         $this->expandedKey = $key;
         $this->collectKey = $key;
+        $this->collectModalOpen = true;
         $this->paymentError = null;
-        $this->officialReceiptNo = '';
 
         $accounts = collect($ledger['accounts']);
 
@@ -318,8 +784,11 @@ class CollectionPayment extends Page
     {
         $this->collectKey = null;
         $this->collectLoanId = null;
-        $this->paymentAmount = '';
-        $this->officialReceiptNo = '';
+        $this->collectModalOpen = false;
+        $this->editingLoanPaymentId = null;
+        $this->editingPosPaymentId = null;
+        $this->paymentAmount = '0.00';
+        $this->cashTendered = '';
         $this->paymentError = null;
         $this->paymentKind = CharacterLoanLedgerEntries::KIND_INTEREST;
     }
@@ -340,17 +809,31 @@ class CollectionPayment extends Page
         }
 
         if ($this->paymentKind === CharacterLoanLedgerEntries::KIND_INTEREST) {
-            $this->paymentAmount = PesoInput::format(CharacterLoanLedgerEntries::periodInterest($loan));
+            $this->paymentAmount = $this->pesoOrZero(CharacterLoanLedgerEntries::periodInterest($loan));
 
             return;
         }
 
         $remaining = RecordMemberLoanPayment::remainingPrincipal($loan);
-        $this->paymentAmount = $remaining > 0 ? PesoInput::format($remaining) : '';
+        $this->paymentAmount = $this->pesoOrZero($remaining);
     }
 
     public function recordCollection(): void
     {
+        if (! $this->kindChosen) {
+            return;
+        }
+
+        if (! $this->assertSaveGuards()) {
+            return;
+        }
+
+        if (! in_array($this->collectionMethod, ['cash', 'check'], true)) {
+            $this->paymentError = __('Select Cash or Checks.');
+
+            return;
+        }
+
         $account = $this->findOpenAccount((string) $this->collectKey);
 
         if ($account === null) {
@@ -477,6 +960,135 @@ class CollectionPayment extends Page
     }
 
     /**
+     * @return array<string, string>
+     */
+    protected function invoiceFeeAmounts(): array
+    {
+        return [
+            InvoiceFeeItems::INTEREST => $this->invoiceInterest,
+            InvoiceFeeItems::SURCHARGE => $this->invoiceSurcharge,
+            InvoiceFeeItems::MEMBERSHIP_FEE => $this->invoiceMembershipFee,
+            InvoiceFeeItems::OTHERS => $this->invoiceOthers,
+        ];
+    }
+
+    protected function resetInvoiceFees(): void
+    {
+        $this->invoiceInterest = '0.00';
+        $this->invoiceSurcharge = '0.00';
+        $this->invoiceMembershipFee = '0.00';
+        $this->invoiceOthers = '0.00';
+        $this->editingInvoiceFees = false;
+    }
+
+    protected function pesoOrZero(mixed $value): string
+    {
+        return number_format(PesoInput::parse($value), 2, '.', ',');
+    }
+
+    protected function digitsOnly(mixed $value): string
+    {
+        return preg_replace('/[^0-9.,]/', '', (string) $value) ?? '';
+    }
+
+    /**
+     * @param  Collection<int, InvoiceFeePayment>  $fees
+     */
+    protected function loadInvoiceFeePayment(Collection $fees): void
+    {
+        $fee = $fees->first();
+
+        if (! $fee instanceof InvoiceFeePayment) {
+            return;
+        }
+
+        $fee->load('member');
+        $member = $fee->member;
+
+        if (! $member instanceof Member) {
+            $this->paymentError = __('This member could not be found.');
+
+            return;
+        }
+
+        $this->resetInvoiceFees();
+        $this->selectedMemberId = $member->id;
+        $this->memberSearch = $member->name;
+        $this->editingInvoiceFees = true;
+        $this->collectionMethod = in_array((string) $fee->collection_method, ['cash', 'check'], true)
+            ? (string) $fee->collection_method
+            : 'cash';
+        $this->cashTendered = $this->pesoOrZero($fee->totalAmount());
+        $this->invoiceInterest = $this->pesoOrZero($fee->interest);
+        $this->invoiceSurcharge = $this->pesoOrZero($fee->surcharge);
+        $this->invoiceMembershipFee = $this->pesoOrZero($fee->membership_fee);
+        $this->invoiceOthers = $this->pesoOrZero($fee->others);
+    }
+
+    protected function recordInvoiceFees(): void
+    {
+        $member = $this->getSelectedMember();
+
+        if (! $member instanceof Member) {
+            $this->paymentError = __('Select a member to collect.');
+
+            return;
+        }
+
+        if (! in_array($this->collectionMethod, ['cash', 'check'], true)) {
+            $this->paymentError = __('Select Cash or Checks.');
+
+            return;
+        }
+
+        $total = $this->getTotalAmount();
+
+        if ($total < 0.01) {
+            $this->paymentError = __('Enter at least one invoice amount.');
+
+            return;
+        }
+
+        $wasUpdate = $this->editingInvoiceFees;
+        $memberName = $member->name;
+        $invoiceNo = trim($this->invoiceNo);
+        $receivedAt = filled($this->paymentDate)
+            ? \Illuminate\Support\Carbon::parse($this->paymentDate)
+            : now();
+
+        DB::transaction(function () use ($member, $invoiceNo, $receivedAt, $total): void {
+            InvoiceFeePayment::query()
+                ->whereIn('invoice_no', CollectionReceipts::candidates($invoiceNo))
+                ->delete();
+
+            InvoiceFeePayment::query()->create([
+                'member_id' => $member->id,
+                'invoice_no' => $invoiceNo,
+                'interest' => PesoInput::parse($this->invoiceInterest),
+                'surcharge' => PesoInput::parse($this->invoiceSurcharge),
+                'membership_fee' => PesoInput::parse($this->invoiceMembershipFee),
+                'others' => PesoInput::parse($this->invoiceOthers),
+                'amount' => $total,
+                'collection_method' => $this->collectionMethod,
+                'received_by' => auth()->id(),
+                'received_at' => $receivedAt,
+            ]);
+        });
+
+        $this->resetInvoiceFees();
+        $this->refreshReceiptNumbers();
+        $this->openSavedModal(
+            $wasUpdate ? __('Payment updated') : __('Payment saved'),
+            __('Invoice :number was recorded for :member — ₱:amount.', [
+                'number' => $invoiceNo,
+                'member' => $memberName,
+                'amount' => number_format($total, 2),
+            ]),
+            $wasUpdate ? 'update' : 'save',
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $account
      */
     protected function recordCanteenPayment(array $account): void
@@ -504,22 +1116,42 @@ class CollectionPayment extends Page
             return;
         }
 
-        $result = SettleMemberCredit::applyAcrossChannels($member, $amount, auth()->user());
+        if ($this->receiptKind === ReceiptKind::OfficialReceipt->value && trim($this->officialReceiptNo) === '') {
+            $this->paymentError = __('Enter the O.R. number.');
 
-        Notification::make()
-            ->title(__('Payment recorded'))
-            ->body(__(':member paid ₱:paid toward canteen / grocery credit.', [
+            return;
+        }
+
+        if ($this->receiptKind === ReceiptKind::Invoice->value && trim($this->invoiceNo) === '') {
+            $this->paymentError = __('Enter the invoice number.');
+
+            return;
+        }
+
+        $printKind = $this->receiptKind;
+        $result = SettleMemberCredit::applyAcrossChannels(
+            $member,
+            $amount,
+            auth()->user(),
+            $printKind === ReceiptKind::OfficialReceipt->value ? ($this->officialReceiptNo !== '' ? $this->officialReceiptNo : null) : null,
+            $printKind === ReceiptKind::Invoice->value ? ($this->invoiceNo !== '' ? $this->invoiceNo : null) : null,
+            $printKind,
+        );
+
+        $this->printedPreview = $this->receiptPreview();
+        $this->closeCollectForm();
+        $this->refreshReceiptNumbers();
+        $this->openSavedModal(
+            __('Payment saved'),
+            __(':member paid ₱:paid toward canteen / grocery credit.', [
                 'member' => $member->name,
                 'paid' => number_format($result['applied'], 2),
-            ]))
-            ->success()
-            ->send();
-
-        $this->closeCollectForm();
+            ]),
+            'save',
+        );
 
         if ($result['payment'] instanceof PosCreditPayment) {
             $this->receiptPaymentId = $result['payment']->id;
-            $this->showReceiptModal = true;
         }
     }
 
@@ -536,13 +1168,21 @@ class CollectionPayment extends Page
             return;
         }
 
+        if (trim($this->officialReceiptNo) === '') {
+            $this->paymentError = __('Enter the O.R. number.');
+
+            return;
+        }
+
         try {
             RecordMemberLoanPayment::apply(
                 $loan,
                 PesoInput::parse($this->paymentAmount),
                 $this->paymentKind,
-                $this->officialReceiptNo !== '' ? $this->officialReceiptNo : null,
+                $this->officialReceiptNo,
                 now(),
+                ReceiptKind::OfficialReceipt->value,
+                ($staffId = auth()->guard('web')->id()) !== null ? (int) $staffId : null,
             );
         } catch (InvalidArgumentException $exception) {
             $this->paymentError = $exception->getMessage();
@@ -550,16 +1190,67 @@ class CollectionPayment extends Page
             return;
         }
 
-        Notification::make()
-            ->title(__('Payment recorded'))
-            ->body(__('₱:amount applied to :account.', [
-                'amount' => number_format(PesoInput::parse($this->paymentAmount), 2),
-                'account' => $account['label'],
-            ]))
-            ->success()
-            ->send();
+        $this->printedPreview = $this->receiptPreview();
+        $amountPaid = PesoInput::parse($this->paymentAmount);
+        $accountLabel = $account['label'];
 
         $this->closeCollectForm();
+        $this->refreshReceiptNumbers();
+        $this->openSavedModal(
+            __('Payment saved'),
+            __('₱:amount applied to :account.', [
+                'amount' => number_format($amountPaid, 2),
+                'account' => $accountLabel,
+            ]),
+            'save',
+        );
+    }
+
+    public function closeSavedModal(): void
+    {
+        $this->showSavedModal = false;
+        $this->savedTitle = '';
+        $this->savedMessage = '';
+        $this->savedTone = 'save';
+    }
+
+    protected function openSavedModal(string $title, string $message, string $tone = 'save'): void
+    {
+        $this->savedTitle = $title;
+        $this->savedMessage = $message;
+        $this->savedTone = $tone;
+        $this->showSavedModal = true;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function receiptPreview(): array
+    {
+        $member = $this->getSelectedMember();
+        $account = $this->collectKey ? $this->findOpenAccount($this->collectKey) : null;
+        $ledger = $this->collectKey ? $this->findLedger($this->collectKey) : ($this->expandedKey ? $this->findLedger($this->expandedKey) : null);
+        $label = $account['label'] ?? $ledger['label'] ?? '';
+        $date = filled($this->paymentDate)
+            ? \Illuminate\Support\Carbon::parse($this->paymentDate)->format('m-d-y')
+            : now()->format('m-d-y');
+
+        return [
+            'receivedFrom' => $member?->name ?? '',
+            'soldTo' => $member?->name ?? '',
+            'tin' => (string) ($member?->tin_number ?? ''),
+            'paymentFor' => $label,
+            'item' => $label,
+            'amount' => PesoInput::parse($this->paymentAmount),
+            'date' => $date,
+            'orNo' => $this->officialReceiptNo,
+            'invoiceNo' => $this->invoiceNo,
+            'cash' => match ($this->collectionMethod) {
+                'cash' => true,
+                'check' => false,
+                default => null,
+            },
+        ];
     }
 
     /**
@@ -618,13 +1309,13 @@ class CollectionPayment extends Page
         if ($account['type'] === MemberCollectionAccounts::TYPE_CHARACTER) {
             $loan = $this->resolveLoan($account);
             $this->paymentAmount = $loan
-                ? PesoInput::format(CharacterLoanLedgerEntries::periodInterest($loan))
-                : '';
+                ? $this->pesoOrZero(CharacterLoanLedgerEntries::periodInterest($loan))
+                : '0.00';
 
             return;
         }
 
-        $this->paymentAmount = PesoInput::format((float) $account['balance']);
+        $this->paymentAmount = $this->pesoOrZero($account['balance']);
     }
 
     /**
@@ -645,6 +1336,209 @@ class CollectionPayment extends Page
         };
 
         return $model::query()->with('payments')->find((int) $id);
+    }
+
+    protected function tryLoadFromReceiptNumber(bool $notifyMissing): void
+    {
+        $kind = $this->receiptKind !== '' ? $this->receiptKind : ReceiptKind::OfficialReceipt->value;
+        $number = CollectionReceipts::currentNumber($kind, $this->officialReceiptNo, $this->invoiceNo);
+
+        if ($number === '') {
+            return;
+        }
+
+        if (CollectionReceipts::isCancelled($number, $kind)) {
+            $this->showCancelledAccount();
+
+            if ($notifyMissing) {
+                $this->paymentError = __('This number was cancelled and cannot be updated.');
+            }
+
+            return;
+        }
+
+        if ($this->isInvoiceMode()) {
+            $invoiceFees = CollectionReceipts::findInvoiceFees($number);
+
+            if ($invoiceFees->isNotEmpty()) {
+                $this->loadInvoiceFeePayment($invoiceFees);
+
+                return;
+            }
+        }
+
+        $hit = CollectionReceipts::findPosted($number, $kind);
+        $loanPayment = $hit['loan'];
+        $canteenPayment = $hit['canteen'];
+
+        if (! $loanPayment instanceof LoanPayment && ! $canteenPayment instanceof PosCreditPayment) {
+            $this->editingLoanPaymentId = null;
+            $this->editingPosPaymentId = null;
+
+            if ($this->isCancelledAccountLabel($this->memberSearch) && $this->selectedMemberId === null) {
+                $this->memberSearch = '';
+            }
+
+            if ($notifyMissing) {
+                $this->paymentError = __('No payment found for this number.');
+            }
+
+            return;
+        }
+
+        $this->loadPostedPayment($loanPayment, $canteenPayment);
+    }
+
+    protected function showCancelledAccount(): void
+    {
+        $this->selectedMemberId = null;
+        $this->memberSearch = __('Cancelled');
+        $this->expandedKey = null;
+        $this->regularViewLoanId = null;
+        $this->editingLoanPaymentId = null;
+        $this->editingPosPaymentId = null;
+        $this->collectKey = null;
+        $this->collectLoanId = null;
+        $this->collectModalOpen = false;
+        $this->paymentAmount = '0.00';
+        $this->cashTendered = '';
+        $this->resetInvoiceFees();
+        $this->paymentError = null;
+    }
+
+    protected function isCancelledAccountLabel(string $value): bool
+    {
+        return strcasecmp(trim($value), (string) __('Cancelled')) === 0;
+    }
+
+    protected function assertSaveGuards(): bool
+    {
+        return $this->assertCashTendered() && $this->assertReceiptAvailable();
+    }
+
+    protected function assertCashTendered(): bool
+    {
+        $total = $this->getTotalAmount();
+        $tendered = $this->getOverallAmount();
+
+        if ($tendered + 0.001 < $total) {
+            $this->paymentError = __('Cash tendered cannot be less than the total payment.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function assertReceiptAvailable(): bool
+    {
+        $kind = $this->receiptKind !== '' ? $this->receiptKind : ReceiptKind::OfficialReceipt->value;
+        $number = CollectionReceipts::currentNumber($kind, $this->officialReceiptNo, $this->invoiceNo);
+
+        if ($number === '') {
+            $this->paymentError = $kind === ReceiptKind::Invoice->value
+                ? __('Enter the invoice number.')
+                : __('Enter the O.R. number.');
+
+            return false;
+        }
+
+        if (CollectionReceipts::isTaken(
+            $number,
+            $kind,
+            $this->editingLoanPaymentId,
+            $this->editingPosPaymentId,
+            $this->editingInvoiceFees ? $number : null,
+        )) {
+            $this->paymentError = __('This receipt number is already used or cancelled.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function loadPostedPayment(?LoanPayment $loanPayment, ?PosCreditPayment $canteenPayment): void
+    {
+        $this->collectModalOpen = false;
+        $this->paymentError = null;
+        $this->editingLoanPaymentId = $loanPayment?->id;
+        $this->editingPosPaymentId = $canteenPayment?->id;
+
+        if ($loanPayment instanceof LoanPayment) {
+            $loanPayment->load(['characterLoan.member', 'quickLoan.member', 'regularLoan.member']);
+            $loan = $loanPayment->loan();
+            $member = $loan?->member ?? $loan?->user;
+
+            if (! $loan instanceof MemberLoan || ! $member instanceof Member) {
+                $this->paymentError = __('This loan could not be found.');
+
+                return;
+            }
+
+            $this->selectedMemberId = $member->id;
+            $this->memberSearch = $member->name;
+            $this->expandedKey = MemberCollectionAccounts::ledgerType($loan);
+            $this->collectKey = $this->expandedKey;
+            $this->collectLoanId = $loan->getKey();
+            $this->regularViewLoanId = $loan instanceof RegularLoan ? $loan->id : null;
+            $this->paymentKind = (string) ($loanPayment->kind ?: CharacterLoanLedgerEntries::KIND_PRINCIPAL);
+            $this->paymentAmount = $this->pesoOrZero($loanPayment->amount);
+            $this->cashTendered = $this->paymentAmount;
+            $this->collectionMethod = 'cash';
+
+            return;
+        }
+
+        if (! $canteenPayment instanceof PosCreditPayment) {
+            return;
+        }
+
+        $canteenPayment->load('member');
+        $member = $canteenPayment->member;
+
+        if (! $member instanceof Member) {
+            $this->paymentError = __('This member could not be found.');
+
+            return;
+        }
+
+        $this->selectedMemberId = $member->id;
+        $this->memberSearch = $member->name;
+        $this->expandedKey = MemberCollectionAccounts::TYPE_CANTEEN;
+        $this->collectKey = MemberCollectionAccounts::TYPE_CANTEEN;
+        $this->collectLoanId = null;
+        $this->regularViewLoanId = null;
+        $this->paymentKind = CharacterLoanLedgerEntries::KIND_PRINCIPAL;
+        $this->paymentAmount = $this->pesoOrZero($canteenPayment->amount);
+        $this->cashTendered = $this->paymentAmount;
+        $this->collectionMethod = 'cash';
+    }
+
+    protected function reviseCanteenPayment(PosCreditPayment $payment): void
+    {
+        $member = $this->getSelectedMember();
+
+        if (! $member instanceof Member) {
+            throw new InvalidArgumentException(__('Select a member to collect.'));
+        }
+
+        $amount = PesoInput::parse($this->paymentAmount);
+        $ledger = $this->findLedger(MemberCollectionAccounts::TYPE_CANTEEN);
+        $outstanding = (float) ($ledger['balance'] ?? 0) + (float) $payment->amount;
+
+        if ($amount < 0.01) {
+            throw new InvalidArgumentException(__('Enter the amount the member is paying.'));
+        }
+
+        if ($amount - $outstanding > SettleMemberCredit::EPSILON) {
+            throw new InvalidArgumentException(__('Payment cannot be more than the ₱:amount balance.', [
+                'amount' => number_format($outstanding, 2),
+            ]));
+        }
+
+        $payment->amount = $amount;
+        $payment->save();
     }
 
     protected function findMember(int $memberId): ?Member

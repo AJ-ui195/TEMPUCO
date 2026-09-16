@@ -71,6 +71,9 @@ final class MemberForm
                 ->tel()
                 ->required()
                 ->maxLength(32),
+            TextInput::make('tin_number')
+                ->label(__('TIN number'))
+                ->maxLength(32),
             TextInput::make('email')
                 ->label(__('Email'))
                 ->email()

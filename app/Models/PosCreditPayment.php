@@ -14,6 +14,8 @@ class PosCreditPayment extends Model
         'sale_channel',
         'amount',
         'reference',
+        'invoice_no',
+        'receipt_kind',
     ];
 
     /**

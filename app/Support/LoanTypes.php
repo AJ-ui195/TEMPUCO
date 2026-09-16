@@ -27,6 +27,8 @@ final class LoanTypes
 
     public const REGULAR = 'REGULAR LOAN';
 
+    public const SALARY_2 = 'SALARY LOAN 2';
+
     public const COLLATERALIZED = 'COLLATERALIZED LOAN';
 
     /**
@@ -45,6 +47,7 @@ final class LoanTypes
             self::CALAMITY,
             self::RETIREE_SHORT_TERM,
             self::TRAVEL,
+            self::COLLATERALIZED,
         ];
     }
 
@@ -63,6 +66,7 @@ final class LoanTypes
             self::CALAMITY,
             self::RETIREE_SHORT_TERM,
             self::TRAVEL,
+            self::COLLATERALIZED,
         ];
     }
 
@@ -123,9 +127,11 @@ final class LoanTypes
     {
         $options = [
             self::CHARACTER => __('Character loan'),
+            self::CHARACTER_SHORT_TERM => __('Short term'),
             self::CALAMITY => __('Calamity loan'),
             self::EMERGENCY => __('Emergency loan'),
             self::TRAVEL => __('Travel loan'),
+            self::COLLATERALIZED => __('Collateralized loan'),
         ];
 
         if ($member?->isRetiree()) {
@@ -133,6 +139,11 @@ final class LoanTypes
         }
 
         return $options;
+    }
+
+    public static function isSalary2(string $loanType): bool
+    {
+        return strcasecmp(trim($loanType), self::SALARY_2) === 0;
     }
 
     public static function isCollateralized(string $loanType): bool
@@ -161,8 +172,8 @@ final class LoanTypes
     public static function regularOptions(): array
     {
         return [
-            self::REGULAR => __('Regular loan'),
-            self::COLLATERALIZED => __('Collateralized loan'),
+            self::REGULAR => __('Salary loan 1'),
+            self::SALARY_2 => __('Salary loan 2'),
         ];
     }
 }
