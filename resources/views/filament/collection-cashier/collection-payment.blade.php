@@ -231,7 +231,7 @@
                     <h3 style="margin: 0 0 0.25rem; font-size: 1.0625rem; font-weight: 700;">{{ __('Charge to canteen credit') }}</h3>
                     <p class="pos-muted" style="margin: 0 0 1rem; font-size: 0.8125rem;">{{ $chargeMember->name }}</p>
                     <div class="pos-panel pos-stat" style="margin-bottom: 1rem;">
-                        <div class="pos-muted pos-stat-label">{{ __('Remaining monthly limit') }}</div>
+                        <div class="pos-muted pos-stat-label">{{ __('Remaining credit limit') }}</div>
                         <div class="pos-stat-value">₱{{ number_format($this->getChargeRemainingLimit(), 2) }}</div>
                     </div>
                     <label for="charge-amount" style="display: block; font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.375rem;">{{ __('Amount to charge (₱)') }}</label>

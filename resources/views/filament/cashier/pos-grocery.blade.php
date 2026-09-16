@@ -729,9 +729,9 @@
                                         </span>
                                     @endif
                                     <span class="pos-muted" style="display: block; margin-top: 0.375rem; font-size: 0.8125rem;">
-                                        {{ __('Credit left this month: ₱:remaining of ₱:limit', [
-                                            'remaining' => number_format($this->getCreditRemainingThisMonth(), 2),
-                                            'limit' => number_format($this->getMonthlyCreditLimit(), 2),
+                                        {{ __('Credit available: ₱:remaining of ₱:limit', [
+                                            'remaining' => number_format($this->getCreditRemaining(), 2),
+                                            'limit' => number_format($this->getCreditLimit(), 2),
                                         ]) }}
                                     </span>
                                 </div>
@@ -825,17 +825,17 @@
                         <span>₱{{ number_format($creditDue, 2) }}</span>
                     </div>
 
-                    @if ($this->exceedsMonthlyCreditLimit())
+                    @if ($this->exceedsCreditLimit())
                         <div class="pos-member-feedback--error" style="margin-bottom: 0.75rem; padding: 0.625rem 0.75rem; border-radius: 0.5rem; background: rgba(220, 38, 38, 0.08); font-size: 0.8125rem; font-weight: 600;">
-                            @if ($this->getCreditRemainingThisMonth() > 0)
-                                {{ __('Only ₱:remaining of the ₱:limit monthly limit is left. Collect at least ₱:cash in cash.', [
-                                    'remaining' => number_format($this->getCreditRemainingThisMonth(), 2),
-                                    'limit' => number_format($this->getMonthlyCreditLimit(), 2),
+                            @if ($this->getCreditRemaining() > 0)
+                                {{ __('Only ₱:remaining of the ₱:limit credit limit is left. Collect at least ₱:cash in cash.', [
+                                    'remaining' => number_format($this->getCreditRemaining(), 2),
+                                    'limit' => number_format($this->getCreditLimit(), 2),
                                     'cash' => number_format($this->getMinimumCashDue(), 2),
                                 ]) }}
                             @else
-                                {{ __('The ₱:limit monthly credit limit is used up. This sale must be paid in full.', [
-                                    'limit' => number_format($this->getMonthlyCreditLimit(), 2),
+                                {{ __('The ₱:limit credit limit is fully used. Settle the account or pay this sale in full.', [
+                                    'limit' => number_format($this->getCreditLimit(), 2),
                                 ]) }}
                             @endif
 
@@ -878,7 +878,7 @@
                     </div>
                 @endif
 
-                @php($checkoutBlocked = $cartLines === [] || ($paymentType === 'credit' && (! $memberId || $this->exceedsMonthlyCreditLimit())))
+                @php($checkoutBlocked = $cartLines === [] || ($paymentType === 'credit' && (! $memberId || $this->exceedsCreditLimit())))
 
                 <button
                     type="button"

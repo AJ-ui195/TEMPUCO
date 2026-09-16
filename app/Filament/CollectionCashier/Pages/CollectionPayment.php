@@ -376,13 +376,14 @@ class CollectionPayment extends Page
             return;
         }
 
-        $remaining = MemberCreditLimit::remainingThisMonth($member->id, PosSaleChannel::Canteen);
+        $remaining = MemberCreditLimit::remaining($member->id, PosSaleChannel::Canteen);
 
         if ($remaining < 0.01) {
             Notification::make()
-                ->title(__('Monthly limit reached'))
-                ->body(__(':member has no remaining canteen credit this month.', [
+                ->title(__('Credit limit reached'))
+                ->body(__(':member has no remaining canteen credit. Settle the account to free the ₱:limit limit.', [
                     'member' => $member->name,
+                    'limit' => number_format(MemberCreditLimit::LIMIT, 2),
                 ]))
                 ->warning()
                 ->send();
@@ -418,7 +419,7 @@ class CollectionPayment extends Page
             return 0;
         }
 
-        return MemberCreditLimit::remainingThisMonth($member->id, PosSaleChannel::Canteen);
+        return MemberCreditLimit::remaining($member->id, PosSaleChannel::Canteen);
     }
 
     public function recordCharge(): void

@@ -3,40 +3,51 @@
 namespace App\Support;
 
 use App\Enums\PosSaleChannel;
-use App\Models\PosSale;
-use Illuminate\Support\Carbon;
+use App\Models\Member;
 
 /**
- * How much a member may still charge to their account this month. Grocery and
- * canteen each have their own allowance, and it is measured on what was put on
- * account during the calendar month — settling an old balance does not free up
- * more room until the next month.
+ * How much a member may still charge to their account. Grocery and canteen each
+ * have their own ₱6,000 cap on outstanding balance. Paying down the balance frees
+ * room immediately; the full limit is available again only when the channel is
+ * fully paid.
  */
 final class MemberCreditLimit
 {
-    /** Per member, per channel, per calendar month. */
-    public const MONTHLY_LIMIT = 6000.00;
+    /** Per member, per channel — outstanding balance may not exceed this. */
+    public const LIMIT = 6000.00;
+
+    /** @deprecated Use LIMIT. Kept so older call sites keep working. */
+    public const MONTHLY_LIMIT = self::LIMIT;
 
     /** Amounts within half a centavo of the limit are treated as equal. */
     private const EPSILON = 0.005;
 
-    public static function usedThisMonth(int $memberId, PosSaleChannel $channel, ?Carbon $month = null): float
+    public static function used(int $memberId, PosSaleChannel $channel): float
     {
-        $month ??= PhilippineTime::now();
+        $member = Member::query()->find($memberId);
 
-        return round((float) PosSale::query()
-            ->where('member_id', $memberId)
-            ->where('sale_channel', $channel->value)
-            ->whereColumn('amount_paid', '<', 'total')
-            ->whereYear('created_at', $month->year)
-            ->whereMonth('created_at', $month->month)
-            ->selectRaw('SUM(total - amount_paid) as charged')
-            ->value('charged'), 2);
+        if (! $member instanceof Member) {
+            return 0.0;
+        }
+
+        return (new MemberPosCredit($member))->outstandingFor($channel);
     }
 
-    public static function remainingThisMonth(int $memberId, PosSaleChannel $channel, ?Carbon $month = null): float
+    public static function remaining(int $memberId, PosSaleChannel $channel): float
     {
-        return round(max(0, self::MONTHLY_LIMIT - self::usedThisMonth($memberId, $channel, $month)), 2);
+        return round(max(0, self::LIMIT - self::used($memberId, $channel)), 2);
+    }
+
+    /** @deprecated Use used() — limit is no longer calendar-month based. */
+    public static function usedThisMonth(int $memberId, PosSaleChannel $channel, mixed $month = null): float
+    {
+        return self::used($memberId, $channel);
+    }
+
+    /** @deprecated Use remaining() — limit is no longer calendar-month based. */
+    public static function remainingThisMonth(int $memberId, PosSaleChannel $channel, mixed $month = null): float
+    {
+        return self::remaining($memberId, $channel);
     }
 
     public static function allows(float $creditPortion, float $remaining): bool
@@ -46,7 +57,7 @@ final class MemberCreditLimit
 
     /**
      * Cash the cashier has to collect now so the rest of the sale fits within
-     * what the member has left for the month.
+     * what the member still has available on their credit limit.
      */
     public static function minimumCashDue(float $total, float $remaining): float
     {
