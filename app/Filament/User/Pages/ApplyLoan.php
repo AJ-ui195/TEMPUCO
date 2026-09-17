@@ -173,7 +173,6 @@ class ApplyLoan extends Page
 
                         if ($state === self::APPLICATION_TYPE_CHARACTER) {
                             $set('character_loan_type', LoanTypes::CHARACTER);
-                            $set('character_variant', CharacterLoanRules::VARIANT_EMERGENCY);
                             $this->syncCharacterDefaults($set, $get);
 
                             return;
@@ -478,8 +477,10 @@ class ApplyLoan extends Page
                         $characterRate = $member instanceof Member && $member->isRetiree() ? '1%' : '2%';
 
                         return match (true) {
-                            LoanTypes::isCharacter($type) => __('Granted on integrity and repayment record. Replaces Emergency and Short-Term for qualified regular members.'),
-                            LoanTypes::isCharacterShortTerm($type) => __(':rate monthly diminishing. Interest deducted from proceeds. 7-day grace. Equal monthly amortization. Term 12 months.', [
+                            LoanTypes::isCharacter($type) => $member instanceof Member && $member->isRetiree()
+                                ? __('1% monthly, prepaid. Term 1 to 24 months.')
+                                : __('2% monthly, prepaid. Term 1 to 12 months.'),
+                            LoanTypes::isCharacterShortTerm($type) => __(':rate monthly diminishing. Interest deducted from proceeds. 7-day grace. Equal monthly amortization. Term 1 to 12 months.', [
                                 'rate' => $characterRate,
                             ]),
                             LoanTypes::isCalamity($type) => __('Immediate assistance after a calamity. Maximum ₱40,000. 5% per annum. Term 24 months (NTHP).'),
@@ -511,31 +512,6 @@ class ApplyLoan extends Page
                         ->modalCancelActionLabel(__('Close')),
                 ])
                     ->visible(fn (callable $get): bool => LoanTypes::isCollateralized((string) ($get('character_loan_type') ?? '')))
-                    ->columnSpanFull(),
-                Radio::make('character_variant')
-                    ->label(__('Character loan terms'))
-                    ->options([
-                        CharacterLoanRules::VARIANT_EMERGENCY => __('Character-Emergency (3 months)'),
-                        CharacterLoanRules::VARIANT_SHORT_TERM => __('Character Short-Term (12 months)'),
-                    ])
-                    ->descriptions(function (): array {
-                        $member = auth()->user();
-                        $rate = $member instanceof Member && $member->isRetiree() ? '1%' : '2%';
-
-                        return [
-                            CharacterLoanRules::VARIANT_EMERGENCY => __(':rate monthly, prepaid. Renewable up to two (2) times. 7-day grace. Repayment every 3 months.', [
-                                'rate' => $rate,
-                            ]),
-                            CharacterLoanRules::VARIANT_SHORT_TERM => __(':rate monthly diminishing. Interest deducted from proceeds. 7-day grace. Equal monthly amortization.', [
-                                'rate' => $rate,
-                            ]),
-                        ];
-                    })
-                    ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER
-                        && LoanTypes::isCharacter((string) ($get('character_loan_type') ?? '')))
-                    ->visible(fn (callable $get): bool => LoanTypes::isCharacter((string) ($get('character_loan_type') ?? '')))
-                    ->live()
-                    ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncCharacterDefaults($set, $get))
                     ->columnSpanFull(),
                 PesoInput::decorate(
                     TextInput::make('loan_amount')
@@ -581,15 +557,36 @@ class ApplyLoan extends Page
                     ->required(fn (callable $get): bool => $get('loan_application_type') === self::APPLICATION_TYPE_CHARACTER)
                     ->integer()
                     ->minValue(function (callable $get): int {
-                        if (LoanTypes::isCollateralized((string) ($get('character_loan_type') ?? ''))) {
+                        $type = (string) ($get('character_loan_type') ?? '');
+
+                        if (LoanTypes::isCollateralized($type)) {
                             return CollateralizedLoanRules::MIN_TERM_MONTHS;
+                        }
+
+                        if (LoanTypes::isRetireeShortTerm($type)) {
+                            return CharacterLoanRules::RETIREE_SHORT_TERM_MIN_MONTHS;
+                        }
+
+                        if (LoanTypes::isCharacter($type) || LoanTypes::isCharacterShortTerm($type)) {
+                            return CharacterLoanRules::CHARACTER_TERM_MIN_MONTHS;
                         }
 
                         return 1;
                     })
                     ->maxValue(function (callable $get): int {
-                        if (LoanTypes::isCollateralized((string) ($get('character_loan_type') ?? ''))) {
+                        $type = (string) ($get('character_loan_type') ?? '');
+                        $member = auth()->user();
+
+                        if (LoanTypes::isCollateralized($type)) {
                             return CollateralizedLoanRules::MAX_TERM_MONTHS;
+                        }
+
+                        if (LoanTypes::isRetireeShortTerm($type)) {
+                            return CharacterLoanRules::RETIREE_SHORT_TERM_MAX_MONTHS;
+                        }
+
+                        if (LoanTypes::isCharacter($type) || LoanTypes::isCharacterShortTerm($type)) {
+                            return CharacterLoanRules::characterTermMaxMonths($member instanceof Member ? $member : null);
                         }
 
                         return 84;
@@ -597,23 +594,20 @@ class ApplyLoan extends Page
                     ->default(24)
                     ->suffix(__('month(s)'))
                     ->disabled(fn (callable $get): bool => CharacterLoanRules::termIsLocked(
-                        CharacterLoanRules::resolveStoredType(
-                            (string) ($get('character_loan_type') ?? ''),
-                            $get('character_variant'),
-                        )
+                        (string) ($get('character_loan_type') ?? '')
                     ))
                     ->dehydrated()
                     ->live(onBlur: true)
                     ->afterStateUpdated(fn (callable $set, callable $get) => $this->syncCharacterDefaults($set, $get))
                     ->helperText(function (callable $get): string {
-                        $type = CharacterLoanRules::resolveStoredType(
-                            (string) ($get('character_loan_type') ?? ''),
-                            $get('character_variant'),
-                        );
+                        $type = (string) ($get('character_loan_type') ?? '');
+                        $member = auth()->user();
 
                         return match (true) {
-                            LoanTypes::isCharacterEmergency($type) => __('Fixed at 3 months.'),
-                            LoanTypes::isCharacterShortTerm($type) => __('Fixed at 12 months.'),
+                            LoanTypes::isCharacter($type) => $member instanceof Member && $member->isRetiree()
+                                ? __('1 to 24 months.')
+                                : __('1 to 12 months.'),
+                            LoanTypes::isCharacterShortTerm($type) => __('1 to 12 months.'),
                             LoanTypes::isCalamity($type) => __('Fixed at 24 months.'),
                             LoanTypes::isEmergency($type) => __('Fixed at 3 months.'),
                             LoanTypes::isTravel($type) => __('Fixed at 6 months.'),
@@ -626,15 +620,12 @@ class ApplyLoan extends Page
                     TextInput::make('installment_amount')
                         ->label(__('Period interest (PHP)'))
                         ->helperText(function (callable $get): string {
-                            $type = CharacterLoanRules::resolveStoredType(
-                                (string) ($get('character_loan_type') ?? ''),
-                                $get('character_variant'),
-                            );
+                            $type = (string) ($get('character_loan_type') ?? '');
                             $member = auth()->user();
                             $characterRate = $member instanceof Member && $member->isRetiree() ? '1%' : '2%';
 
                             return match (true) {
-                                LoanTypes::isCharacterEmergency($type) => __('Prepaid: :rate monthly × 3 months.', [
+                                LoanTypes::isCharacter($type), LoanTypes::isCharacterEmergency($type) => __('Prepaid: :rate monthly × the term in months.', [
                                     'rate' => $characterRate,
                                 ]),
                                 LoanTypes::isCharacterShortTerm($type) => __(':rate monthly on diminishing balance (first period). Interest deducted from proceeds.', [
@@ -768,10 +759,7 @@ class ApplyLoan extends Page
         }
 
         if ($isCharacterLoan) {
-            $characterType = CharacterLoanRules::resolveStoredType(
-                (string) ($data['character_loan_type'] ?? ''),
-                $data['character_variant'] ?? null,
-            );
+            $characterType = (string) ($data['character_loan_type'] ?? '');
             $characterError = CharacterLoanRules::applicationError(
                 $member,
                 $characterType,
@@ -817,10 +805,7 @@ class ApplyLoan extends Page
 
         $loanType = match ($applicationType) {
             self::APPLICATION_TYPE_QUICK => LoanTypes::QUICK,
-            self::APPLICATION_TYPE_CHARACTER => CharacterLoanRules::resolveStoredType(
-                (string) ($data['character_loan_type'] ?? ''),
-                $data['character_variant'] ?? null,
-            ),
+            self::APPLICATION_TYPE_CHARACTER => (string) ($data['character_loan_type'] ?? LoanTypes::CHARACTER),
             default => in_array((string) ($data['loan_type'] ?? ''), [
                 LoanTypes::REGULAR,
                 LoanTypes::SALARY_2,
@@ -957,13 +942,20 @@ class ApplyLoan extends Page
             return;
         }
 
-        $type = CharacterLoanRules::resolveStoredType(
-            (string) ($get('character_loan_type') ?: LoanTypes::CHARACTER),
-            $get('character_variant') ?: CharacterLoanRules::VARIANT_EMERGENCY,
-        );
+        $type = (string) ($get('character_loan_type') ?: LoanTypes::CHARACTER);
 
-        if (CharacterLoanRules::termIsLocked($type) || LoanTypes::isCharacter((string) ($get('character_loan_type') ?? ''))) {
+        if (CharacterLoanRules::termIsLocked($type)) {
             $set('loan_period_months', CharacterLoanRules::defaultTermMonths($type));
+        } elseif (LoanTypes::isCharacter($type) || LoanTypes::isCharacterShortTerm($type)) {
+            $member = auth()->user();
+            $months = (int) ($get('loan_period_months') ?? 0);
+            $max = CharacterLoanRules::characterTermMaxMonths($member instanceof Member ? $member : null);
+
+            if ($months < CharacterLoanRules::CHARACTER_TERM_MIN_MONTHS) {
+                $set('loan_period_months', CharacterLoanRules::defaultTermMonths($type));
+            } elseif ($months > $max) {
+                $set('loan_period_months', $max);
+            }
         } elseif (LoanTypes::isRetireeShortTerm($type) || LoanTypes::isCollateralized($type)) {
             $months = (int) ($get('loan_period_months') ?? 0);
             $min = LoanTypes::isCollateralized($type)

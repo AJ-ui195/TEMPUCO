@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\PrintMemberQrCodeController;
 use App\Http\Controllers\PrintCreditPaymentReceiptController;
+use App\Http\Controllers\PrintApdsListController;
 use App\Http\Controllers\PrintMemberLedgerController;
 use App\Http\Controllers\PrintMemberLoanController;
 use App\Http\Controllers\PrintPosSaleReceiptController;
@@ -48,6 +49,9 @@ Route::middleware(['auth:web,member'])->group(function (): void {
 
     Route::get('/pos/member-ledger/print', PrintMemberLedgerController::class)
         ->name('pos.member-ledger.print');
+
+    Route::get('/collection/regular-loan/apds-print', PrintApdsListController::class)
+        ->name('collection.apds.print');
 
     Route::get('/pos/credit-payments/{payment}/receipt', PrintCreditPaymentReceiptController::class)
         ->name('pos.credit-payments.print-receipt');

@@ -127,16 +127,18 @@ final class LoanTypes
     {
         $options = [
             self::CHARACTER => __('Character loan'),
-            self::CHARACTER_SHORT_TERM => __('Short term'),
-            self::CALAMITY => __('Calamity loan'),
-            self::EMERGENCY => __('Emergency loan'),
-            self::TRAVEL => __('Travel loan'),
-            self::COLLATERALIZED => __('Collateralized loan'),
         ];
 
         if ($member?->isRetiree()) {
-            $options[self::RETIREE_SHORT_TERM] = __('Retirees’ short-term loan');
+            $options[self::RETIREE_SHORT_TERM] = __('Short term');
+        } else {
+            $options[self::CHARACTER_SHORT_TERM] = __('Short term');
         }
+
+        $options[self::CALAMITY] = __('Calamity loan');
+        $options[self::EMERGENCY] = __('Emergency loan');
+        $options[self::TRAVEL] = __('Travel loan');
+        $options[self::COLLATERALIZED] = __('Collateralized loan');
 
         return $options;
     }

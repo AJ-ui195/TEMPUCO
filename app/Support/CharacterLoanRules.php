@@ -34,6 +34,12 @@ final class CharacterLoanRules
 
     public const CHARACTER_MONTHLY_RATE_RETIREE = 0.01;
 
+    public const CHARACTER_TERM_MIN_MONTHS = 1;
+
+    public const CHARACTER_TERM_MAX_REGULAR = 12;
+
+    public const CHARACTER_TERM_MAX_RETIREE = 24;
+
     public const CHARACTER_EMERGENCY_TERM_MONTHS = 3;
 
     public const CHARACTER_SHORT_TERM_MONTHS = 12;
@@ -50,15 +56,17 @@ final class CharacterLoanRules
 
     public const TRAVEL_RATE_RETIREE = 0.01;
 
-    public static function resolveStoredType(string $dropdownType, ?string $variant): string
+    public static function resolveStoredType(string $dropdownType, ?string $variant = null): string
     {
-        if (! LoanTypes::isCharacter($dropdownType)) {
-            return $dropdownType;
+        if (LoanTypes::isCharacter($dropdownType) && $variant === self::VARIANT_SHORT_TERM) {
+            return LoanTypes::CHARACTER_SHORT_TERM;
         }
 
-        return $variant === self::VARIANT_SHORT_TERM
-            ? LoanTypes::CHARACTER_SHORT_TERM
-            : LoanTypes::CHARACTER_EMERGENCY;
+        if (LoanTypes::isCharacter($dropdownType) && $variant === self::VARIANT_EMERGENCY) {
+            return LoanTypes::CHARACTER;
+        }
+
+        return $dropdownType !== '' ? $dropdownType : LoanTypes::CHARACTER;
     }
 
     public static function characterMonthlyRate(bool $isRetiree): float
@@ -80,14 +88,18 @@ final class CharacterLoanRules
         };
     }
 
+    public static function characterTermMaxMonths(?Member $member): int
+    {
+        return $member?->isRetiree()
+            ? self::CHARACTER_TERM_MAX_RETIREE
+            : self::CHARACTER_TERM_MAX_REGULAR;
+    }
+
     public static function termIsLocked(string $loanType): bool
     {
         return LoanTypes::isCalamity($loanType)
             || LoanTypes::isEmergency($loanType)
-            || LoanTypes::isTravel($loanType)
-            || LoanTypes::isCharacterEmergency($loanType)
-            || LoanTypes::isCharacterShortTerm($loanType)
-            || LoanTypes::isCharacter($loanType);
+            || LoanTypes::isTravel($loanType);
     }
 
     public static function periodInterest(string $loanType, float $amount, int $termMonths, bool $isRetiree): float
@@ -105,7 +117,7 @@ final class CharacterLoanRules
         return match (true) {
             LoanTypes::isCalamity($loanType) => round($amount * self::CALAMITY_ANNUAL_RATE * ($months / 12), 2),
             LoanTypes::isEmergency($loanType) => round($amount * self::EMERGENCY_MONTHLY_RATE * $months, 2),
-            LoanTypes::isCharacterEmergency($loanType) => round($amount * $rate * self::CHARACTER_EMERGENCY_TERM_MONTHS, 2),
+            LoanTypes::isCharacter($loanType), LoanTypes::isCharacterEmergency($loanType) => round($amount * $rate * $months, 2),
             LoanTypes::isCharacterShortTerm($loanType) => round($amount * $rate, 2),
             LoanTypes::isTravel($loanType) => round($amount * ($isRetiree ? self::TRAVEL_RATE_RETIREE : self::TRAVEL_RATE_REGULAR), 2),
             LoanTypes::isRetireeShortTerm($loanType) => round($amount * self::RETIREE_SHORT_TERM_MONTHLY_RATE, 2),
@@ -155,10 +167,8 @@ final class CharacterLoanRules
         float $amount,
         int $termMonths,
     ): ?string {
-        if (! LoanTypes::isCharacterFamily($loanType) || LoanTypes::isCharacter($loanType)) {
-            return LoanTypes::isCharacter($loanType)
-                ? __('Choose Character-Emergency or Character Short-Term.')
-                : __('Choose a character loan type.');
+        if (! LoanTypes::isCharacterFamily($loanType)) {
+            return __('Choose a character loan type.');
         }
 
         if (LoanTypes::isCollateralized($loanType)) {
@@ -170,7 +180,7 @@ final class CharacterLoanRules
             return __('The retirees’ short-term loan is available only to retired members.');
         }
 
-        if (LoanTypes::isCharacterEmergency($loanType) || LoanTypes::isCharacterShortTerm($loanType)) {
+        if (LoanTypes::isCharacter($loanType) || LoanTypes::isCharacterEmergency($loanType) || LoanTypes::isCharacterShortTerm($loanType)) {
             $max = self::characterMaxAmount($member);
 
             if ($amount > $max) {
@@ -212,16 +222,14 @@ final class CharacterLoanRules
             ]);
         }
 
-        if (LoanTypes::isCharacterEmergency($loanType) && $termMonths !== self::CHARACTER_EMERGENCY_TERM_MONTHS) {
-            return __('The Character-Emergency term is :months months.', [
-                'months' => self::CHARACTER_EMERGENCY_TERM_MONTHS,
-            ]);
-        }
+        if (LoanTypes::isCharacter($loanType) || LoanTypes::isCharacterEmergency($loanType) || LoanTypes::isCharacterShortTerm($loanType)) {
+            $max = self::characterTermMaxMonths($member);
 
-        if (LoanTypes::isCharacterShortTerm($loanType) && $termMonths !== self::CHARACTER_SHORT_TERM_MONTHS) {
-            return __('The Character Short-Term loan term is :months months.', [
-                'months' => self::CHARACTER_SHORT_TERM_MONTHS,
-            ]);
+            if ($termMonths < self::CHARACTER_TERM_MIN_MONTHS || $termMonths > $max) {
+                return $member->isRetiree()
+                    ? __('Retirees may choose a Character loan term of 1 to 24 months.')
+                    : __('The Character loan term may be 1 to 12 months.');
+            }
         }
 
         if (LoanTypes::isTravel($loanType) && $termMonths !== self::TRAVEL_TERM_MONTHS) {
@@ -235,9 +243,9 @@ final class CharacterLoanRules
             return __('The retirees’ short-term loan term must be 12 to 24 months.');
         }
 
-        if (LoanTypes::isEmergency($loanType) || LoanTypes::isCharacterEmergency($loanType)) {
-            $type = LoanTypes::isCharacterEmergency($loanType)
-                ? LoanTypes::CHARACTER_EMERGENCY
+        if (LoanTypes::isEmergency($loanType) || LoanTypes::isCharacterEmergency($loanType) || LoanTypes::isCharacter($loanType)) {
+            $type = LoanTypes::isCharacter($loanType) || LoanTypes::isCharacterEmergency($loanType)
+                ? (LoanTypes::isCharacterEmergency($loanType) ? LoanTypes::CHARACTER_EMERGENCY : LoanTypes::CHARACTER)
                 : LoanTypes::EMERGENCY;
 
             $existing = CharacterLoan::query()
