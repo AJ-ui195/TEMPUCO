@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PosSaleChannel;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -31,6 +32,33 @@ class PosSale extends Model
             'amount_paid' => 'decimal:2',
             'change_amount' => 'decimal:2',
         ];
+    }
+
+    /**
+     * @param  Builder<PosSale>  $query
+     * @return Builder<PosSale>
+     */
+    public function scopeGrocery(Builder $query): Builder
+    {
+        return $query->where($query->qualifyColumn('sale_channel'), PosSaleChannel::Grocery->value);
+    }
+
+    /**
+     * @param  Builder<PosSale>  $query
+     * @return Builder<PosSale>
+     */
+    public function scopeCanteen(Builder $query): Builder
+    {
+        return $query->where($query->qualifyColumn('sale_channel'), PosSaleChannel::Canteen->value);
+    }
+
+    /**
+     * @param  Builder<PosSale>  $query
+     * @return Builder<PosSale>
+     */
+    public function scopeForChannel(Builder $query, PosSaleChannel $channel): Builder
+    {
+        return $query->where($query->qualifyColumn('sale_channel'), $channel->value);
     }
 
     public function outstandingAmount(): float

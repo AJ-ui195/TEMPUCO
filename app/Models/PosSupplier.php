@@ -31,9 +31,4 @@ class PosSupplier extends Model
     {
         return $this->hasMany(PosInventoryItem::class, 'supplier_id');
     }
-
-    public function canteenInventoryItems(): HasMany
-    {
-        return $this->hasMany(PosCanteenInventoryItem::class, 'supplier_id');
-    }
 }

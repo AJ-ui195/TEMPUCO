@@ -12,15 +12,9 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('sku')->nullable()->unique();
-            $table->text('description')->nullable();
-            $table->foreignId('supplier_id')
-                ->nullable()
-                ->constrained('pos_suppliers')
-                ->nullOnDelete();
             $table->unsignedInteger('quantity')->default(0);
             $table->decimal('unit_price', 15, 2)->default(0);
             $table->decimal('cost', 15, 2)->default(0);
-            $table->unsignedInteger('reorder_level')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });

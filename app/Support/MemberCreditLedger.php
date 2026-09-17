@@ -209,7 +209,7 @@ final class MemberCreditLedger
         return PosSale::query()
             ->where('member_id', $this->member->id)
             ->whereColumn('amount_paid', '<', 'total')
-            ->when($channel, fn (Builder $query) => $query->where('sale_channel', $channel->value));
+            ->when($channel, fn (Builder $query) => $query->forChannel($channel));
     }
 
     /**

@@ -4,20 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PosCanteenInventoryItem extends Model
 {
     protected $fillable = [
         'name',
         'sku',
-        'description',
-        'supplier_id',
         'quantity',
         'unit_price',
         'cost',
-        'reorder_level',
         'is_active',
+        'menu_slot',
     ];
 
     /**
@@ -29,23 +26,9 @@ class PosCanteenInventoryItem extends Model
             'quantity' => 'integer',
             'unit_price' => 'decimal:2',
             'cost' => 'decimal:2',
-            'reorder_level' => 'integer',
             'is_active' => 'boolean',
+            'menu_slot' => 'integer',
         ];
-    }
-
-    public function supplier(): BelongsTo
-    {
-        return $this->belongsTo(PosSupplier::class, 'supplier_id');
-    }
-
-    public function isLowStock(): bool
-    {
-        if ($this->reorder_level === null) {
-            return false;
-        }
-
-        return $this->quantity <= $this->reorder_level;
     }
 
     /**
@@ -67,23 +50,6 @@ class PosCanteenInventoryItem extends Model
             $inner->where($inner->qualifyColumn('name'), 'like', "%{$term}%")
                 ->orWhere($inner->qualifyColumn('sku'), 'like', "%{$term}%");
         });
-    }
-
-    /**
-     * @param  Builder<PosCanteenInventoryItem>  $query
-     * @return Builder<PosCanteenInventoryItem>
-     */
-    public function scopeLowStockCatalog(Builder $query): Builder
-    {
-        return $query
-            ->active()
-            ->whereNotNull($query->qualifyColumn('reorder_level'))
-            ->whereColumn(
-                $query->qualifyColumn('quantity'),
-                '<=',
-                $query->qualifyColumn('reorder_level'),
-            )
-            ->orderedByName();
     }
 
     public function stockQuantityLabel(): string

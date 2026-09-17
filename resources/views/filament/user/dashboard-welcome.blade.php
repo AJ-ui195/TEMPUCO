@@ -8,6 +8,7 @@
 
     $credit = new MemberPosCredit($user);
     $totalOutstanding = $credit->totalOutstanding();
+    $points = (int) ($user->points ?? 0);
     $loans = $user->loans();
     $loansCount = $loans->count();
     $pendingLoans = $loans
@@ -60,6 +61,17 @@
                 </div>
                 <div class="mp-stat-value">₱{{ number_format($totalOutstanding, 2) }}</div>
                 <p class="mp-stat-hint">{{ __('Grocery & canteen credits') }}</p>
+            </div>
+
+            <div class="mp-stat-card">
+                <div class="mp-stat-card-header">
+                    <span class="mp-stat-label">{{ __('Points') }}</span>
+                    <span class="mp-stat-icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.991l4.069 2.085c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z" clip-rule="evenodd"/></svg>
+                    </span>
+                </div>
+                <div class="mp-stat-value">{{ number_format($points) }}</div>
+                <p class="mp-stat-hint">{{ __('Grocery cash rewards · ₱200 = 1 point') }}</p>
             </div>
 
             <div class="mp-stat-card">

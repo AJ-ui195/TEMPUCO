@@ -10,8 +10,6 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
@@ -53,17 +51,6 @@ class CanteenInventoryItemResource extends Resource
                     ->maxLength(255)
                     ->columnSpanFull(),
                 ...self::inventoryBarcodeFormFields(),
-                Textarea::make('description')
-                    ->label(__('Description'))
-                    ->rows(3)
-                    ->columnSpanFull(),
-                Select::make('supplier_id')
-                    ->label(__('Supplier'))
-                    ->relationship('supplier', 'name')
-                    ->searchable()
-                    ->preload()
-                    ->native(false)
-                    ->columnSpanFull(),
                 TextInput::make('quantity')
                     ->label(__('Quantity in stock'))
                     ->required()
@@ -87,11 +74,6 @@ class CanteenInventoryItemResource extends Resource
                     ->prefix('₱')
                     ->default(0)
                     ->helperText(__('Purchase or unit cost.')),
-                TextInput::make('reorder_level')
-                    ->label(__('Reorder level'))
-                    ->integer()
-                    ->minValue(0)
-                    ->helperText(__('Alert when stock is at or below this level.')),
                 Toggle::make('is_active')
                     ->label(__('Active'))
                     ->default(true),
@@ -122,11 +104,6 @@ class CanteenInventoryItemResource extends Resource
                     })
                     ->searchable()
                     ->placeholder('—'),
-                TextColumn::make('supplier.name')
-                    ->label(__('Supplier'))
-                    ->searchable()
-                    ->sortable()
-                    ->placeholder('—'),
                 TextColumn::make('quantity')
                     ->label(__('Qty'))
                     ->sortable()
@@ -141,18 +118,10 @@ class CanteenInventoryItemResource extends Resource
                     ->formatStateUsing(fn (mixed $state): string => '₱'.number_format((float) $state, 2))
                     ->sortable()
                     ->alignEnd(),
-                TextColumn::make('reorder_level')
-                    ->label(__('Reorder at'))
-                    ->placeholder('—')
-                    ->alignEnd(),
                 TextColumn::make('stock_status')
                     ->label(__('Status'))
                     ->badge()
                     ->getStateUsing(function (PosCanteenInventoryItem $record): string {
-                        if ($record->isLowStock()) {
-                            return 'low';
-                        }
-
                         if (! $record->is_active) {
                             return 'inactive';
                         }
@@ -160,12 +129,10 @@ class CanteenInventoryItemResource extends Resource
                         return 'ok';
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'low' => __('Low stock'),
                         'inactive' => __('Inactive'),
                         default => __('OK'),
                     })
                     ->color(fn (string $state): string => match ($state) {
-                        'low' => 'warning',
                         'inactive' => 'gray',
                         default => 'success',
                     }),

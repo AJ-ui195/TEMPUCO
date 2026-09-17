@@ -161,7 +161,7 @@ class MemberPosCredit
     {
         return PosSale::query()
             ->where('member_id', $this->user->id)
-            ->where('sale_channel', $channel->value)
+            ->forChannel($channel)
             ->whereColumn('amount_paid', '<', 'total');
     }
 
