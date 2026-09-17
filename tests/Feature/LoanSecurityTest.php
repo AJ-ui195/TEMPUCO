@@ -267,7 +267,6 @@ class LoanSecurityTest extends TestCase
             'mode_of_payment' => ModeOfPayment::CashPayment->value,
             'loan_category' => LoanCategory::AdditionalNew->value,
             'character_loan_type' => LoanTypes::CHARACTER,
-            'character_variant' => 'character_emergency',
             'loan_type' => LoanTypes::CHARACTER,
         ], $overrides);
     }

@@ -61,10 +61,7 @@ final class LoanApplicationService
 
         $loanType = match ($applicationType) {
             'quick' => LoanTypes::QUICK,
-            'character' => CharacterLoanRules::resolveStoredType(
-                (string) ($data['character_loan_type'] ?? $data['loan_type'] ?? LoanTypes::CHARACTER),
-                $data['character_variant'] ?? null,
-            ),
+            'character' => (string) ($data['character_loan_type'] ?? $data['loan_type'] ?? LoanTypes::CHARACTER),
             default => in_array((string) ($data['loan_type'] ?? ''), [
                 LoanTypes::REGULAR,
                 LoanTypes::SALARY_2,
