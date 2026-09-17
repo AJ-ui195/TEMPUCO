@@ -4,7 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Auth\Pages\ChangePassword;
 use App\Filament\Auth\Pages\Login;
-use App\Filament\Canteen\Pages\CanteenInventoryPage;
+use App\Filament\Canteen\Pages\EditCanteenMenuPage;
 use App\Filament\Canteen\Pages\PosCanteenPage;
 use App\Filament\Cashier\Pages\PosVoidSalePage;
 use App\Http\Middleware\EnsurePasswordChanged;
@@ -46,11 +46,10 @@ class PosCanteenPanelProvider extends PanelProvider
             ->userMenu(false)
             ->pages([
                 PosCanteenPage::class,
-                CanteenInventoryPage::class,
+                EditCanteenMenuPage::class,
                 PosVoidSalePage::class,
                 ChangePassword::class,
             ])
-            ->discoverResources(in: app_path('Filament/Canteen/Resources'), for: 'App\Filament\Canteen\Resources')
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

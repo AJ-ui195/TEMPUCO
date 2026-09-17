@@ -23,6 +23,15 @@
         @endif
         @if ($sale->member)
             <div>{{ __('Member') }}: {{ $sale->member->name }}</div>
+            @if ($sale->sale_channel === \App\Enums\PosSaleChannel::Grocery)
+                @if (\App\Support\MemberGroceryPoints::qualifies($sale))
+                    @php($pointsEarned = \App\Support\MemberGroceryPoints::pointsForAmount((float) $sale->total))
+                    @if ($pointsEarned > 0)
+                        <div>{{ __('Points earned') }}: {{ $pointsEarned }}</div>
+                    @endif
+                @endif
+                <div>{{ __('Points balance') }}: {{ number_format((int) $sale->member->points) }}</div>
+            @endif
         @endif
         <div>{{ __('Payment') }}: {{ $isCredit ? __('Credit') : __('Cash') }}</div>
     </div>

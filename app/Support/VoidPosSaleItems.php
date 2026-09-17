@@ -36,6 +36,9 @@ final class VoidPosSaleItems
         }
 
         return DB::transaction(function () use ($sale, $ids, $reason, $cashier): array {
+            $sale->refresh();
+            $previousTotal = (float) $sale->total;
+
             $lines = PosSaleItem::query()
                 ->where('pos_sale_id', $sale->id)
                 ->whereIn('id', $ids)
@@ -63,6 +66,8 @@ final class VoidPosSaleItems
                 ->sum('line_total'), 2);
 
             $sale->forceFill(['total' => $newTotal])->save();
+
+            MemberGroceryPoints::adjustAfterVoid($sale, $previousTotal, $newTotal);
 
             return [
                 'voided' => $lines->count(),

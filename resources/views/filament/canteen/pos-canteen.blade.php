@@ -489,93 +489,45 @@
         data-receipt-title="{{ __('Receipt') }}"
     >@include('filament.cashier.partials.receipt-print-styles')</style>
 
-    <div
-        class="fi-pos-grocery"
-        x-data="{
-            focusScanner() {
-                const el = this.$refs.barcodeScanner;
-                const active = document.activeElement;
-                if (! el) return;
-                if (active === el) return;
-                if (active?.closest?.('[data-pos-no-refocus]')) return;
-                el.focus();
-            },
-        }"
-        x-on:click.window="focusScanner()"
-        x-on:focus-barcode-scanner.window="focusScanner()"
-        x-init="focusScanner()"
-    >
+    <div class="fi-pos-grocery" data-pos-no-refocus>
         <div style="display: grid; grid-template-columns: 1fr 22rem; gap: 1.25rem; align-items: start;">
-            {{-- Left: scanner + cart --}}
+            {{-- Left: food choices + cart --}}
             <div style="display: flex; flex-direction: column; gap: 1rem;">
-                <div class="pos-panel pos-panel--scanner" style="padding: 1rem 1.25rem;">
-                    <label for="barcode-scanner" class="pos-label-accent" style="display: block; font-size: 0.875rem; font-weight: 700; margin-bottom: 0.5rem;">
-                        {{ __('Barcode scanner') }}
-                    </label>
-                    <p class="pos-muted" style="margin: 0 0 0.75rem; font-size: 0.8125rem;">
-                        {{ __('Scan a product barcode.') }}
-                    </p>
-                    <input
-                        id="barcode-scanner"
-                        type="text"
-                        wire:model="barcodeInput"
-                        wire:keydown.enter.prevent="scanBarcode"
-                        x-ref="barcodeScanner"
-                        autocomplete="off"
-                        placeholder="{{ __('Scan barcode here…') }}"
-                        class="pos-input pos-input--scanner"
-                    />
+                <div class="pos-panel" style="padding: 1rem 1.25rem;">
+                    <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div>
+                            <h2 style="margin: 0; font-size: 0.9375rem; font-weight: 700;">{{ __('Food choices') }}</h2>
+                            <p class="pos-muted" style="margin: 0.25rem 0 0; font-size: 0.8125rem;">
+                                {{ __('Tap a food to add it to the cart.') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 0.75rem;">
+                        @foreach ($this->getMenuChoices() as $choice)
+                            @php($availableQty = (int) $choice->quantity)
+                            <button
+                                type="button"
+                                wire:click="addMenuChoice({{ $choice->id }})"
+                                @disabled($availableQty < 1)
+                                class="pos-search-result {{ $availableQty < 1 ? 'pos-search-result--low-stock' : '' }}"
+                                style="flex-direction: column; align-items: flex-start; justify-content: space-between; min-height: 6.5rem; border-radius: 0.75rem; border-width: 2px; padding: 0.875rem 1rem; opacity: {{ $availableQty < 1 ? '0.55' : '1' }};"
+                            >
+                                <span style="display: block; font-weight: 700; font-size: 1rem; line-height: 1.3;">{{ $choice->name }}</span>
+                                <span class="pos-muted" style="display: block; margin-top: 0.5rem; font-size: 0.8125rem; font-weight: 600;">
+                                    {{ __('Qty') }}: {{ number_format($availableQty) }}
+                                </span>
+                                <span class="pos-price" style="margin-top: 0.5rem; font-size: 1.0625rem;">
+                                    ₱{{ number_format((float) $choice->unit_price, 2) }}
+                                </span>
+                            </button>
+                        @endforeach
+                    </div>
+
                     @if ($scanFeedback)
                         <p class="{{ $scanFeedbackIsError ? 'pos-feedback--error' : 'pos-feedback--ok' }}" style="margin: 0.75rem 0 0; font-size: 0.8125rem; font-weight: 600;">
                             {{ $scanFeedback }}
                         </p>
-                    @endif
-                </div>
-
-                <div data-pos-no-refocus class="pos-panel" style="padding: 1rem 1.25rem;">
-                    <label for="product-search" style="display: block; font-size: 0.875rem; font-weight: 700; margin-bottom: 0.5rem;">
-                        {{ __('Search products') }}
-                    </label>
-                    <p class="pos-muted" style="margin: 0 0 0.75rem; font-size: 0.8125rem;">
-                        {{ __('Search by product name or SKU, then click a result to add to cart.') }}
-                    </p>
-                    <input
-                        id="product-search"
-                        type="search"
-                        wire:model.live.debounce.300ms="productSearch"
-                        autocomplete="off"
-                        placeholder="{{ __('Type to search…') }}"
-                        class="pos-input"
-                        style="padding: 0.625rem 0.75rem; font-size: 0.9375rem;"
-                    />
-
-                    @php($searchResults = $this->getSearchResults())
-
-                    @if (strlen(trim($productSearch)) >= 2)
-                        <div class="pos-panel" style="margin-top: 0.75rem; max-height: 14rem; overflow-y: auto; padding: 0;">
-                            @forelse ($searchResults as $product)
-                                <button
-                                    type="button"
-                                    wire:click="addProductFromSearch({{ $product->id }})"
-                                    class="pos-search-result {{ $product->quantity < 1 ? 'pos-search-result--low-stock' : '' }}"
-                                >
-                                    <span>
-                                        <span style="display: block; font-weight: 600; font-size: 0.875rem;">{{ $product->name }}</span>
-                                        <span class="pos-muted" style="font-size: 0.75rem;">
-                                            {{ $product->sku ?? __('No SKU') }}
-                                            · {{ __('Stock') }}: {{ number_format($product->quantity) }}
-                                        </span>
-                                    </span>
-                                    <span class="pos-price">
-                                        ₱{{ number_format((float) $product->unit_price, 2) }}
-                                    </span>
-                                </button>
-                            @empty
-                                <p class="pos-muted" style="margin: 0; padding: 1rem 0.75rem; font-size: 0.8125rem; text-align: center;">
-                                    {{ __('No products match your search.') }}
-                                </p>
-                            @endforelse
-                        </div>
                     @endif
                 </div>
 
@@ -630,7 +582,7 @@
 
                     @if ($cartLines === [])
                         <p class="pos-muted" style="padding: 2rem 1rem; text-align: center; font-size: 0.875rem; margin: 0;">
-                            {{ __('Scan or search products to add them to the cart.') }}
+                            {{ __('Tap a food choice to add it to the cart.') }}
                         </p>
                     @else
                         <div style="overflow-x: auto;">
@@ -640,8 +592,7 @@
                                         @if ($voidMode)
                                             <th style="padding: 0.5rem 0.75rem; width: 2.5rem;"></th>
                                         @endif
-                                        <th style="padding: 0.5rem 0.75rem;">{{ __('Product') }}</th>
-                                        <th style="padding: 0.5rem 0.75rem;">{{ __('SKU') }}</th>
+                                        <th style="padding: 0.5rem 0.75rem;">{{ __('Food') }}</th>
                                         <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Price') }}</th>
                                         <th style="padding: 0.5rem 0.75rem; text-align: center;">{{ __('Qty') }}</th>
                                         <th style="padding: 0.5rem 0.75rem; text-align: end;">{{ __('Total') }}</th>
@@ -663,7 +614,6 @@
                                                 </td>
                                             @endif
                                             <td style="padding: 0.5rem 0.75rem; font-weight: 500;">{{ $line['name'] }}</td>
-                                            <td class="pos-muted" style="padding: 0.5rem 0.75rem;">{{ $line['sku'] ?? '—' }}</td>
                                             <td style="padding: 0.5rem 0.75rem; text-align: end;">₱{{ number_format($line['unit_price'], 2) }}</td>
                                             <td style="padding: 0.5rem 0.75rem; text-align: center;">
                                                 <div style="display: inline-flex; align-items: center; gap: 0.25rem;">
@@ -734,12 +684,6 @@
                                             'limit' => number_format($this->getCreditLimit(), 2),
                                         ]) }}
                                     </span>
-                                    <span class="pos-muted" style="display: block; margin-top: 0.375rem; font-size: 0.8125rem;">
-                                        {{ __('Points: :points', ['points' => number_format($this->getMemberPoints())]) }}
-                                        @if ($paymentType === 'cash' && $this->getPointsForCurrentCart() > 0)
-                                            · {{ __('This cash sale: +:points', ['points' => $this->getPointsForCurrentCart()]) }}
-                                        @endif
-                                    </span>
                                 </div>
                                 <button
                                     type="button"
@@ -789,8 +733,8 @@
                                         <span style="display: block; font-weight: 600; font-size: 0.875rem;">{{ $member->name }}</span>
                                         <span class="pos-muted" style="font-size: 0.75rem;">
                                             {{ $member->email }}
-                                            @if ($member->cellphone)
-                                                · {{ $member->cellphone }}
+                                            @if ($member->contact_number)
+                                                · {{ $member->contact_number }}
                                             @endif
                                         </span>
                                     </span>

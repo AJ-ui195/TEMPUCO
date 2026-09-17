@@ -11,6 +11,7 @@ use App\Models\PosSaleItem;
 use App\Models\User;
 use App\Support\CanteenBarcodeLookup;
 use App\Support\MemberCreditLimit;
+use App\Support\MemberGroceryPoints;
 use App\Support\MemberQrCodeLookup;
 use App\Support\PhilippineTime;
 use App\Support\PosBarcodeLookup;
@@ -162,6 +163,28 @@ trait ManagesPosCheckout
         $this->setScanFeedback(__('Member: :name', ['name' => $member->name]), false);
     }
 
+    public function getMemberPoints(): int
+    {
+        if ($this->memberId === null) {
+            return 0;
+        }
+
+        return (int) (Member::query()->whereKey($this->memberId)->value('points') ?? 0);
+    }
+
+    public function getPointsForCurrentCart(): int
+    {
+        if (
+            $this->getSaleChannel() !== PosSaleChannel::Grocery
+            || $this->memberId === null
+            || $this->isCreditSale()
+        ) {
+            return 0;
+        }
+
+        return MemberGroceryPoints::pointsForAmount($this->getCartTotal());
+    }
+
     public function isCreditSale(): bool
     {
         return $this->paymentType === 'credit';
@@ -284,7 +307,7 @@ trait ManagesPosCheckout
 
         $line = $this->cartLines[$productId];
 
-        if ($line['quantity'] >= $line['max_qty']) {
+        if ($this->tracksInventoryStock() && $line['quantity'] >= $line['max_qty']) {
             $this->setScanFeedback(__('Cannot add more than available stock.'), true);
 
             return;
@@ -490,6 +513,7 @@ trait ManagesPosCheckout
         $catalogModel = $this->catalogModelClass();
 
         $sale = DB::transaction(function () use ($memberId, $isCredit, $total, $paid, $saleChannel, $inventoryForeignKey, $catalogModel): PosSale {
+            // Shared pos_sales table — grocery and canteen are separated only by sale_channel.
             $sale = PosSale::query()->create([
                 'pos_branch_id' => null,
                 'member_id' => $memberId,
@@ -510,13 +534,21 @@ trait ManagesPosCheckout
                     'line_total' => $line['line_total'],
                 ]);
 
-                $catalogModel::query()
-                    ->whereKey($line['product_id'])
-                    ->decrement('quantity', $line['quantity']);
+                if ($this->tracksInventoryStock()) {
+                    $catalogModel::query()
+                        ->whereKey($line['product_id'])
+                        ->decrement('quantity', $line['quantity']);
+                }
             }
 
-            return $sale;
+            MemberGroceryPoints::awardForSale($sale);
+
+            return $sale->fresh() ?? $sale;
         });
+
+        $pointsEarned = MemberGroceryPoints::qualifies($sale)
+            ? MemberGroceryPoints::pointsForAmount((float) $sale->total)
+            : 0;
 
         if ($isCredit) {
             $outstanding = round($total - $paid, 2);
@@ -534,9 +566,15 @@ trait ManagesPosCheckout
                 ->success()
                 ->send();
         } else {
+            $cashBody = __('Change: ₱:change', ['change' => number_format($paid - $total, 2)]);
+
+            if ($pointsEarned > 0) {
+                $cashBody .= ' · '.__('+ :points point(s)', ['points' => $pointsEarned]);
+            }
+
             Notification::make()
                 ->title(__('Sale completed'))
-                ->body(__('Change: ₱:change', ['change' => number_format($paid - $total, 2)]))
+                ->body($cashBody)
                 ->success()
                 ->send();
         }
@@ -658,9 +696,11 @@ trait ManagesPosCheckout
 
     protected function addCatalogProduct(PosInventoryItem|PosCanteenInventoryItem $product): void
     {
-        $available = (int) $product->quantity;
+        $available = $this->tracksInventoryStock()
+            ? (int) $product->quantity
+            : PHP_INT_MAX;
 
-        if ($available < 1) {
+        if ($this->tracksInventoryStock() && $available < 1) {
             $this->setScanFeedback(__(':name is out of stock.', ['name' => $product->name]), true);
 
             return;
@@ -676,7 +716,7 @@ trait ManagesPosCheckout
         $unitPrice = (float) $product->unit_price;
 
         if (isset($this->cartLines[$productId])) {
-            if ($this->cartLines[$productId]['quantity'] >= $available) {
+            if ($this->tracksInventoryStock() && $this->cartLines[$productId]['quantity'] >= $available) {
                 $this->setScanFeedback(__('Cannot add more than available stock.'), true);
 
                 return;
@@ -761,6 +801,11 @@ trait ManagesPosCheckout
     {
         $this->memberScanFeedback = $message;
         $this->memberScanFeedbackIsError = $isError;
+    }
+
+    protected function tracksInventoryStock(): bool
+    {
+        return true;
     }
 
     /**
