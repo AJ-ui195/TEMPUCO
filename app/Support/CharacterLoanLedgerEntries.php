@@ -10,7 +10,8 @@ use Illuminate\Support\Collection;
 
 /**
  * Character / Character-Emergency style ledger:
- * release + prepaid interest, interest payments (balance unchanged), then principal payoff.
+ * release + prepaid interest billed every 3 months, then principal payoff
+ * after the full prepaid interest is collected.
  * Regular members: 2%/mo. Retirees (`is_retiree`): 1%/mo.
  */
 final class CharacterLoanLedgerEntries
@@ -24,9 +25,9 @@ final class CharacterLoanLedgerEntries
     public const KIND_PRINCIPAL = 'principal';
 
     /**
-     * Recurring interest for one repayment period (Character-Emergency: rate/mo × term, typically 3).
+     * Full prepaid interest for the whole term (e.g. ₱30,000 × 2% × 6 = ₱3,600).
      */
-    public static function periodInterest(MemberLoan $loan): float
+    public static function totalPrepaidInterest(MemberLoan $loan): float
     {
         $principal = round((float) $loan->loan_amount, 2);
         $stored = round((float) $loan->installment_amount, 2);
@@ -36,12 +37,34 @@ final class CharacterLoanLedgerEntries
         }
 
         $months = max(1, (int) $loan->loan_period_months);
-        $periodMonths = $months <= 3 ? $months : ($months >= 12 ? 1 : $months);
         $rate = $loan->user?->isRetiree()
             ? self::MONTHLY_INTEREST_RATE_RETIREE
             : self::MONTHLY_INTEREST_RATE;
 
-        return round($principal * $rate * $periodMonths, 2);
+        return round($principal * $rate * $months, 2);
+    }
+
+    /**
+     * Interest due for one 3-month collection (e.g. ₱3,600 ÷ 2 = ₱1,800).
+     */
+    public static function periodInterest(MemberLoan $loan): float
+    {
+        $total = self::totalPrepaidInterest($loan);
+        $periods = self::interestPeriodCount($loan);
+
+        if ($periods < 2) {
+            return $total;
+        }
+
+        return round($total / $periods, 2);
+    }
+
+    public static function interestPeriodCount(MemberLoan $loan): int
+    {
+        $months = max(1, (int) $loan->loan_period_months);
+        $interval = self::repaymentIntervalMonths($loan);
+
+        return max(1, (int) ceil($months / $interval));
     }
 
     public static function repaymentIntervalMonths(MemberLoan $loan): int
@@ -204,35 +227,80 @@ final class CharacterLoanLedgerEntries
 
     public static function interestPaymentCount(MemberLoan $loan): int
     {
+        $period = self::periodInterest($loan);
+
+        if ($period < 0.01) {
+            return 0;
+        }
+
+        return (int) floor((self::recordedInterestPaid($loan) + 0.005) / $period);
+    }
+
+    public static function recordedInterestPaid(MemberLoan $loan): float
+    {
         $payments = $loan->relationLoaded('payments')
             ? $loan->payments
             : $loan->payments()->get();
 
-        return $payments
+        return round((float) $payments
             ->filter(fn (LoanPayment $payment): bool => self::isInterestPayment($payment))
-            ->count();
+            ->sum(fn (LoanPayment $payment): float => (float) $payment->amount), 2);
     }
 
-    public static function interestPeriodsDue(MemberLoan $loan): int
+    public static function remainingPrepaidInterest(MemberLoan $loan): float
     {
+        return round(max(0, self::totalPrepaidInterest($loan) - self::recordedInterestPaid($loan)), 2);
+    }
+
+    /**
+     * How many 3-month interest slices are open by calendar.
+     * The first slice is due from release; the next opens only after its due date.
+     */
+    public static function calendarPeriodsDue(MemberLoan $loan): int
+    {
+        $total = self::interestPeriodCount($loan);
+
+        if ($total < 2) {
+            return $total;
+        }
+
         $due = 1;
+        $step = 3;
         $releaseDate = Carbon::parse($loan->loan_date ?? $loan->approved_at ?? $loan->created_at);
         $cursor = $loan->first_payment_due_date
             ? Carbon::parse($loan->first_payment_due_date)->startOfDay()
-            : $releaseDate->copy()->addMonthsNoOverflow(3)->startOfDay();
+            : $releaseDate->copy()->addMonthsNoOverflow($step)->startOfDay();
         $today = now()->startOfDay();
 
-        while ($cursor->lte($today)) {
+        while ($due < $total && $cursor->lte($today)) {
             $due++;
-            $cursor->addMonthsNoOverflow(3);
+            $cursor->addMonthsNoOverflow($step);
         }
 
         return $due;
     }
 
+    /**
+     * Next collectible interest period after the previous is paid, and only once its due date has passed.
+     */
+    public static function interestPeriodsDue(MemberLoan $loan): int
+    {
+        $total = self::interestPeriodCount($loan);
+        $paid = min($total, self::interestPaymentCount($loan));
+        $calendar = self::calendarPeriodsDue($loan);
+
+        return min($total, max($paid, min($paid + 1, $calendar)));
+    }
+
     public static function principalUnlocked(MemberLoan $loan): bool
     {
-        if (self::interestPaymentCount($loan) >= self::interestPeriodsDue($loan)) {
+        $total = self::totalPrepaidInterest($loan);
+
+        if ($total < 0.01) {
+            return true;
+        }
+
+        if (self::recordedInterestPaid($loan) + 0.005 >= $total) {
             return true;
         }
 

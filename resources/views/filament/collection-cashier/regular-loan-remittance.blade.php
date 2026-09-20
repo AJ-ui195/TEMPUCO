@@ -8,28 +8,50 @@
         $addableCount = $this->addableCount();
         $totalRemaining = $listed->sum('remaining');
         $totalInstallment = $listed->sum('installment');
+        $totalLandbank = $this->getTotalLandbankAmount();
         $searching = trim($memberSearch) !== '';
     @endphp
 
     <div class="fi-pos-ui rl-screen">
-        <div class="pos-panel" style="padding: 1rem 1.25rem; margin-bottom: 1rem;">
-            <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-start; justify-content: space-between;">
+        <div class="pos-panel col-pay-head" style="padding: 1rem 1.25rem; margin-bottom: 1rem;">
+            <div class="rl-head-top">
                 <div>
-                    <h2 style="margin: 0; font-size: 1.125rem; font-weight: 700;">{{ __('Regular loan') }}</h2>
-                    <p class="pos-muted" style="margin: 0.375rem 0 0; font-size: 0.8125rem;">
-                        {{ __('Add accounts to the APDS list, then record Landbank amounts or print the PDF.') }}
-                    </p>
+                    <h2 class="col-pay-title" style="margin: 0;">{{ __('Regular loan') }}</h2>
+                    
                 </div>
-                <button
-                    type="button"
-                    onclick="window.print()"
-                    class="pos-btn-primary"
-                    style="width: auto; white-space: nowrap;"
-                    @disabled($listedCount === 0)
-                >
-                    {{ __('Print APDS PDF') }}
-                </button>
+                <div class="rl-head-tools">
+                    <label>
+                        <span>{{ __('Date') }}</span>
+                        <input type="date" wire:model.live="paymentDate" class="pos-input">
+                    </label>
+                    <label>
+                        <span>{{ __('O.R. #') }}</span>
+                        <input
+                            type="text"
+                            wire:model.live.debounce.400ms="officialReceiptNo"
+                            wire:keydown.enter.prevent="searchOfficialReceipt"
+                            wire:blur="searchOfficialReceipt"
+                            class="pos-input"
+                            placeholder="{{ __('Search O.R. #') }}"
+                            autocomplete="off"
+                        >
+                    </label>
+                    <div class="rl-head-print">
+                        <button
+                            type="button"
+                            onclick="window.print()"
+                            class="pos-btn-primary"
+                            style="width: auto; white-space: nowrap;"
+                            @disabled($listedCount === 0)
+                        >
+                            {{ __('Print APDS PDF') }}
+                        </button>
+                    </div>
+                </div>
             </div>
+            @if ($paymentError)
+                <p style="margin: 0.75rem 0 0; font-size: 0.8125rem; font-weight: 600; color: rgb(185 28 28);">{{ $paymentError }}</p>
+            @endif
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; margin: 1rem 0;">
                 <div class="pos-panel pos-stat">
@@ -140,7 +162,7 @@
                                 <th style="text-align: left; padding: 0.75rem 1rem; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Member') }}</th>
                                 <th style="text-align: right; padding: 0.75rem 1rem; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Remaining') }}</th>
                                 <th style="text-align: right; padding: 0.75rem 1rem; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Installment') }}</th>
-                                <th style="text-align: left; padding: 0.75rem 1rem; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Landbank amount') }}</th>
+                                <th class="rl-landbank-col" style="padding: 0.75rem 1rem; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Landbank amount') }}</th>
                                 <th style="padding: 0.75rem 1rem; text-align: right; vertical-align: bottom;">
                                     <button type="button" wire:click="recordAllRemittances" class="pos-btn-primary" style="width: auto; white-space: nowrap;">
                                         {{ __('Record all') }}
@@ -176,20 +198,22 @@
                                             <span class="pos-muted">—</span>
                                         @endif
                                     </td>
-                                    <td style="padding: 0.875rem 1rem; vertical-align: top; min-width: 12rem;">
-                                        <input
-                                            type="text"
-                                            inputmode="decimal"
-                                            autocomplete="off"
-                                            x-mask:dynamic="$money($input, '.', ',', 2)"
-                                            wire:model="amounts.{{ $loanId }}"
-                                            placeholder="{{ __('Amount from Landbank') }}"
-                                            class="pos-input"
-                                            aria-label="{{ __('Landbank amount for :member', ['member' => $member?->name ?? $loanId]) }}"
-                                        />
-                                        @if (! empty($rowErrors[$loanId]))
-                                            <p style="margin: 0.375rem 0 0; font-size: 0.75rem; font-weight: 600; color: rgb(185 28 28);">{{ $rowErrors[$loanId] }}</p>
-                                        @endif
+                                    <td class="rl-landbank-col" style="padding: 0.875rem 1rem; vertical-align: middle;">
+                                        <div class="rl-landbank-box">
+                                            <input
+                                                type="text"
+                                                inputmode="decimal"
+                                                autocomplete="off"
+                                                x-mask:dynamic="$money($input, '.', ',', 2)"
+                                                wire:model="amounts.{{ $loanId }}"
+                                                placeholder="{{ __('Amount from Landbank') }}"
+                                                class="pos-input rl-landbank-input"
+                                                aria-label="{{ __('Landbank amount for :member', ['member' => $member?->name ?? $loanId]) }}"
+                                            />
+                                            @if (! empty($rowErrors[$loanId]))
+                                                <p style="margin: 0.375rem 0 0; font-size: 0.75rem; font-weight: 600; color: rgb(185 28 28);">{{ $rowErrors[$loanId] }}</p>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td style="padding: 0.875rem 1rem; vertical-align: top; white-space: nowrap;">
                                         <div style="display: flex; justify-content: flex-end;">
@@ -207,7 +231,59 @@
                                 </tr>
                             @endforeach
                         </tbody>
+                        <tfoot>
+                            <tr style="font-weight: 700;">
+                                <td colspan="3" style="padding: 0.875rem 1rem; text-align: right;">{{ __('Total') }}</td>
+                                <td class="rl-landbank-col" style="padding: 0.875rem 1rem;">
+                                    <div class="rl-landbank-box rl-landbank-total">₱{{ number_format($totalLandbank, 2) }}</div>
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
                     </table>
+                </div>
+            </div>
+        @endif
+
+        <div class="rl-pay-bar">
+            <div class="col-pay-actions" role="group" aria-label="{{ __('Payment actions') }}">
+                <button type="button" wire:click="cancelOfficialReceipt" class="col-pay-action col-pay-action--cancel">
+                    {{ __('Cancelled OR#') }}
+                </button>
+                <button type="button" wire:click="deletePaymentDraft" class="col-pay-action col-pay-action--delete">
+                    {{ __('Delete payment') }}
+                </button>
+                <button type="button" wire:click="updatePayment" class="col-pay-action col-pay-action--update">
+                    {{ __('Update payment') }}
+                </button>
+                <button type="button" wire:click="savePayment" class="col-pay-action col-pay-action--save">
+                    {{ __('Save payment') }}
+                </button>
+            </div>
+        </div>
+
+        @if ($showSavedModal)
+            <div class="pos-credit-modal" wire:key="saved-payment">
+                <div class="pos-credit-modal__backdrop" wire:click="closeSavedModal"></div>
+                <div class="pos-credit-modal__dialog col-pay-saved col-pay-saved--{{ $savedTone }}">
+                    <div class="col-pay-saved-icon" aria-hidden="true">
+                        @if ($savedTone === 'delete')
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" />
+                            </svg>
+                        @elseif ($savedTone === 'cancel')
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="9" /><path d="M15 9 9 15" /><path d="m9 9 6 6" />
+                            </svg>
+                        @else
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 6 9 17l-5-5" />
+                            </svg>
+                        @endif
+                    </div>
+                    <h3>{{ $savedTitle }}</h3>
+                    <p>{{ $savedMessage }}</p>
+                    <button type="button" wire:click="closeSavedModal">{{ __('OK') }}</button>
                 </div>
             </div>
         @endif
@@ -282,7 +358,128 @@
     </div>
 
     <style>
+        .rl-landbank-col { text-align: center; width: 13rem; }
+        .rl-landbank-box {
+            width: 11rem;
+            max-width: 100%;
+            margin-inline: auto;
+        }
+        .rl-landbank-input {
+            width: 100%;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .rl-landbank-total {
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
         .apds-print-only { display: none; }
+        .col-pay-head { display: flex; flex-direction: column; }
+        .col-pay-title { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #1e3a8a; }
+        .rl-head-top {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .rl-head-tools {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+        .rl-head-tools label span {
+            display: block;
+            text-align: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+        .fi-pos-ui .rl-head-tools .pos-input {
+            width: 10.5rem;
+            text-align: center;
+        }
+        .rl-head-print { display: flex; align-items: center; }
+        .rl-pay-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin: 0.75rem 1rem 1.15rem;
+            padding-right: 0.25rem;
+        }
+        .col-pay-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.4rem;
+        }
+        .col-pay-action {
+            border: 0;
+            border-radius: 0.45rem;
+            padding: 0.4rem 0.85rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            line-height: 1.2;
+            cursor: pointer;
+            color: #fff;
+            width: auto;
+            white-space: nowrap;
+        }
+        .col-pay-action--cancel { background: #e2e8f0; color: #0f172a; }
+        .col-pay-action--delete { background: #ef5b6a; }
+        .col-pay-action--update { background: #f5b942; color: #1f2937; }
+        .col-pay-action--save { background: #2563eb; }
+        .fi-pos-ui .pos-credit-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .fi-pos-ui .pos-credit-modal__backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.55); }
+        .fi-pos-ui .pos-credit-modal__dialog { position: relative; width: 100%; max-width: 22rem; padding: 1.25rem; border-radius: 0.75rem; background: #fff; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25); max-height: 90vh; overflow: auto; }
+        .dark .fi-pos-ui .pos-credit-modal__dialog { background: rgb(30 41 59); color: #fff; }
+        .fi-pos-ui .col-pay-saved { max-width: 20rem; padding: 1.5rem 1.35rem 1.25rem; text-align: center; }
+        .col-pay-saved-icon {
+            width: 3rem;
+            height: 3rem;
+            margin: 0 auto 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: rgb(220 252 231);
+            color: rgb(22 163 74);
+        }
+        .col-pay-saved--update .col-pay-saved-icon { background: rgb(254 243 199); color: rgb(180 83 9); }
+        .col-pay-saved--delete .col-pay-saved-icon { background: rgb(254 226 226); color: rgb(185 28 28); }
+        .col-pay-saved--cancel .col-pay-saved-icon { background: rgb(226 232 240); color: rgb(51 65 85); }
+        .dark .col-pay-saved-icon { background: rgb(20 83 45); color: rgb(134 239 172); }
+        .dark .col-pay-saved--update .col-pay-saved-icon { background: rgb(120 53 15); color: rgb(253 224 71); }
+        .dark .col-pay-saved--delete .col-pay-saved-icon { background: rgb(127 29 29); color: rgb(252 165 165); }
+        .dark .col-pay-saved--cancel .col-pay-saved-icon { background: rgb(51 65 85); color: rgb(226 232 240); }
+        .col-pay-saved--delete button { background: #ef5b6a; }
+        .col-pay-saved--delete button:hover { background: #dc2626; }
+        .col-pay-saved--update button { background: #d97706; }
+        .col-pay-saved--update button:hover { background: #b45309; }
+        .col-pay-saved--cancel button { background: #475569; }
+        .col-pay-saved--cancel button:hover { background: #334155; }
+        .col-pay-saved h3 { margin: 0 0 0.4rem; font-size: 1.125rem; font-weight: 800; }
+        .col-pay-saved p { margin: 0 0 1.15rem; font-size: 0.875rem; line-height: 1.45; color: rgb(71 85 105); }
+        .dark .col-pay-saved p { color: rgb(148 163 184); }
+        .col-pay-saved button {
+            width: 100%;
+            border: 0;
+            border-radius: 0.55rem;
+            padding: 0.7rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 700;
+            cursor: pointer;
+            color: #fff;
+            background: #2563eb;
+        }
+        .col-pay-saved button:hover { background: #1d4ed8; }
+        @media (max-width: 900px) {
+            .rl-head-tools { justify-content: center; }
+            .rl-head-top { justify-content: center; text-align: center; }
+            .rl-pay-bar { justify-content: center; }
+        }
 
         .apds-head {
             display: flex;

@@ -625,7 +625,7 @@ class ApplyLoan extends Page
                             $characterRate = $member instanceof Member && $member->isRetiree() ? '1%' : '2%';
 
                             return match (true) {
-                                LoanTypes::isCharacter($type), LoanTypes::isCharacterEmergency($type) => __('Prepaid: :rate monthly × the term in months.', [
+                                LoanTypes::isCharacter($type), LoanTypes::isCharacterEmergency($type) => __('Prepaid: :rate monthly × the term in months. Collected every 3 months (e.g. ₱3,600 for 6 months → ₱1,800 then ₱1,800). Principal after all interest is paid.', [
                                     'rate' => $characterRate,
                                 ]),
                                 LoanTypes::isCharacterShortTerm($type) => __(':rate monthly on diminishing balance (first period). Interest deducted from proceeds.', [
