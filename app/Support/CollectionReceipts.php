@@ -124,12 +124,66 @@ final class CollectionReceipts
         $values = [$number];
 
         if ($digits !== '') {
-            $values[] = $digits;
-            $values[] = ltrim($digits, '0') ?: '0';
-            $values[] = str_pad($digits, 6, '0', STR_PAD_LEFT);
+            $stripped = ltrim($digits, '0') ?: '0';
+            $padded = str_pad($digits, 6, '0', STR_PAD_LEFT);
+
+            foreach ([$digits, $stripped, $padded] as $value) {
+                $values[] = $value;
+                $values[] = $value.'-OR';
+                $values[] = $value.'-IN';
+            }
         }
 
         return array_values(array_unique($values));
+    }
+
+    public static function findRegularLoanPayment(string $number): ?LoanPayment
+    {
+        $number = trim($number);
+        $candidates = self::candidates($number);
+        $digits = preg_replace('/\D+/', '', $number) ?? '';
+
+        if ($candidates === [] && $digits === '') {
+            return null;
+        }
+
+        $match = LoanPayment::query()
+            ->whereNotNull('regular_loan_id')
+            ->whereNotNull('official_receipt_no')
+            ->whereIn('official_receipt_no', $candidates)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($match instanceof LoanPayment) {
+            return $match;
+        }
+
+        if ($digits === '') {
+            return null;
+        }
+
+        $padded = str_pad($digits, 6, '0', STR_PAD_LEFT);
+        $stripped = ltrim($digits, '0') ?: '0';
+
+        return LoanPayment::query()
+            ->whereNotNull('regular_loan_id')
+            ->whereNotNull('official_receipt_no')
+            ->orderByDesc('id')
+            ->get()
+            ->first(function (LoanPayment $payment) use ($digits, $padded, $stripped): bool {
+                $stored = preg_replace('/\D+/', '', (string) $payment->official_receipt_no) ?? '';
+
+                if ($stored === '') {
+                    return false;
+                }
+
+                $storedPadded = str_pad($stored, 6, '0', STR_PAD_LEFT);
+                $storedStripped = ltrim($stored, '0') ?: '0';
+
+                return $stored === $digits
+                    || $storedPadded === $padded
+                    || $storedStripped === $stripped;
+            });
     }
 
     public static function currentNumber(string $kind, string $officialReceiptNo, string $invoiceNo): string

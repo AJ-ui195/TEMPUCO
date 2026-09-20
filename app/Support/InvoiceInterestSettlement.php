@@ -23,8 +23,8 @@ final class InvoiceInterestSettlement
     {
         $needed = 0.0;
 
-        foreach (self::obligations($member) as $obligation) {
-            $needed = round($needed + $obligation['amount'], 2);
+        foreach (self::remaindersForMemberId((int) $member->id) as $row) {
+            $needed = round($needed + self::collectableInterest($row), 2);
         }
 
         return $needed;
@@ -35,7 +35,7 @@ final class InvoiceInterestSettlement
         $remaining = 0.0;
 
         foreach (self::remaindersForMemberId((int) $member->id) as $row) {
-            $remaining = round($remaining + $row['remaining'], 2);
+            $remaining = round($remaining + self::collectableInterest($row), 2);
         }
 
         return $remaining;
@@ -164,17 +164,16 @@ final class InvoiceInterestSettlement
                 continue;
             }
 
-            $short = max(0, CharacterLoanLedgerEntries::interestPeriodsDue($loan)
-                - CharacterLoanLedgerEntries::interestPaymentCount($loan));
+            $amount = CharacterLoanLedgerEntries::remainingPrepaidInterest($loan);
 
-            if ($short < 1) {
+            if ($amount < 0.01) {
                 continue;
             }
 
             $items[] = [
                 'type' => CharacterLoan::class,
                 'loan_id' => (int) $loan->id,
-                'amount' => round(CharacterLoanLedgerEntries::periodInterest($loan) * $short, 2),
+                'amount' => $amount,
             ];
         }
 
@@ -203,5 +202,41 @@ final class InvoiceInterestSettlement
         });
 
         return $items;
+    }
+
+    /**
+     * Character interest is billed one 3-month slice at a time.
+     *
+     * @param  array{type: class-string, loan_id: int, remaining?: float, amount?: float}  $row
+     */
+    private static function collectableInterest(array $row): float
+    {
+        $open = round((float) ($row['remaining'] ?? $row['amount'] ?? 0), 2);
+
+        if ($open < 0.01) {
+            return 0.0;
+        }
+
+        if ($row['type'] !== CharacterLoan::class) {
+            return $open;
+        }
+
+        $loan = CharacterLoan::query()->with('payments')->find($row['loan_id']);
+
+        if (! $loan instanceof CharacterLoan) {
+            return $open;
+        }
+
+        $period = CharacterLoanLedgerEntries::periodInterest($loan);
+        $invoicePaid = round((float) ($row['amount'] ?? 0) - $open, 2);
+        $paidAmount = round($invoicePaid + CharacterLoanLedgerEntries::recordedInterestPaid($loan), 2);
+        $paidPeriods = $period < 0.01 ? 0 : (int) floor(($paidAmount + 0.005) / $period);
+        $openPeriods = max(0, CharacterLoanLedgerEntries::calendarPeriodsDue($loan) - $paidPeriods);
+
+        if ($openPeriods < 1) {
+            return 0.0;
+        }
+
+        return round(min($open, $period), 2);
     }
 }
