@@ -32,7 +32,14 @@ final class CollectionReceipts
         }
 
         return [
-            'loan' => LoanPayment::query()->whereIn('official_receipt_no', $candidates)->first(),
+            'loan' => LoanPayment::query()
+                ->whereNotNull('official_receipt_no')
+                ->whereIn('official_receipt_no', $candidates)
+                ->where(function ($query): void {
+                    $query->whereNull('receipt_kind')
+                        ->orWhere('receipt_kind', ReceiptKind::OfficialReceipt->value);
+                })
+                ->first(),
             'canteen' => PosCreditPayment::query()
                 ->whereIn('reference', $candidates)
                 ->first(),
@@ -51,6 +58,20 @@ final class CollectionReceipts
             ->where('kind', $kind)
             ->whereIn('number', $candidates)
             ->exists();
+    }
+
+    public static function releaseCancelled(string $number, string $kind): int
+    {
+        $candidates = self::candidates($number);
+
+        if ($candidates === []) {
+            return 0;
+        }
+
+        return CancelledReceipt::query()
+            ->where('kind', $kind)
+            ->whereIn('number', $candidates)
+            ->delete();
     }
 
     public static function isTaken(
@@ -74,6 +95,14 @@ final class CollectionReceipts
 
         if ($canteen instanceof PosCreditPayment && $canteen->id !== $exceptPosPaymentId) {
             return true;
+        }
+
+        if ($kind === ReceiptKind::OfficialReceipt->value) {
+            $remittance = self::findRegularLoanPayment($number);
+
+            if ($remittance instanceof LoanPayment && $remittance->id !== $exceptLoanPaymentId) {
+                return true;
+            }
         }
 
         if ($kind === ReceiptKind::Invoice->value) {
@@ -137,29 +166,29 @@ final class CollectionReceipts
         return array_values(array_unique($values));
     }
 
-    public static function findRegularLoanPayment(string $number): ?LoanPayment
+    /**
+     * @return Collection<int, LoanPayment>
+     */
+    public static function findRegularLoanPayments(string $number): Collection
     {
         $number = trim($number);
         $candidates = self::candidates($number);
         $digits = preg_replace('/\D+/', '', $number) ?? '';
 
         if ($candidates === [] && $digits === '') {
-            return null;
+            return collect();
         }
 
-        $match = LoanPayment::query()
+        $matches = LoanPayment::query()
             ->whereNotNull('regular_loan_id')
+            ->where('receipt_kind', ReceiptKind::Landbank->value)
             ->whereNotNull('official_receipt_no')
             ->whereIn('official_receipt_no', $candidates)
-            ->orderByDesc('id')
-            ->first();
+            ->orderBy('id')
+            ->get();
 
-        if ($match instanceof LoanPayment) {
-            return $match;
-        }
-
-        if ($digits === '') {
-            return null;
+        if ($matches->isNotEmpty() || $digits === '') {
+            return $matches;
         }
 
         $padded = str_pad($digits, 6, '0', STR_PAD_LEFT);
@@ -167,10 +196,11 @@ final class CollectionReceipts
 
         return LoanPayment::query()
             ->whereNotNull('regular_loan_id')
+            ->where('receipt_kind', ReceiptKind::Landbank->value)
             ->whereNotNull('official_receipt_no')
-            ->orderByDesc('id')
+            ->orderBy('id')
             ->get()
-            ->first(function (LoanPayment $payment) use ($digits, $padded, $stripped): bool {
+            ->filter(function (LoanPayment $payment) use ($digits, $padded, $stripped): bool {
                 $stored = preg_replace('/\D+/', '', (string) $payment->official_receipt_no) ?? '';
 
                 if ($stored === '') {
@@ -183,7 +213,15 @@ final class CollectionReceipts
                 return $stored === $digits
                     || $storedPadded === $padded
                     || $storedStripped === $stripped;
-            });
+            })
+            ->values();
+    }
+
+    public static function findRegularLoanPayment(string $number): ?LoanPayment
+    {
+        $match = self::findRegularLoanPayments($number)->last();
+
+        return $match instanceof LoanPayment ? $match : null;
     }
 
     public static function currentNumber(string $kind, string $officialReceiptNo, string $invoiceNo): string

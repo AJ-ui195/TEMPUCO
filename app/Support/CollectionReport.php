@@ -160,6 +160,9 @@ class CollectionReport
         $grouped = [];
 
         foreach ($this->loanPayments() as $payment) {
+            if ($payment->receipt_kind === ReceiptKind::Landbank->value) {
+                continue;
+            }
             $amount = round((float) $payment->amount, 2);
             $orNo = CollectionReceiptNumbers::displayOfficialReceipt((string) ($payment->official_receipt_no ?? ''));
             $member = (string) ($payment->loan()?->member?->name ?? '—');

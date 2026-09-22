@@ -6,4 +6,5 @@ enum ReceiptKind: string
 {
     case OfficialReceipt = 'official_receipt';
     case Invoice = 'invoice';
+    case Landbank = 'landbank';
 }

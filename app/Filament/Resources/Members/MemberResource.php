@@ -6,6 +6,7 @@ use App\Filament\Resources\Members\Pages\ManageMembers;
 use App\Filament\Resources\Members\Schemas\MemberForm;
 use App\Models\Member;
 use App\Support\MemberAccount;
+use App\Support\MemberEditPin;
 use App\Support\MemberQrCode;
 use App\Support\PrintMemberQrCode;
 use BackedEnum;
@@ -132,12 +133,21 @@ class MemberResource extends Resource
                         ? null
                         : __('Available after the member confirms their email.')),
                 EditAction::make()
+                    ->schema([
+                        MemberEditPin::formField(),
+                        ...MemberForm::components(),
+                    ])
                     ->mutateRecordDataUsing(fn (array $data): array => MemberForm::withComputedAge($data))
                     ->using(function (Model $record, array $data): Model {
+                        unset($data['member_edit_pin']);
+
                         /** @var Member $record */
                         return MemberAccount::update($record, $data);
                     }),
                 DeleteAction::make()
+                    ->schema([
+                        MemberEditPin::formField(),
+                    ])
                     ->using(function (Model $record): void {
                         /** @var Member $record */
                         MemberAccount::delete($record);
@@ -146,6 +156,9 @@ class MemberResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
+                        ->schema([
+                            MemberEditPin::formField(),
+                        ])
                         ->action(function (Collection $records): void {
                             $records->each(fn (Member $record) => MemberAccount::delete($record));
                         }),

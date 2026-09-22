@@ -212,47 +212,48 @@
                         </div>
                     @endif
                     @endif
-                    <div class="col-pay-settle">
-                        <div class="col-pay-totals" aria-label="{{ __('Cash tendered, change, and total payment') }}">
-                            <label class="col-pay-total-cell">
-                                <span>{{ __('Cash Tendered') }}</span>
-                                <input
-                                    type="text"
-                                    inputmode="decimal"
-                                    autocomplete="off"
-                                    placeholder="{{ __('Enter amount') }}"
-                                    x-mask:dynamic="$money($input, '.', ',', 2)"
-                                    wire:model.live="cashTendered"
-                                >
-                            </label>
-                            <label class="col-pay-total-cell">
-                                <span>{{ __('Change') }}</span>
-                                <input type="text" readonly value="{{ number_format($this->getChangeAmount(), 2) }}">
-                            </label>
-                            <label class="col-pay-total-cell">
-                                <span>{{ __('Total Payment') }}</span>
-                                <input type="text" readonly value="₱{{ number_format($this->getTotalAmount(), 2) }}">
-                            </label>
-                        </div>
-                        @if ($paymentError)
-                            <p style="margin: 0; font-size: 0.8125rem; font-weight: 600; color: rgb(185 28 28);">{{ $paymentError }}</p>
-                        @endif
-                        <div class="col-pay-actions" role="group" aria-label="{{ __('Payment actions') }}">
-                            <button type="button" wire:click="cancelOfficialReceipt" class="col-pay-action col-pay-action--cancel">
-                                {{ __('Cancelled OR#') }}
-                            </button>
-                            <button type="button" wire:click="deletePaymentDraft" class="col-pay-action col-pay-action--delete">
-                                {{ __('Delete payment') }}
-                            </button>
-                            <button type="button" wire:click="updatePayment" class="col-pay-action col-pay-action--update">
-                                {{ __('Update payment') }}
-                            </button>
-                            <button type="button" wire:click="savePayment" class="col-pay-action col-pay-action--save">
-                                {{ __('Save payment') }}
-                            </button>
-                        </div>
+                    <div class="col-pay-totals" aria-label="{{ __('Cash tendered, change, and total payment') }}" style="margin-top: auto; padding-top: 1rem;">
+                        <label class="col-pay-total-cell">
+                            <span>{{ __('Cash Tendered') }}</span>
+                            <input
+                                type="text"
+                                inputmode="decimal"
+                                autocomplete="off"
+                                placeholder="{{ __('Enter amount') }}"
+                                x-mask:dynamic="$money($input, '.', ',', 2)"
+                                wire:model.live="cashTendered"
+                            >
+                        </label>
+                        <label class="col-pay-total-cell">
+                            <span>{{ __('Change') }}</span>
+                            <input type="text" readonly value="{{ number_format($this->getChangeAmount(), 2) }}">
+                        </label>
+                        <label class="col-pay-total-cell">
+                            <span>{{ __('Total Payment') }}</span>
+                            <input type="text" readonly value="₱{{ number_format($this->getTotalAmount(), 2) }}">
+                        </label>
                     </div>
                 @endif
+                <div class="col-pay-settle">
+                    @if ($paymentError)
+                        <p style="margin: 0; font-size: 0.8125rem; font-weight: 600; color: rgb(185 28 28);">{{ $paymentError }}</p>
+                    @endif
+                    @php($receiptCancelled = $this->isCurrentReceiptCancelled())
+                    <div class="col-pay-actions" role="group" aria-label="{{ __('Payment actions') }}">
+                        <button type="button" wire:click="requestPinAction('cancelOfficialReceipt')" class="col-pay-action col-pay-action--cancel">
+                            {{ __('Cancelled OR#') }}
+                        </button>
+                        <button type="button" wire:click="requestPinAction('deletePaymentDraft')" class="col-pay-action col-pay-action--delete">
+                            {{ __('Delete payment') }}
+                        </button>
+                        <button type="button" wire:click="requestPinAction('updatePayment')" class="col-pay-action col-pay-action--update" @disabled($receiptCancelled)>
+                            {{ __('Update payment') }}
+                        </button>
+                        <button type="button" wire:click="savePayment" class="col-pay-action col-pay-action--save" @disabled($receiptCancelled)>
+                            {{ __('Save payment') }}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -409,6 +410,8 @@
                 </div>
             </div>
         @endif
+
+        @include('filament.collection-cashier.partials.member-edit-pin-modal')
 
         @if ($showSavedModal)
             <div class="pos-credit-modal" wire:key="saved-payment">
@@ -577,6 +580,7 @@
         .col-pay-action--delete { background: #ef5b6a; }
         .col-pay-action--update { background: #f5b942; color: #1f2937; }
         .col-pay-action--save { background: #2563eb; }
+        .col-pay-action:disabled { opacity: 0.4; cursor: not-allowed; }
         @media (max-width: 900px) {
             .col-pay-grid, .col-pay-meta { grid-template-columns: 1fr; }
             .col-pay-chips { grid-template-columns: repeat(5, minmax(0, 1fr)); }

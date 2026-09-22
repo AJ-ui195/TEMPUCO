@@ -49,4 +49,50 @@ class RegularLoanPaymentAllocationTest extends TestCase
             0.01
         );
     }
+
+    public function test_extra_above_one_installment_prepay_principal_not_next_interest(): void
+    {
+        $schedule = RegularLoanSchedule::calculate(300000, 60, false);
+        $cash = round($schedule->monthlyInstallment + 2000, 2);
+        $allocated = RegularLoanPaymentAllocation::allocate($schedule, $cash, 1);
+
+        $this->assertSame(RegularLoanPaymentAllocation::STATUS_PAID, $allocated['periods'][1]['interest_status']);
+        $this->assertSame(RegularLoanPaymentAllocation::STATUS_PAID, $allocated['periods'][1]['principal_status']);
+        $this->assertSame(RegularLoanPaymentAllocation::STATUS_UNPAID, $allocated['periods'][2]['interest_status']);
+        $this->assertEqualsWithDelta(2000.0, $allocated['periods'][2]['principal_allocated'], 0.01);
+    }
+
+    public function test_advance_recast_lowers_interest_and_can_go_negative_at_term(): void
+    {
+        $base = RegularLoanSchedule::calculate(300000, 60, false);
+        $recast = $base->recastAfterAdvance(2000);
+
+        $basePeriodOne = collect($base->rows)->firstWhere('period', 1);
+        $recastPeriodOne = collect($recast->rows)->firstWhere('period', 1);
+        $last = collect($recast->rows)->firstWhere('period', 60);
+
+        $this->assertNotNull($basePeriodOne);
+        $this->assertNotNull($recastPeriodOne);
+        $this->assertNotNull($last);
+        $this->assertEqualsWithDelta(round(298000 * $base->monthlyInterestRate, 2), $recastPeriodOne['interest'], 0.01);
+        $this->assertTrue($recastPeriodOne['interest'] < $basePeriodOne['interest']);
+        $this->assertTrue($last['outstanding'] < 0);
+    }
+
+    public function test_remaining_rows_recast_from_current_outstanding_minus_installment(): void
+    {
+        $base = RegularLoanSchedule::calculate(300000, 60, false);
+        $recast = $base->recastFromPeriod(2, 287811.74);
+        $periodTwo = collect($recast->rows)->firstWhere('period', 2);
+        $periodOne = collect($recast->rows)->firstWhere('period', 1);
+        $basePeriodOne = collect($base->rows)->firstWhere('period', 1);
+
+        $this->assertNotNull($periodTwo);
+        $this->assertNotNull($periodOne);
+        $this->assertNotNull($basePeriodOne);
+        $this->assertEqualsWithDelta((float) $basePeriodOne['principal'], (float) $periodOne['principal'], 0.01);
+        $this->assertEqualsWithDelta(287811.74, (float) $periodOne['outstanding'], 0.01);
+        $this->assertEqualsWithDelta(281800.35, (float) $periodTwo['outstanding'], 0.01);
+        $this->assertEqualsWithDelta(round(287811.74 * $base->monthlyInterestRate, 2), (float) $periodTwo['interest'], 0.01);
+    }
 }

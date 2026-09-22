@@ -14,6 +14,8 @@ final class RegularLoanPaymentAllocation
 
     public const STATUS_UNPAID = 'unpaid';
 
+    public const KIND_ADVANCE = 'advance';
+
     /**
      * @return array{
      *     periods: array<int, array{
@@ -109,6 +111,28 @@ final class RegularLoanPaymentAllocation
         ];
     }
 
+    public static function isAdvance(LoanPayment $payment): bool
+    {
+        return strcasecmp((string) ($payment->kind ?? ''), self::KIND_ADVANCE) === 0;
+    }
+
+    public static function advancePrincipalPaid(RegularLoan $loan): float
+    {
+        $payments = $loan->relationLoaded('payments')
+            ? $loan->payments
+            : $loan->payments()->get();
+
+        return round((float) $payments
+            ->filter(fn (LoanPayment $payment): bool => self::isAdvance($payment))
+            ->sum(function (LoanPayment $payment): float {
+                if ($payment->principal_applied !== null) {
+                    return (float) $payment->principal_applied;
+                }
+
+                return (float) $payment->amount;
+            }), 2);
+    }
+
     public static function duePeriodCount(RegularLoan $loan, RegularLoanSchedule $schedule, mixed $asOf = null): int
     {
         $asOf = Carbon::parse($asOf ?? now())->startOfDay();
@@ -196,7 +220,6 @@ final class RegularLoanPaymentAllocation
                     continue;
                 }
 
-                $remaining = self::fillInterest($periods, $remaining, $period, $period);
                 $remaining = self::fillPrincipal($periods, $remaining, $period, $period);
 
                 if ($remaining <= RecordMemberLoanPayment::EPSILON) {
@@ -257,6 +280,10 @@ final class RegularLoanPaymentAllocation
             : $loan->payments()->get();
 
         foreach (LoanPayment::inRecordedOrder($payments) as $payment) {
+            if (self::isAdvance($payment)) {
+                continue;
+            }
+
             $dueCount = self::duePeriodCount(
                 $loan,
                 $schedule,
@@ -266,6 +293,33 @@ final class RegularLoanPaymentAllocation
         }
 
         return $state;
+    }
+
+    public static function lastFullyPaidPeriod(RegularLoan $loan, RegularLoanSchedule $schedule): int
+    {
+        $payments = $loan->relationLoaded('payments')
+            ? $loan->payments
+            : $loan->payments()->get();
+
+        $cash = 0.0;
+
+        foreach (LoanPayment::inRecordedOrder($payments) as $payment) {
+            if (self::isAdvance($payment)) {
+                continue;
+            }
+
+            $cash = round($cash + (float) $payment->amount, 2);
+        }
+
+        $installment = round($schedule->monthlyInstallment, 2);
+
+        if ($installment <= RecordMemberLoanPayment::EPSILON) {
+            return 0;
+        }
+
+        $paid = (int) floor(($cash + RecordMemberLoanPayment::EPSILON) / $installment);
+
+        return max(0, min($schedule->termMonths, $paid));
     }
 
     /**

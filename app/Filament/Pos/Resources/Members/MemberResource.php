@@ -6,6 +6,7 @@ use App\Filament\Pos\Resources\Members\Pages\ManageMembers;
 use App\Filament\Resources\Members\Schemas\MemberForm;
 use App\Models\Member;
 use App\Support\MemberAccount;
+use App\Support\MemberEditPin;
 use App\Support\MemberQrCode;
 use App\Support\PrintMemberQrCode;
 use BackedEnum;
@@ -99,8 +100,14 @@ class MemberResource extends Resource
                     ->url(fn (Member $record): string => PrintMemberQrCode::printUrl($record))
                     ->openUrlInNewTab(),
                 EditAction::make()
+                    ->schema([
+                        MemberEditPin::formField(),
+                        ...MemberForm::components(),
+                    ])
                     ->mutateRecordDataUsing(fn (array $data): array => MemberForm::withComputedAge($data))
                     ->using(function (Model $record, array $data): Model {
+                        unset($data['member_edit_pin']);
+
                         /** @var Member $record */
                         return MemberAccount::update($record, $data);
                     }),

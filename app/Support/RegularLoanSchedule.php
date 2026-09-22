@@ -60,7 +60,7 @@ final class RegularLoanSchedule
                 $principal,
                 $termMonths,
                 (bool) $user?->isRetiree(),
-            );
+            )->recastRemainingForLoan($loan);
         }
 
         $isSecond = ApdsRules::isSecondAccountType($loanType);
@@ -82,7 +82,8 @@ final class RegularLoanSchedule
             }
         }
 
-        return self::calculate($principal, $termMonths, $isSecond);
+        return self::calculate($principal, $termMonths, $isSecond)
+            ->recastRemainingForLoan($loan);
     }
 
     /** Empty APDS form so the layout still shows when no loan is selected. */
@@ -294,6 +295,122 @@ final class RegularLoanSchedule
         // APDS worksheets round the installment to thousandths, then to centavos
         // (₱300,000 × 7.50% × 60 mo → ₱6,011.39).
         return round(round($raw, 3), 2);
+    }
+
+    /**
+     * After an advance, unpaid periods are rebuilt from the current outstanding.
+     * Outstanding then drops by the monthly installment (₱287,811.74 − ₱6,011.39).
+     */
+    public function recastRemainingForLoan(RegularLoan $loan): self
+    {
+        $loan->loadMissing('payments');
+        $lastPaid = RegularLoanPaymentAllocation::lastFullyPaidPeriod($loan, $this);
+        $fromPeriod = $lastPaid + 1;
+
+        if ($fromPeriod > $this->termMonths) {
+            return $this;
+        }
+
+        $opening = $lastPaid < 1
+            ? $this->principal
+            : (float) (collect($this->rows)->firstWhere('period', $lastPaid)['outstanding'] ?? $this->principal);
+        $remaining = RecordMemberLoanPayment::remainingPrincipal($loan);
+
+        if (abs($remaining - $opening) <= RecordMemberLoanPayment::EPSILON) {
+            return $this;
+        }
+
+        return $this->recastFromPeriod($fromPeriod, $remaining);
+    }
+
+    /**
+     * Extra principal (counter O.R. advance) lowers the opening balance, then
+     * remaining periods keep the same installment so later outstanding can go negative.
+     */
+    public function recastAfterAdvance(float $advance): self
+    {
+        $advance = round(max(0.0, $advance), 2);
+
+        if ($advance <= RecordMemberLoanPayment::EPSILON) {
+            return $this;
+        }
+
+        return $this->recastFromPeriod(1, round($this->principal - $advance, 2));
+    }
+
+    public function recastFromPeriod(int $fromPeriod, float $openingOutstanding): self
+    {
+        $fromPeriod = max(1, min($this->termMonths, $fromPeriod));
+        $balance = round($openingOutstanding, 2);
+        $rows = $this->rows;
+        $totalPrincipal = 0.0;
+        $totalInterest = 0.0;
+
+        foreach ($rows as $index => $row) {
+            $period = (int) ($row['period'] ?? 0);
+
+            if ($period < 1) {
+                continue;
+            }
+
+            if ($period === $fromPeriod - 1) {
+                $rows[$index] = [
+                    ...$row,
+                    'outstanding' => round($openingOutstanding, 2),
+                ];
+                $totalPrincipal = round($totalPrincipal + (float) ($row['principal'] ?? 0), 2);
+                $totalInterest = round($totalInterest + (float) ($row['interest'] ?? 0), 2);
+
+                continue;
+            }
+
+            if ($period < $fromPeriod) {
+                $totalPrincipal = round($totalPrincipal + (float) ($row['principal'] ?? 0), 2);
+                $totalInterest = round($totalInterest + (float) ($row['interest'] ?? 0), 2);
+
+                continue;
+            }
+
+            $interest = round($balance * $this->monthlyInterestRate, 2);
+            $principalPortion = round($this->monthlyInstallment - $interest, 2);
+            $outstanding = round($balance - $this->monthlyInstallment, 2);
+            $balance = $outstanding;
+
+            $totalPrincipal = round($totalPrincipal + $principalPortion, 2);
+            $totalInterest = round($totalInterest + $interest, 2);
+
+            $rows[$index] = [
+                ...$row,
+                'principal' => $principalPortion,
+                'interest' => $interest,
+                'cash_flow' => $this->monthlyInstallment,
+                'outstanding' => $outstanding,
+            ];
+        }
+
+        return new self(
+            principal: $this->principal,
+            termMonths: $this->termMonths,
+            termYears: $this->termYears,
+            installments: $this->installments,
+            gracePeriodMonths: $this->gracePeriodMonths,
+            periods: $this->periods,
+            otherCharges: $this->otherCharges,
+            otherChargesRate: $this->otherChargesRate,
+            capitalBuildUpRetention: $this->capitalBuildUpRetention,
+            netProceeds: $this->netProceeds,
+            monthlyInstallment: $this->monthlyInstallment,
+            monthlyEir: $this->monthlyEir,
+            annualEir: $this->annualEir,
+            annualInterestRate: $this->annualInterestRate,
+            monthlyInterestRate: $this->monthlyInterestRate,
+            nominalInterestRate: $this->nominalInterestRate,
+            isSecondApdsAccount: $this->isSecondApdsAccount,
+            otherChargeLines: $this->otherChargeLines,
+            rows: $rows,
+            totalPrincipal: $totalPrincipal,
+            totalInterest: $totalInterest,
+        );
     }
 
     /**

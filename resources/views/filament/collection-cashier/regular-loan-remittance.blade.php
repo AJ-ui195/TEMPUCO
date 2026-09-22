@@ -163,11 +163,7 @@
                                 <th style="text-align: right; padding: 0.75rem 1rem; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Remaining') }}</th>
                                 <th style="text-align: right; padding: 0.75rem 1rem; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Installment') }}</th>
                                 <th class="rl-landbank-col" style="padding: 0.75rem 1rem; font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">{{ __('Landbank amount') }}</th>
-                                <th style="padding: 0.75rem 1rem; text-align: right; vertical-align: bottom;">
-                                    <button type="button" wire:click="recordAllRemittances" class="pos-btn-primary" style="width: auto; white-space: nowrap;">
-                                        {{ __('Record all') }}
-                                    </button>
-                                </th>
+                                <th style="padding: 0.75rem 1rem;"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -246,21 +242,24 @@
         @endif
 
         <div class="rl-pay-bar">
+            @php($receiptCancelled = $this->isCurrentReceiptCancelled())
             <div class="col-pay-actions" role="group" aria-label="{{ __('Payment actions') }}">
-                <button type="button" wire:click="cancelOfficialReceipt" class="col-pay-action col-pay-action--cancel">
+                <button type="button" wire:click="requestPinAction('cancelOfficialReceipt')" class="col-pay-action col-pay-action--cancel">
                     {{ __('Cancelled OR#') }}
                 </button>
-                <button type="button" wire:click="deletePaymentDraft" class="col-pay-action col-pay-action--delete">
+                <button type="button" wire:click="requestPinAction('deletePaymentDraft')" class="col-pay-action col-pay-action--delete">
                     {{ __('Delete payment') }}
                 </button>
-                <button type="button" wire:click="updatePayment" class="col-pay-action col-pay-action--update">
+                <button type="button" wire:click="requestPinAction('updatePayment')" class="col-pay-action col-pay-action--update" @disabled($receiptCancelled)>
                     {{ __('Update payment') }}
                 </button>
-                <button type="button" wire:click="savePayment" class="col-pay-action col-pay-action--save">
+                <button type="button" wire:click="savePayment" class="col-pay-action col-pay-action--save" @disabled($receiptCancelled)>
                     {{ __('Save payment') }}
                 </button>
             </div>
         </div>
+
+        @include('filament.collection-cashier.partials.member-edit-pin-modal')
 
         @if ($showSavedModal)
             <div class="pos-credit-modal" wire:key="saved-payment">
@@ -431,6 +430,7 @@
         .col-pay-action--delete { background: #ef5b6a; }
         .col-pay-action--update { background: #f5b942; color: #1f2937; }
         .col-pay-action--save { background: #2563eb; }
+        .col-pay-action:disabled { opacity: 0.4; cursor: not-allowed; }
         .fi-pos-ui .pos-credit-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 1rem; }
         .fi-pos-ui .pos-credit-modal__backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.55); }
         .fi-pos-ui .pos-credit-modal__dialog { position: relative; width: 100%; max-width: 22rem; padding: 1.25rem; border-radius: 0.75rem; background: #fff; box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25); max-height: 90vh; overflow: auto; }

@@ -2,6 +2,7 @@
 
 namespace App\Filament\CollectionCashier\Pages;
 
+use App\Filament\CollectionCashier\Concerns\RequiresMemberEditPin;
 use App\Enums\LoanStatus;
 use App\Enums\PosSaleChannel;
 use App\Enums\ReceiptKind;
@@ -47,6 +48,7 @@ use function Filament\Support\original_request;
 
 class CollectionPayment extends Page
 {
+    use RequiresMemberEditPin;
     protected static ?string $navigationLabel = 'Collection payment';
 
     protected static ?string $title = 'Collection payment';
@@ -399,6 +401,12 @@ class CollectionPayment extends Page
         $this->editingLoanPaymentId = null;
         $this->editingPosPaymentId = null;
 
+        if ($this->isCurrentReceiptCancelled()) {
+            $this->paymentError = __('This number was cancelled and cannot be saved.');
+
+            return;
+        }
+
         if (! $this->assertSaveGuards()) {
             return;
         }
@@ -443,6 +451,10 @@ class CollectionPayment extends Page
 
     public function cancelOfficialReceipt(): void
     {
+        if (! $this->consumePinGate('cancelOfficialReceipt')) {
+            return;
+        }
+
         $this->paymentError = null;
         $kind = $this->receiptKind !== '' ? $this->receiptKind : ReceiptKind::OfficialReceipt->value;
         $number = CollectionReceipts::currentNumber($kind, $this->officialReceiptNo, $this->invoiceNo);
@@ -477,6 +489,10 @@ class CollectionPayment extends Page
 
     public function deletePaymentDraft(): void
     {
+        if (! $this->consumePinGate('deletePaymentDraft')) {
+            return;
+        }
+
         $this->paymentError = null;
         $kind = $this->receiptKind !== '' ? $this->receiptKind : ReceiptKind::OfficialReceipt->value;
         $number = CollectionReceipts::currentNumber($kind, $this->officialReceiptNo, $this->invoiceNo);
@@ -490,7 +506,15 @@ class CollectionPayment extends Page
         }
 
         if (CollectionReceipts::isCancelled($number, $kind)) {
-            $this->paymentError = __('This number was cancelled and cannot be deleted as a payment.');
+            CollectionReceipts::releaseCancelled($number, $kind);
+            $this->selectedMemberId = null;
+            $this->memberSearch = '';
+            $this->refreshReceiptNumbers();
+            $this->openSavedModal(
+                __('Cancelled number removed'),
+                __(':number can be used again.', ['number' => $number]),
+                'delete',
+            );
 
             return;
         }
@@ -542,6 +566,10 @@ class CollectionPayment extends Page
 
     public function updatePayment(): void
     {
+        if (! $this->consumePinGate('updatePayment')) {
+            return;
+        }
+
         $this->paymentError = null;
         $kind = $this->receiptKind !== '' ? $this->receiptKind : ReceiptKind::OfficialReceipt->value;
         $number = CollectionReceipts::currentNumber($kind, $this->officialReceiptNo, $this->invoiceNo);
@@ -1440,6 +1468,14 @@ class CollectionPayment extends Page
     protected function isCancelledAccountLabel(string $value): bool
     {
         return strcasecmp(trim($value), (string) __('Cancelled')) === 0;
+    }
+
+    public function isCurrentReceiptCancelled(): bool
+    {
+        $kind = $this->receiptKind !== '' ? $this->receiptKind : ReceiptKind::OfficialReceipt->value;
+        $number = CollectionReceipts::currentNumber($kind, $this->officialReceiptNo, $this->invoiceNo);
+
+        return $number !== '' && CollectionReceipts::isCancelled($number, $kind);
     }
 
     protected function assertSaveGuards(): bool

@@ -163,7 +163,7 @@ final class RecordMemberLoanPayment
 
         return DB::transaction(function () use ($loan, $amount, $kind, $officialReceiptNo, $receivedAt, $type, $receiptKind, $receivedBy): LoanPayment {
             if ($loan instanceof RegularLoan) {
-                return self::storeRegularSplit($loan, $amount, $officialReceiptNo, $receivedAt, $receiptKind, $receivedBy);
+                return self::storeRegularSplit($loan, $amount, $officialReceiptNo, $receivedAt, $receiptKind, $receivedBy, $kind);
             }
 
             return $loan->payments()->create([
@@ -202,6 +202,27 @@ final class RecordMemberLoanPayment
         $kind = strtolower(trim((string) $payment->kind)) ?: CharacterLoanLedgerEntries::KIND_PRINCIPAL;
 
         if ($loan instanceof RegularLoan) {
+            if (RegularLoanPaymentAllocation::isAdvance($payment)
+                || strcasecmp($kind, RegularLoanPaymentAllocation::KIND_ADVANCE) === 0) {
+                $remaining = self::remainingPrincipal($loan);
+
+                if ($amount - $remaining > self::EPSILON) {
+                    throw new InvalidArgumentException(__('Payment cannot be more than the ₱:amount remaining principal.', [
+                        'amount' => number_format($remaining, 2),
+                    ]));
+                }
+
+                $payment->fill([
+                    'amount' => $amount,
+                    'kind' => RegularLoanPaymentAllocation::KIND_ADVANCE,
+                    'interest_applied' => 0.0,
+                    'principal_applied' => $amount,
+                ]);
+                $payment->save();
+
+                return $payment->refresh();
+            }
+
             $remaining = RegularLoanPaymentAllocation::remainingCollectable($loan);
 
             if ($amount - $remaining > self::EPSILON) {
@@ -249,7 +270,29 @@ final class RecordMemberLoanPayment
         mixed $receivedAt,
         ?string $receiptKind = null,
         ?int $receivedBy = null,
+        string $kind = CharacterLoanLedgerEntries::KIND_PRINCIPAL,
     ): LoanPayment {
+        if (strcasecmp($kind, RegularLoanPaymentAllocation::KIND_ADVANCE) === 0) {
+            $remaining = self::remainingPrincipal($loan);
+
+            if ($amount - $remaining > self::EPSILON) {
+                throw new InvalidArgumentException(__('Payment cannot be more than the ₱:amount remaining principal.', [
+                    'amount' => number_format($remaining, 2),
+                ]));
+            }
+
+            return $loan->payments()->create([
+                'amount' => $amount,
+                'kind' => RegularLoanPaymentAllocation::KIND_ADVANCE,
+                'interest_applied' => 0.0,
+                'principal_applied' => $amount,
+                'official_receipt_no' => $officialReceiptNo,
+                'receipt_kind' => $receiptKind,
+                'received_at' => $receivedAt ?? now(),
+                'received_by' => $receivedBy ?? self::staffUserId(),
+            ]);
+        }
+
         $split = RegularLoanPaymentAllocation::splitAmount($loan, $amount);
 
         return $loan->payments()->create([

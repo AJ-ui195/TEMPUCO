@@ -2,6 +2,7 @@
 
 namespace App\Filament\CollectionCashier\Pages;
 
+use App\Filament\CollectionCashier\Concerns\RequiresMemberEditPin;
 use App\Enums\LoanStatus;
 use App\Enums\ReceiptKind;
 use App\Models\CancelledReceipt;
@@ -21,10 +22,13 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use RuntimeException;
 
 class RegularLoanRemittance extends Page
 {
+    use RequiresMemberEditPin;
     protected static ?string $navigationLabel = 'Regular loan';
 
     protected static ?string $title = 'Regular loan';
@@ -58,6 +62,16 @@ class RegularLoanRemittance extends Page
     public ?int $editingLoanPaymentId = null;
 
     public ?int $editingLoanId = null;
+
+    /**
+     * @var list<int>
+     */
+    public array $editingLoanIds = [];
+
+    /**
+     * @var array<int, int>
+     */
+    public array $editingLoanPaymentIds = [];
 
     /**
      * @var list<int>
@@ -139,11 +153,18 @@ class RegularLoanRemittance extends Page
             fn (int $id): bool => $id !== $loanId,
         ));
 
-        unset($this->amounts[$loanId], $this->rowErrors[$loanId]);
+        unset($this->amounts[$loanId], $this->rowErrors[$loanId], $this->editingLoanPaymentIds[$loanId]);
+
+        $this->editingLoanIds = array_values(array_filter(
+            $this->editingLoanIds,
+            fn (int $id): bool => $id !== $loanId,
+        ));
 
         if ($this->editingLoanId === $loanId) {
-            $this->editingLoanId = null;
-            $this->editingLoanPaymentId = null;
+            $this->editingLoanId = $this->editingLoanIds[0] ?? null;
+            $this->editingLoanPaymentId = $this->editingLoanId !== null
+                ? ($this->editingLoanPaymentIds[$this->editingLoanId] ?? null)
+                : null;
         }
     }
 
@@ -152,8 +173,7 @@ class RegularLoanRemittance extends Page
         $this->selectedLoanIds = [];
         $this->amounts = [];
         $this->rowErrors = [];
-        $this->editingLoanPaymentId = null;
-        $this->editingLoanId = null;
+        $this->clearEditingReceipt();
     }
 
     /**
@@ -170,7 +190,7 @@ class RegularLoanRemittance extends Page
                     return $open->get($loanId);
                 }
 
-                if ($this->editingLoanId === $loanId) {
+                if (in_array($loanId, $this->editingLoanIds, true)) {
                     $loan = RegularLoan::query()
                         ->with(['member', 'payments'])
                         ->find($loanId);
@@ -239,17 +259,17 @@ class RegularLoanRemittance extends Page
         }
     }
 
-    public function recordAllRemittances(): void
-    {
-        $this->savePayment();
-    }
-
     public function savePayment(): void
     {
         $this->paymentError = null;
         $this->rowErrors = [];
-        $this->editingLoanPaymentId = null;
-        $this->editingLoanId = null;
+        $this->clearEditingReceipt();
+
+        if ($this->isCurrentReceiptCancelled()) {
+            $this->paymentError = __('This number was cancelled and cannot be saved.');
+
+            return;
+        }
 
         if (! $this->assertReceiptAvailable()) {
             return;
@@ -267,67 +287,61 @@ class RegularLoanRemittance extends Page
             return;
         }
 
-        $recorded = 0;
-        $failed = 0;
         $receiptNo = trim($this->officialReceiptNo);
         $receivedAt = filled($this->paymentDate)
             ? Carbon::parse($this->paymentDate)
             : now();
 
-        foreach ($listed as $row) {
-            $loanId = (int) $row['loan']->id;
-            $this->fillLandbankAmountFromInstallment($loanId);
+        try {
+            DB::transaction(function () use ($listed, $receiptNo, $receivedAt): void {
+                foreach ($listed as $row) {
+                    $loanId = (int) $row['loan']->id;
+                    $this->fillLandbankAmountFromInstallment($loanId);
 
-            while (
-                $receiptNo !== ''
-                && CollectionReceipts::isTaken($receiptNo, ReceiptKind::OfficialReceipt->value)
-            ) {
-                $receiptNo = $this->incrementReceiptNumber($receiptNo);
-            }
-
-            if ($this->recordOneRemittance($loanId, $receiptNo, $receivedAt)) {
-                $recorded++;
-                $receiptNo = $this->incrementReceiptNumber($receiptNo);
-            } else {
-                $failed++;
-            }
-        }
-
-        if ($recorded === 0 && $failed === 0) {
+                    if (! $this->recordOneRemittance($loanId, $receiptNo, $receivedAt)) {
+                        throw new RuntimeException('remittance-row-failed');
+                    }
+                }
+            });
+        } catch (RuntimeException) {
             $this->openSavedModal(
-                __('Nothing to record'),
-                __('Add accounts to the APDS list first.'),
+                __('Payment was not recorded'),
+                __('Check the amount on each failed row. Nothing was saved.'),
                 'cancel',
             );
 
             return;
         }
 
-        $this->refreshReceiptNumbers();
+        foreach ($listed as $row) {
+            $loanId = (int) $row['loan']->id;
+            unset($this->amounts[$loanId], $this->rowErrors[$loanId]);
 
-        if ($failed === 0) {
-            $this->openSavedModal(
-                __('Payment saved'),
-                __(':count Landbank payment(s) recorded.', ['count' => $recorded]),
-                'save',
-            );
+            $loan = RegularLoan::query()->with('payments')->find($loanId);
 
-            return;
+            if ($loan instanceof RegularLoan
+                && RecordMemberLoanPayment::remainingPrincipal($loan) <= RecordMemberLoanPayment::EPSILON) {
+                $this->removeLoan($loanId);
+            }
         }
 
-        $this->officialReceiptNo = $receiptNo;
+        $this->refreshReceiptNumbers();
         $this->openSavedModal(
-            __('Some payments were not recorded'),
-            __(':recorded recorded, :failed skipped. Check the amount on each failed row.', [
-                'recorded' => $recorded,
-                'failed' => $failed,
+            __('Payment saved'),
+            __(':count Landbank payment(s) recorded on O.R. :number.', [
+                'count' => $listed->count(),
+                'number' => $receiptNo,
             ]),
-            'cancel',
+            'save',
         );
     }
 
     public function cancelOfficialReceipt(): void
     {
+        if (! $this->consumePinGate('cancelOfficialReceipt')) {
+            return;
+        }
+
         $this->paymentError = null;
         $number = trim($this->officialReceiptNo);
 
@@ -359,6 +373,10 @@ class RegularLoanRemittance extends Page
 
     public function deletePaymentDraft(): void
     {
+        if (! $this->consumePinGate('deletePaymentDraft')) {
+            return;
+        }
+
         $this->paymentError = null;
         $number = trim($this->officialReceiptNo);
 
@@ -369,22 +387,29 @@ class RegularLoanRemittance extends Page
         }
 
         if (CollectionReceipts::isCancelled($number, ReceiptKind::OfficialReceipt->value)) {
-            $this->paymentError = __('This number was cancelled and cannot be deleted as a payment.');
+            CollectionReceipts::releaseCancelled($number, ReceiptKind::OfficialReceipt->value);
+            $this->clearEditingReceipt();
+            $this->refreshReceiptNumbers();
+            $this->openSavedModal(
+                __('Cancelled number removed'),
+                __(':number can be used again.', ['number' => $number]),
+                'delete',
+            );
 
             return;
         }
 
+        $regularPayments = CollectionReceipts::findRegularLoanPayments($number);
         $hit = CollectionReceipts::findPosted($number, ReceiptKind::OfficialReceipt->value);
-        $loanPayment = $hit['loan'];
         $canteenPayment = $hit['canteen'];
 
-        if (! $loanPayment instanceof LoanPayment && ! $canteenPayment instanceof PosCreditPayment) {
+        if ($regularPayments->isEmpty() && ! $canteenPayment instanceof PosCreditPayment) {
             $this->paymentError = __('No payment found for this number.');
 
             return;
         }
 
-        if ($loanPayment instanceof LoanPayment) {
+        foreach ($regularPayments as $loanPayment) {
             $loanPayment->delete();
         }
 
@@ -392,8 +417,7 @@ class RegularLoanRemittance extends Page
             $canteenPayment->delete();
         }
 
-        $this->editingLoanPaymentId = null;
-        $this->editingLoanId = null;
+        $this->clearEditingReceipt();
         $this->refreshReceiptNumbers();
         $this->openSavedModal(
             __('Payment deleted'),
@@ -404,6 +428,10 @@ class RegularLoanRemittance extends Page
 
     public function updatePayment(): void
     {
+        if (! $this->consumePinGate('updatePayment')) {
+            return;
+        }
+
         $this->paymentError = null;
         $number = trim($this->officialReceiptNo);
 
@@ -419,20 +447,22 @@ class RegularLoanRemittance extends Page
             return;
         }
 
-        $loanPayment = CollectionReceipts::findRegularLoanPayment($number);
+        $payments = CollectionReceipts::findRegularLoanPayments($number);
 
-        if (! $loanPayment instanceof LoanPayment) {
+        if ($payments->isEmpty()) {
             $this->paymentError = __('No regular loan payment found for this number.');
 
             return;
         }
 
-        $alreadyLoaded = $this->editingLoanPaymentId === $loanPayment->id;
+        $foundIds = $payments->pluck('id')->map(fn ($id): int => (int) $id)->sort()->values()->all();
+        $loadedIds = collect($this->editingLoanPaymentIds)->map(fn ($id): int => (int) $id)->sort()->values()->all();
+        $alreadyLoaded = $foundIds !== [] && $foundIds === $loadedIds;
 
         if (! $alreadyLoaded) {
-            $this->loadPostedPayment($loanPayment);
+            $this->loadPostedPayments($payments);
 
-            if ($this->editingLoanPaymentId === $loanPayment->id) {
+            if ($this->editingLoanPaymentIds !== []) {
                 $this->openSavedModal(
                     __('Payment loaded'),
                     __('Account information was loaded for :number. Change the amount, then click Update payment again.', [
@@ -445,19 +475,25 @@ class RegularLoanRemittance extends Page
             return;
         }
 
-        $loanId = (int) ($this->editingLoanId ?? 0);
-        $amount = PesoInput::parse($this->amounts[$loanId] ?? '');
-
         try {
-            RecordMemberLoanPayment::revise($loanPayment, $amount);
+            foreach ($payments as $loanPayment) {
+                $loan = $loanPayment->loan();
 
-            if (filled($this->paymentDate)) {
-                $loanPayment->received_at = Carbon::parse($this->paymentDate);
-                $loanPayment->save();
+                if (! $loan instanceof RegularLoan) {
+                    continue;
+                }
+
+                $loanId = (int) $loan->id;
+                $amount = PesoInput::parse($this->amounts[$loanId] ?? '');
+                RecordMemberLoanPayment::revise($loanPayment, $amount);
+
+                if (filled($this->paymentDate)) {
+                    $loanPayment->received_at = Carbon::parse($this->paymentDate);
+                    $loanPayment->save();
+                }
             }
         } catch (InvalidArgumentException $exception) {
             $this->paymentError = $exception->getMessage();
-            $this->rowErrors[$loanId] = $exception->getMessage();
 
             return;
         }
@@ -514,20 +550,12 @@ class RegularLoanRemittance extends Page
                 CharacterLoanLedgerEntries::KIND_PRINCIPAL,
                 $officialReceiptNo,
                 $receivedAt,
-                ReceiptKind::OfficialReceipt->value,
+                ReceiptKind::Landbank->value,
             );
         } catch (InvalidArgumentException $exception) {
             $this->rowErrors[$loanId] = $exception->getMessage();
 
             return false;
-        }
-
-        unset($this->amounts[$loanId], $this->rowErrors[$loanId]);
-
-        $remaining = RecordMemberLoanPayment::remainingPrincipal($loan->fresh(['payments']));
-
-        if ($remaining <= RecordMemberLoanPayment::EPSILON) {
-            $this->removeLoan($loanId);
         }
 
         return true;
@@ -605,7 +633,7 @@ class RegularLoanRemittance extends Page
 
         return array_values(array_unique(array_filter(
             array_map(intval(...), $this->selectedLoanIds),
-            fn (int $id): bool => in_array($id, $openIds, true) || $id === $this->editingLoanId,
+            fn (int $id): bool => in_array($id, $openIds, true) || in_array($id, $this->editingLoanIds, true),
         )));
     }
 
@@ -644,8 +672,7 @@ class RegularLoanRemittance extends Page
         }
 
         if (CollectionReceipts::isCancelled($number, ReceiptKind::OfficialReceipt->value)) {
-            $this->editingLoanPaymentId = null;
-            $this->editingLoanId = null;
+            $this->clearEditingReceipt();
 
             if ($notifyMissing) {
                 $this->paymentError = __('This number was cancelled and cannot be updated.');
@@ -654,11 +681,10 @@ class RegularLoanRemittance extends Page
             return;
         }
 
-        $loanPayment = CollectionReceipts::findRegularLoanPayment($number);
+        $payments = CollectionReceipts::findRegularLoanPayments($number);
 
-        if (! $loanPayment instanceof LoanPayment) {
-            $this->editingLoanPaymentId = null;
-            $this->editingLoanId = null;
+        if ($payments->isEmpty()) {
+            $this->clearEditingReceipt();
 
             if ($notifyMissing && ! $this->isNextUnusedReceipt($number)) {
                 $this->paymentError = __('No payment found for this number.');
@@ -667,35 +693,75 @@ class RegularLoanRemittance extends Page
             return;
         }
 
-        $this->loadPostedPayment($loanPayment);
+        $this->loadPostedPayments($payments);
     }
 
-    protected function loadPostedPayment(LoanPayment $loanPayment): void
+    /**
+     * @param  Collection<int, LoanPayment>  $payments
+     */
+    protected function loadPostedPayments(Collection $payments): void
     {
         $this->paymentError = null;
-        $loanPayment->load(['characterLoan.member', 'quickLoan.member', 'regularLoan.member']);
-        $loan = $loanPayment->loan();
+        $selected = [];
+        $amounts = [];
+        $paymentIds = [];
+        $loanIds = [];
+        $date = null;
 
-        if (! $loan instanceof RegularLoan) {
+        foreach ($payments as $loanPayment) {
+            $loanPayment->load(['characterLoan.member', 'quickLoan.member', 'regularLoan.member']);
+            $loan = $loanPayment->loan();
+
+            if (! $loan instanceof RegularLoan) {
+                continue;
+            }
+
+            $loanId = (int) $loan->id;
+            $selected[] = $loanId;
+            $loanIds[] = $loanId;
+            $paymentIds[$loanId] = (int) $loanPayment->id;
+            $amounts[$loanId] = number_format((float) $loanPayment->amount, 2, '.', ',');
+            unset($this->rowErrors[$loanId]);
+
+            if ($date === null && $loanPayment->received_at) {
+                $date = $loanPayment->received_at->toDateString();
+            }
+        }
+
+        if ($selected === []) {
             $this->paymentError = __('This O.R. # is not a regular loan Landbank payment.');
-            $this->editingLoanPaymentId = null;
-            $this->editingLoanId = null;
+            $this->clearEditingReceipt();
 
             return;
         }
 
-        $this->editingLoanPaymentId = $loanPayment->id;
-        $this->editingLoanId = $loan->id;
+        $this->editingLoanIds = array_values(array_unique($loanIds));
+        $this->editingLoanPaymentIds = $paymentIds;
+        $this->editingLoanId = $this->editingLoanIds[0];
+        $this->editingLoanPaymentId = $paymentIds[$this->editingLoanId] ?? null;
         $this->memberSearch = '';
-        $this->selectedLoanIds = [$loan->id];
-        $this->amounts = [
-            $loan->id => number_format((float) $loanPayment->amount, 2, '.', ','),
-        ];
-        unset($this->rowErrors[$loan->id]);
+        $this->selectedLoanIds = array_values(array_unique($selected));
+        $this->amounts = $amounts;
 
-        if ($loanPayment->received_at) {
-            $this->paymentDate = $loanPayment->received_at->toDateString();
+        if ($date !== null) {
+            $this->paymentDate = $date;
         }
+    }
+
+    protected function clearEditingReceipt(): void
+    {
+        $this->editingLoanPaymentId = null;
+        $this->editingLoanId = null;
+        $this->editingLoanIds = [];
+        $this->editingLoanPaymentIds = [];
+    }
+
+    public function isCurrentReceiptCancelled(): bool
+    {
+        $number = trim($this->officialReceiptNo);
+
+        return $number !== ''
+            && CollectionReceipts::isCancelled($number, ReceiptKind::OfficialReceipt->value);
     }
 
     protected function assertReceiptAvailable(): bool
@@ -715,19 +781,6 @@ class RegularLoanRemittance extends Page
         }
 
         return true;
-    }
-
-    protected function incrementReceiptNumber(string $number): string
-    {
-        $digits = preg_replace('/\D+/', '', $number) ?? '';
-
-        if ($digits === '') {
-            return $number;
-        }
-
-        $width = max(6, strlen($digits));
-
-        return str_pad((string) ((int) $digits + 1), $width, '0', STR_PAD_LEFT);
     }
 
     protected function isNextUnusedReceipt(string $number): bool
